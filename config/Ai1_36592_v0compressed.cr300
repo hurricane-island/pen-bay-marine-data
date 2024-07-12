@@ -76,7 +76,7 @@ Const YSIPPORT As Long = ComRS232: Public Ai1WipesSonde As Boolean = True: Prese
 
 
 
-Const HYDROSPHERE_ID = "aaaaa-aaaaa-aaaaa-aaaaa"              ' The LoginID for the Hydrosphere site.
+Const HYDROSPHERE_ID = "5tP0m-xrWhZ-ZivDe-68XEd"              ' The LoginID for the Hydrosphere site.
 Const PARAMETERS_TO_SEND = 16                                 ' The number of parameters that will be sent to Hydrosphere.
 Dim ParameterToSend(PARAMETERS_TO_SEND) As Long               ' A pointer of type long that points to the address of each variable to send
 Public ExternalTemp As Float                                  ' First reading from the sonde, use this instead of External_Temp
