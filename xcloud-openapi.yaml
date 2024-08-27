@@ -1,0 +1,252 @@
+openapi: 3.0.3
+info:
+  title: Xylem Partner Data API
+  description: "API allowing to retrieve information from water quality stations"
+  version: 0.1-beta
+paths:
+  /sites:
+    get:
+      operationId: getSites
+      tags:
+        - data
+      summary: 'Get list of all sites'
+      responses:
+        '200':
+          description: 'Returns list of Sites'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Site'
+        default:
+          $ref: '#/components/responses/PlaintextErrorResponse'
+  /site/{site_id}/datastreams:
+    get:
+      operationId: getDatastreamsForSite
+      tags:
+        - data
+      parameters:
+        - in: path
+          name: site_id
+          required: true
+          description: 'unique identifier of Site'
+          example: '9eaee914-098c-4704-aa2b-27149c99c3bd'
+          schema:
+            type: string
+      summary: 'Get all Datastreams belonging to Site'
+      responses:
+        '200':
+          description: 'List of datastreams'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Datastream'
+        default:
+          $ref: '#/components/responses/PlaintextErrorResponse'
+  /site/{site_id}/installations:
+    get:
+      operationId: getInstallationsForGivenSite
+      tags:
+        - data
+      parameters:
+        - in: path
+          name: site_id
+          required: true
+          description: 'unique identifier of the site'
+          example: '65c59c72d3e2954f8a3f68b7'
+          schema:
+            type: string
+      summary: 'Get installations of the given site'
+      responses:
+        '200':
+          description: 'List of installations'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Installation'
+        default:
+          $ref: '#/components/responses/PlaintextErrorResponse'
+  /installation/{installation_id}/datastreams:
+    get:
+      operationId: getDatastreamsForGivenInstallation
+      tags:
+        - data
+      parameters:
+        - in: path
+          name: installation_id
+          required: true
+          description: 'unique identifier of installation'
+          example: '65c59c72d3e2954f8a3f68c7'
+          schema:
+            type: string
+      summary: 'Get all datastreams the belong to the given installation'
+      responses:
+        '200':
+          description: 'List of datastreams'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Datastream'
+        default:
+          $ref: '#/components/responses/PlaintextErrorResponse'
+  /observations:
+    get:
+      operationId: getObservationsForDatastreams
+      tags:
+        - data
+      parameters:
+        - in: query
+          name: datastreamIds
+          required: true
+          description: 'list of datastream ids for which observations will be fetched'
+          schema:
+            type: array
+            items:
+              type: string
+        - in: query
+          name: from
+          required: true
+          description: 'start date in ISO8601 format defining duration for retrieving Observation data'
+          example: '2023-03-01T00:00:00.000Z'
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: until
+          required: true
+          example: '2023-03-02T00:00:00.000Z'
+          description: 'end date in ISO8601 format defining duration for retrieving Observation data'
+          schema:
+            type: string
+            format: date-time
+      summary: 'Get Observations from Datastreams'
+      responses:
+        '200':
+          description: 'Returns observations grouped by datastream ids'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Observations'
+        default:
+          $ref: '#/components/responses/PlaintextErrorResponse'
+components:
+  responses:
+    PlaintextErrorResponse:
+      description: Error response with body contents providing detailed information
+      content:
+        text/plain:
+          schema:
+            type: string
+            description: 'Description of error'
+            example: 'Missing Auhtorization header from request'
+  schemas:
+    Site:
+      description: "Information about Site"
+      properties:
+        id:
+          type: string
+          description: 'unique identifier for Site'
+          example: '123CE05739B94270B90D13000CA49ABC'
+        name:
+          type: string
+          description: 'Site name'
+          example: 'WQM30198'
+        description:
+          type: string
+          description: 'additional information about Site'
+          example: 'ProDSS PeliNet unit'
+        location:
+          description: 'list of GPS coordinates specifying geographical location of Site'
+          type: array
+          items:
+            $ref: '#/components/schemas/GeoLocationPoint'
+    Installation:
+      description: "Installation details"
+      properties:
+        id:
+          type: string
+          description: 'Unique identifier for the installation'
+          example: '65c59c72d3e2954f8a3f68c7'
+        name:
+          type: string
+          description: 'Installation name'
+          example: 'XYL2024V1'
+    GeoLocationPoint:
+      type: object
+      description: 'contains GPS information'
+      properties:
+        latitude:
+          type: number
+          format: int64
+          description: 'coordinate that specifies the north–south position of a point on the surface of the Earth'
+          example: 26.795824
+        longitude:
+          type: number
+          format: int64
+          description: 'coordinate that specifies the east–west position of a point on the surface of the Earth'
+          example: 36.116131
+      required:
+        - latitude
+        - longitude
+    Datastream:
+      description: 'Represents single device (sensor) capturing data with known unit of measure'
+      properties:
+        id:
+          description: 'Unique datastream identifier'
+          type: string
+          example: 'ds-id-1270137'
+        name:
+          type: string
+          description: 'Datastream name, sometimes indicates type of sensor'
+          example: 'Battery'
+        unitOfMeasurement:
+          $ref: '#/components/schemas/UnitOfMeasure'
+    UnitOfMeasure:
+      description: 'Unit of measurement'
+      type: object
+      properties:
+        symbol:
+          description: 'Unit symbol'
+          example: "V"
+          type: string
+        name:
+          description: 'Unit name'
+          example: "volt"
+          type: string
+    Observation:
+      type: object
+      description: 'Contains timestamp and value recorded by device'
+      properties:
+        value:
+          title: ObservationValue
+          type: object
+          description: 'Value recorded by device'
+          example: 24.56
+          oneOf:
+            - type: string
+            - type: number
+            - type: object
+            - type: boolean
+        phenomenonTime:
+          description: 'time when phenomenon event happened'
+          type: integer
+          format: int64
+          example: 1678867516841
+    Observations:
+      type: object
+      description: 'Contains lists observations grouped by datastream id'
+      additionalProperties:
+        type: array
+        description: "observations for given datastream"
+        items:
+          $ref: '#/components/schemas/Observation'
+
+
+
