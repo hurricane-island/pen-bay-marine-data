@@ -15,8 +15,8 @@ Const MEASUREMENT_INTERVAL_S As Long = 900 ' Sensor measurement interval, second
 Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 ' Slower interval for less critical measurements, such as GPS, seconds
 Const DATA_STORAGE_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' Store data every measurement cycle
 Const SENSOR_WARMUP_S As Long = 0
-Public MeasureBefore_s As Long = 0
-PreserveOneVariable(MeasureBefore_s) ' The time to warm up the sensor before measuring (in s).  Set to 0 to have always on
+Public MeasureBefore_s As Long = 0 ' The time to warm up the sensor before measuring (in s).  Set to 0 to have always on
+PreserveOneVariable(MeasureBefore_s) 
 Const LOW_BATTERY_SAVER_V = 12.83
 Const LOW_BATTERY_SHUTDOWN_V = 12.75 ' Battery protection thresholds.  SAVER: Slow meas/no night comms.  SHUTDOWN: Slowest meas/No comms
 Const COMMS As Long = CELLULAR
@@ -493,9 +493,9 @@ Dim UTCDate As Long: Units UTCDate = YYMMDD
 Dim GPSFix As Long: Units GPSFix = 0=No FIX, 1=FIX, 2=DIFFERENTIAL FIX
 Public GPSSatellitesInView As Long: Units GPSSatellitesInView = GPS Satellites visible
 PreserveOneVariable(Latitude)
-PreserveOneVariable(Longitude) ' Save these values so a power cycle does not reset them and cause the icon to jump around
+PreserveOneVariable(Longitude)
 Public GPSSatellitesRequired As Long = 4
-PreserveOneVariable(GPSSatellitesRequired) ' Specifies the required satellites for an accurate GPS fix. Up to 7 or 8 is possible
+PreserveOneVariable(GPSSatellitesRequired)
 Const GPS_MAX_ON_TIME As Long = 180 ' If the GPS is on longer than this, the subroutine turns it off
 
 Sub GPSOff
