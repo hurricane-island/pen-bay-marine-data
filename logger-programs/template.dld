@@ -52,13 +52,10 @@ Include "CPU:YSIP_CORE_Enc.CR300"
 
 
 Dim Ai1OSVersion As Float = 0.75
-Dim DataloggerOSVersion As Float                              ' Used for holding CR300 OS version
-Const FILTER_FREQUENCY As Long = 4000                         ' Set to 50 or 60 for situations with AC noise, otherwise 4000Hz provides quickest processing
-
-
-
+Dim DataloggerOSVersion As Float ' Used for holding CR300 OS version
+Const FILTER_FREQUENCY As Long = 4000 ' Set to 50 or 60 for situations with AC noise, otherwise 4000Hz provides quickest processing
 Const READ_ATTEMPTS_LIMIT As Long = 4
-Public ReadAttempts As Long                                   ' Keep track of how many times the sensor read was attempted
+Public ReadAttempts As Long ' Keep track of how many times the sensor read was attempted
 Dim ProgramCounter As Long: Units ProgramCounter = Cycles     ' Keep track of how many program cycles since power up
 Dim LastProgramCounter As Long: Units LastProgramCounter = Cycles
 Public BatteryVoltage As Float: Units BatteryVoltage = Volts
@@ -337,7 +334,7 @@ Public HydrosphereDataBuffer(HYDROSPHERE_BUFFER_SIZE) As String *(22+PARAMETERS_
 Public HydrosphereNames As String *(PARAMETERS_TO_SEND*26) ' The combined descriptions into a single string
 Dim HydrosphereBufferNextPointer As Long = 1
 
-Dim HydrosphereDescription(PARAMETERS_TO_SEND) As String * 26 ' The string description of each parameter, up to 24 characters in length 
+Dim HydrosphereDescription(PARAMETERS_TO_SEND) As String * 26 ' description of parameter, up to 24 characters in length 
 Dim HydrosphereValues(PARAMETERS_TO_SEND) As Float ' The actual values to send
 Dim HydrosphereSocket As Long
 Dim SerialOutResult As Long
@@ -364,18 +361,18 @@ Sub Hydrosphere
           SerialOutResult = 0 ' Make sure that the last OK is not still in the status
         EndIf
         If SerialOutResult = 2 Then ' If "OK" was sent
-          If HydrosphereBufferNextPointer > 2 Then            ' If we still have at least 2 data values in the Buffer (one of which was just sent), move the Buffer forward by one.
+          If HydrosphereBufferNextPointer > 2 Then ' If we still have at least 2 values, move the Buffer forward by one.
             For i = 1 To (HydrosphereBufferNextPointer - 2)
               HydrosphereDataBuffer(i) = HydrosphereDataBuffer(i+1)
             Next i
           EndIf
-          HydrosphereDataBuffer(HydrosphereBufferNextPointer-1) = "" ' Clear the details of the last Message from the Buffer (as they have been shifted forward by one now).
+          HydrosphereDataBuffer(HydrosphereBufferNextPointer-1) = "" ' Clear the details of the last Message from the Buffer
           HydrosphereBufferNextPointer = HydrosphereBufferNextPointer - 1
           Message += "Report " + HydrosphereBufferNextPointer + " sent. "
         Else
           Message += "No OK (" + SerialOutResult + "). "
           If HydrosphereRetries = HYDROSPHERE_MAX_RETRIES Then Message += "Failed. " + HydrosphereRetries + "/" + HYDROSPHERE_MAX_RETRIES + " tries."
-        EndIf ' End if "OK" was sent
+        EndIf
       Loop
     Else
       Message += "No data to send. Use StoreData first. "
@@ -486,7 +483,7 @@ Alias GPSReadings(6) = GPS_QualityIndicator: Units GPS_QualityIndicator = 0=NoFi
 Alias GPSReadings(7) = GPS_Satellites: Units GPS_Satellites = count
 Alias GPSReadings(8) = GPS_HDOP: Units GPS_HDOP = error estimate
 Alias GPSReadings(9) = GPS_Height: Units GPS_Height = meters
-Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)  ' Latitude recombined into a single value.  These are what are stored in the data tables
+Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)
 Public Longitude As Float: Units Longitude = Decimal Degrees (E=+,W=-)
 Public UTCTime As Long: Units UTCTime = HHMMSS
 Dim UTCDate As Long: Units UTCDate = YYMMDD

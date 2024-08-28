@@ -1,0 +1,14 @@
+{
+  "name": "pen-bay-marine-data",
+  "version": "1.0.0",
+  "description": "Logger programs and data access methods for our Pen Bay Marine Data project",
+  "main": "index.js",
+  "repository": "git@github.com:HURRICANE-ISLAND/pen-bay-marine-data.git",
+  "author": "Keeney <nkeeney@hurricaneisland.net>",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "crypto-js": "^4.2.0"
+  }
+}
