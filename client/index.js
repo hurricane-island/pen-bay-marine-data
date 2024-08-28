@@ -4,25 +4,120 @@ const {Base64} = enc;
 
 const serviceID = process.env.XCLOUD_CLIENT_ID ?? "";
 const secretKey = process.env.XCLOUD_SECRET_KEY ?? "";
-const dateHeader = new Date().toISOString()
-const data = {};
+const basePath = "/xcloud/data-export";
+const method = "GET";
 
-const message = [
-    "GET", // httpMethod, 
-    "", // contentType,
-    dateHeader, // ISO Datetime
-    "/sites", // path
-    "", // xCloud headers
-    Object.keys(data).length !== 0 ? MD5(data).toString(Base64) : "", // contentMD5
-    serviceID // client ID
-].join("\n");
-
-const hmac = HmacSHA256(message, Base64.parse(secretKey)).toString(Base64);
-const headers = {
-    Date: dateHeader,
-    Authorization: `xCloud ${btoa(serviceID)}:${hmac}`
+function authHeader({
+    method,
+    dateHeader,
+    path,
+    data
+}) {
+    const message = [
+        method, // httpMethod, 
+        "", // contentType,
+        dateHeader, // ISO timestamp
+        path, // path
+        "", // xCloud headers
+        Object.keys(data).length !== 0 ? MD5(data).toString(Base64) : "", // contentMD5
+        serviceID // client ID
+    ].join("\n");
+    const hmac = HmacSHA256(message, Base64.parse(secretKey)).toString(Base64);
+    return `xCloud ${btoa(serviceID)}:${hmac}`
 }
-let response = await fetch(`https://cloud.xylem.com/v0.1-beta/sites/`, { headers })
-let result = await response.json()
 
-console.log({headers, result})
+/**
+ * Query the production API for all sites associated with our
+ * account. These contain display and location information that
+ * can be used to construction queries for individual data streams.
+ */
+function getSites() {
+    const path = `${basePath}/sites`
+    const dateHeader = new Date().toISOString();
+    return fetch(`https://cloud.xylem.com${path}`, { 
+        method,
+        headers: {
+            Date: dateHeader,
+            Authorization: authHeader({
+                method,
+                dateHeader,
+                path,
+                data: {}
+            })
+        }
+    });
+}
+
+/**
+ * Retrieve all datastreams associate with a single site. Note
+ * that the base path is `site` instead of `sites`. Otherwise
+ * returns a server error, rather than a 404 error.
+ */
+function getDatastreams(siteId) {
+    const path = `${basePath}/site/${siteId}/datastreams`;
+    const dateHeader = new Date().toISOString();
+    return fetch(`https://cloud.xylem.com${path}`, { 
+        method,
+        headers: {
+            Date: dateHeader,
+            Authorization: authHeader({
+                method,
+                dateHeader,
+                path,
+                data: {}
+            })
+        }
+    });
+}
+
+/**
+ * Retrieve batch observations. Rather than using a path variable, 
+ * this endpoint uses query parameters. You can get observations 
+ * from multiple datastreams in a single request.
+ */
+function getObservations(
+    datastreamIds,
+    interval
+) {
+    const now = new Date().toISOString();
+    const [from, until] = interval.map((each) => each.toISOString());
+    const path = `${basePath}/observations?from=${from}&until=${until}&datastreamIds=${datastreamIds.join(",")}`;
+    
+    return fetch(`https://cloud.xylem.com${path}`, { 
+        method,
+        headers: {
+            Date: now,
+            Authorization: authHeader({
+                method,
+                dateHeader: now,
+                path,
+                data: {}
+            })
+        }
+    });
+}
+
+console.info("Querying sites...")
+const sitesResponse = await getSites();
+const sites = await sitesResponse.json();
+const [exampleSite] = sites;
+// console.log(JSON.stringify(sites, null, 2));
+
+console.info(`Querying datastreams at site ${exampleSite.id}...`);
+const datastreamsResponse = await getDatastreams(exampleSite.id);
+const datastreams = await datastreamsResponse.json();
+const datastreamIds = datastreams.map((datastream) => {
+    return datastream.id
+});
+// console.log(JSON.stringify(datastreams, null, 2));
+
+console.info(`Querying observations...`);
+const observationsResponse = await getObservations(
+    datastreamIds.slice(0, 1),
+    [
+        new Date("2024-07-14T00:00:00"),
+        new Date("2024-07-16T00:00:00")
+    ]
+);
+const observations = await observationsResponse.json();
+console.log(JSON.stringify(observations, null, 2));
