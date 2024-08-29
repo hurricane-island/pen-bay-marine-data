@@ -308,7 +308,6 @@ Sub MeasureWaterQuality
     EndIf
     Message += "), restoring previous values. ": Call AddTime: Call AddDate: Errors = Message ' Message only, not logged
  	Else
-	  If NitraLED < 0 Then NitraLED = 0 ' It is impossible for some parameters to be negative, so impose limits on the sensor reading
 	  Message = "Sonde read completed"
 	  getSondeSN()
 	  CallTable SondeValues ' Only store sonde values if the read was successful so we don't store NAN's or 0's
