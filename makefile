@@ -4,4 +4,7 @@ data/locations.csv:
 test-client:
 	cd client && node index.js
 
-.PHONY: test-client
+template:
+	cd client && node template.js
+
+.PHONY: test-client template

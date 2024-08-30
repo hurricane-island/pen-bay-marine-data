@@ -1,0 +1,247 @@
+StationName = Ai1_36594
+
+Const GPS_PORT As Long = ComC2_Rx ' C2 Serial Rx
+Const TIMER_STOP As Long = 1
+Const TIMER_RESET_AND_START As Long = 2
+Const TIMER_READ As Long = 4
+Const ALLOW_SLEEP As Long = 1
+Const GPS_TIMER As Long = 11
+Const RUNNING As Long = 1
+Const CURRENT_PORT As Long = 5
+Const HUMIDITY_PORT As Long = 6
+Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval, seconds
+Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 ' Slower interval for less critical measurements, such as GPS, seconds
+Const CELL_WINDOW_START As Long = 1440 ' Modem is always on when = 1440
+Const CELL_WINDOW_DURATION As Long = 10
+Const CELL_WINDOW_FREQUENCY As Long = 1440 
+Const LOW_BATTERY_SAVER_V As Float = 12.83
+Const LOW_BATTERY_SHUTDOWN_V As Float = 12.75 ' Battery protection thresholds.
+Const PRESSURE_PORT As Long = 3.3
+Const FILTER_FREQUENCY As Long = 4000 ' Set to 50 or 60 for situations with AC noise, otherwise 4000Hz provides quickest processing
+Const PRESSURE_PARAMETERS As Long = 3
+Const PRESSURE_READINGS As Long = 7 ' Number of measurements to take from averaging this single reading
+Const PRESSURE_TIME_AVERAGING As Long = 5 ' The period over which to take time averaged pressure readings
+Const GPS_MAX_ON_TIME As Long = 180 ' If the GPS is on longer than this, the subroutine turns it off
+Const GPS_BAUD As Long = 9600
+Const GPS_BUFFER As Long = 512 ' uBlox GPS outputs a lot more messages, allow a bigger string.
+Const GPS_PARAMETERS As Long = 9 ' 1=Time(UTC),2=Date,3=Lat(ddmm),4=Lat(.mmmmmm),5=Long(ddmm),6=Long(.mmmmmm),7=Alt,8=Fix,9=#Sat
+Const CELL_BILLING_DAY As Long = 1 ' For data usage calculations, to know which day of month the billing cycle resets
+Const GPS_SATELLITES_REQUIRED As Long = 4
+Const CURRENT_ZERO_mV As Long = 1244 ' Factory calibrated. To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
+Const DATA_TABLE_ROWS As Long = 3000
+
+Dim rTime(9)
+Alias rTime(1) = Year
+Alias rTime(2) = Month
+Alias rTime(3) = DayOfMonth
+Alias rTime(4) = Hour
+Alias rTime(5) = Minute
+Alias rTime(6) = Second
+
+Public Message As String * 256 = ""
+Public BatteryVoltage As Float: Units BatteryVoltage = Volts
+Public InternalTemperature As Float: Units InternalTemperature = °C
+Public InternalHumidity As Long: Units InternalHumidity = %
+Public Current_mA As Long: Units Current_mA = mA
+Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)
+Public Longitude As Float: Units Longitude = Decimal Degrees (E=+,W=-)
+Public BarometricPressure: Units BarometricPressure = hPa
+Public GPSReadings(GPS_PARAMETERS) As Float
+Alias GPSReadings(1) = GPS_UTCtime: Units GPS_UTCtime = HHMMSS
+Alias GPSReadings(2) = GPS_Latitude_dddmm: Units GPS_Latitude_dddmm = dddmm.mmmm
+Alias GPSReadings(3) = GPS_LatitudeHemisphere: Units GPS_LatitudeHemisphere = 1=N, -1=S
+Alias GPSReadings(4) = GPS_Longitude_dddmm: Units GPS_Longitude_dddmm = dddmm.mmmm
+Alias GPSReadings(5) = GPS_LongitudeHemisphere: Units GPS_LongitudeHemisphere = 1=E, -1=W
+Alias GPSReadings(6) = GPS_QualityIndicator: Units GPS_QualityIndicator = 0=NoFix,1=GPS,2=DIFFERENTIAL
+Alias GPSReadings(7) = GPS_Satellites: Units GPS_Satellites = count
+Alias GPSReadings(8) = GPS_HDOP: Units GPS_HDOP = error estimate
+Alias GPSReadings(9) = GPS_Height: Units GPS_Height = meters
+
+DataTable(Ai1, True, DATA_TABLE_ROWS) ' Diagnostics
+  DataInterval(0, SLOW_MEASUREMENT_INTERVAL_S, Sec, 0)
+  Sample(1, BatteryVoltage, FP2)
+  Sample(1,InternalTemperature, FP2)
+  Sample(1, InternalHumidity, FP2)
+  Average(1, Current_mA, FP2, False)
+  FieldNames("CurrentAverage:mA"): Units CurrentAverage = mA (-=Charge, +=Discharge)
+  Maximum(1, Current_mA, FP2, False, False)
+  FieldNames("CurrentMaximum:mA"): Units CurrentMaximum = mA (-=Charge, +=Discharge)
+  Sample(1, Latitude, IEEE4)
+  Sample(1, Longitude, IEEE4)
+  Sample(1, GPS_Satellites, FP2)
+  Sample(1, BarometricPressure, FP2)
+EndTable
+
+Function TimeStamp As String
+    RealTime(rTime)
+    Dim Value As String = "["
+    Value += Hour + ":": If Minute < 10 Then Value += "0" 
+    Value += Minute + ":": If Second < 10 Then Value += "0"
+    Value += Second
+    Value += "]"
+    Return Value
+EndFunction
+
+' Vx2 has high power regulator as well.
+' Due to enable/disable circuit Vx2 can not be fully turned off.
+' Anything >400mV is accurate.
+Dim Vx2Voltage As Long
+Sub SetVx2mV(Voltage As Long)
+  If Vx2Voltage <> Voltage Then
+    Message = TimeStamp() + " Setting Port Vx2 to " + (Vx2Voltage/1000) + "V"
+    ExciteV(Vx2, Voltage, 0)
+    Vx2Voltage = Voltage
+  EndIf
+EndSub
+
+Dim ModemPower As Boolean ' state of the cellular modem power, set at compile time
+Sub SetModemPower(State As Boolean)
+  If ModemPower <> State Then
+    Message = TimeStamp() + " Setting Modem State to " + State
+    ModemPower = State
+    IPNetPower(5, State)
+  EndIf
+EndSub
+
+' Read the humidity sensor voltage and use board temperature correction
+' to get the internal humidity.
+Dim HumidityVoltage As Float = 0.0
+Sub ReadInternalHumidity(Temperature As Float)
+  SetVx2mV(3300)
+  VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000, FILTER_FREQUENCY, 1.0, 0.0)
+  InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*Temperature)
+EndSub
+
+' Read the pressure sensor voltage and convert to barometric pressure
+Dim PressureArray(PRESSURE_READINGS) As Float ' Array to hold readings from which the median value is used
+Dim PressureTimeArray(PRESSURE_TIME_AVERAGING) As Float ' tail of pressure time series, init at compile time
+Dim PressureTimeArraySorted(PRESSURE_TIME_AVERAGING) ' hold the sorted values for median
+Dim Pressure_Voltage, Recent as Long
+Dim PressureFirstReading As Boolean = True ' Set at compile time
+Sub ReadBarometricPressure
+  SetVx2mV(5000) ' Barometer uses 5V excitation
+  VoltSe(PressureArray(), PRESSURE_READINGS, mv2500, -PRESSURE_PORT, True, 2000, 50, 0.001, 0)
+  SortSpa(PressureArray(), PRESSURE_READINGS, PressureArray())
+  Pressure_Voltage = PressureArray(Ceiling(PRESSURE_READINGS/2))
+  If PressureFirstReading Then ' First time through the program fill the array with the initial value
+    For Recent = 1 To PRESSURE_TIME_AVERAGING
+      PressureTimeArray(Recent) = Pressure_Voltage
+    Next Recent
+    PressureFirstReading = False ' Only do this first time through
+  Else
+    For Recent = 1 To PRESSURE_TIME_AVERAGING - 1
+      PressureTimeArray(Recent) = PressureTimeArray(Recent + 1)
+    Next Recent
+    PressureTimeArray(PRESSURE_TIME_AVERAGING) = Pressure_Voltage
+  End If
+  SortSpa(PressureTimeArraySorted(), PRESSURE_TIME_AVERAGING, PressureTimeArray())
+  BarometricPressure = (0.725*PressureTimeArraySorted(Ceiling(PRESSURE_TIME_AVERAGING/2)) - 0.2625)*1000
+EndSub
+
+Dim Current_mV As Float = 0.0
+' Read the voltage and calculate current draw.
+Sub ReadCurrent
+  SetVx2mV(5000) ' Step up to 5V for other internal sensors
+  VoltSe(Current_mV, 1, mv2500, CURRENT_PORT, True, 0, FILTER_FREQUENCY, 1, 0) ' Read the raw mV output. Settling time is from humidity sensor
+  Current_mA = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
+EndSub
+
+' Obtain a GPS fix and extract coordinates and quality control
+' metrics.
+Dim CommaCount As Long
+Dim GPSReadingsString(GPS_PARAMETERS) As String * 16
+Dim GPSString As String * GPS_BUFFER: Units GPSString = NMEA 0183 Processed String
+Dim RawGPSString As String * GPS_BUFFER: Units RawGPSString = NMEA 0183 String buffer
+Dim GPSStart As Long: Units GPSStart = Start character For NMEA Message
+Dim GPSEnd As Long: Units GPSEnd = End character For NMEA Message
+Dim GPSLength As Long: Units GPSLength = characters in NMEA Message
+Dim Comma1 As Long
+Dim Comma2 As Long
+Dim InternalCounter As Long
+Dim GPSPowerStatus As Boolean ' Set at compile time, not exec
+Sub ReadPosition
+  If NOT(GPSPowerStatus) Then
+    Message = TimeStamp() + "Powering GPS for location tracking. "
+    SetVx2mV(5000)
+    GPSPowerStatus = True
+    Timer(GPS_TIMER, Sec, TIMER_RESET_AND_START) ' Start the GPS timer
+  End If
+  If (Timer(GPS_TIMER, Sec, TIMER_READ) > GPS_MAX_ON_TIME) Then
+    SetVx2mV(0) ' Turn off the power to the GPS and other internal status sensors
+    Timer(GPS_TIMER,Sec,TIMER_STOP)
+    GPSPowerStatus = False
+    Message = TimeStamp() + " GPS timer shutdown"
+  End If
+  SerialIn(RawGPSString, GPS_PORT, 50, 0, GPS_BUFFER) ' Read in the serial data.
+  SerialFlush(GPS_PORT) ' Clear out any data so a fresh reading is taken next cycle
+  GPSStart = InStr(1, RawGPSString, "$GPGGA", 2) ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
+  GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2) ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
+  If (GPSStart>0) AND (GPSEnd>0) Then
+    GPSString = Mid(RawGPSString, GPSStart, GPSEnd-GPSStart)  ' Get the part between the start and the end
+    GPSLength = Len(GPSString)
+    Comma2 = 1
+    CommaCount = 0 ' Now parse the information and convert to double precision data, starting at the start of the string
+    For InternalCounter = 1 To GPS_PARAMETERS
+      Comma1 = InStr(Comma2, GPSString, ",", 2)
+      Comma2 = InStr(Comma1+1, GPSString, ",", 2) ' Start searching at the position of the last comma
+      If Comma2 > 0 Then
+        GPSReadingsString(InternalCounter) = Mid(GPSString, Comma1+1, Comma2-Comma1-1) ' If it isn't above zero, the string was truncated for some reason
+        CommaCount += 1
+      End If
+    Next InternalCounter
+    For InternalCounter = 1 To GPS_PARAMETERS
+      GPSReadings(InternalCounter) = GPSReadingsString(InternalCounter) ' Convert from string to double
+    Next InternalCounter
+    If CommaCount >= 9 AND (GPS_Satellites >= GPS_SATELLITES_REQUIRED) Then
+      Latitude = Floor(GPS_Latitude_dddmm / 100.0) + (GPS_Latitude_dddmm MOD 100)/60
+      Longitude = Floor(GPS_Longitude_dddmm / 100.0) + (GPS_Longitude_dddmm MOD 100)/60
+      If GPSReadingsString(3) = "S" Then ' Add the sign to the latitude / longitude
+        Latitude = -Latitude
+      End If
+      If GPSReadingsString(5) = "W" Then
+        Longitude = -Longitude
+      End If
+      Message = TimeStamp() + " GPS location complete, using " + GPS_Satellites + " satellites."
+      SetVx2mV(0)
+      Timer(GPS_TIMER, Sec, TIMER_STOP)
+      GPSPowerStatus = False
+    End If
+  End If
+EndSub
+
+BeginProg
+  SetSetting("PakBusTCPClients", "(drema.konectgds.com,9200)")
+  SetSetting("PakBusAddress", 1065)
+  SetSetting("CellEnabled", True)
+  SetSetting("CellAPN", "so01.VZWSTATIC")
+  SetSetting("CellPwrStartTime", CELL_WINDOW_START) ' When to power up the modem
+  SetSetting("CellPwrDuration", CELL_WINDOW_DURATION) ' How long is each window
+  SetSetting("CellPwrRepeat", CELL_WINDOW_FREQUENCY) ' When does the window repeat, i.e. hourly
+  SetSetting("CellBillingDay", CELL_BILLING_DAY) ' When to roll over the monthly usage
+  SetSetting("CellKeepAlive", "www.google.com") ' If this fails, the datalogger will re-establish
+  SetSetting("CellKeepAliveTime", 30) ' How often to ping test the link
+
+  SetVx2mV(0)
+  SerialOpen(GPS_PORT, GPS_BAUD, 0, 0, GPS_BUFFER, ALLOW_SLEEP)
+  SetModemPower(True)
+  
+  Message = TimeStamp() + " System initialization complete."
+  Scan (SCAN_INTERVAL_S, Sec, 0, 0)
+    PanelTemp(InternalTemperature, FILTER_FREQUENCY)
+    If IfTime(0, SLOW_MEASUREMENT_INTERVAL_S, Sec) Then
+      ReadInternalHumidity(InternalTemperature)
+      ReadBarometricPressure()
+      ReadCurrent()
+      ReadPosition()
+    End If
+
+    Battery(BatteryVoltage)
+    If BatteryVoltage < LOW_BATTERY_SHUTDOWN_V Then
+      SetModemPower(False)
+    ElseIf BatteryVoltage > LOW_BATTERY_SAVER_V Then
+      SetModemPower(True)
+    End If
+
+    CallTable Ai1
+  NextScan
+EndProg

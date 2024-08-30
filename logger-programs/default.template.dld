@@ -211,7 +211,7 @@ EndSub
 
 BeginProg
   SetSetting("PakBusTCPClients", "(drema.konectgds.com,9200)")
-  SetSetting("PakBusAddress", 1065)
+  SetSetting("PakBusAddress", $TEMPLATE_PAKBUS_ADDRESS)
   SetSetting("CellEnabled", True)
   SetSetting("CellAPN", "so01.VZWSTATIC")
   SetSetting("CellPwrStartTime", CELL_WINDOW_START) ' When to power up the modem
