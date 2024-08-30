@@ -9,8 +9,7 @@ Const GPS_TIMER As Long = 11
 Const RUNNING As Long = 1
 Const CURRENT_PORT As Long = 5
 Const HUMIDITY_PORT As Long = 6
-Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval, seconds
-Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 ' Slower interval for less critical measurements, such as GPS, seconds
+Const SCAN_INTERVAL_S As Long = 60 ' Program scan Interval, seconds
 Const CELL_WINDOW_START As Long = 1440 ' Modem is always on when = 1440
 Const CELL_WINDOW_DURATION As Long = 10
 Const CELL_WINDOW_FREQUENCY As Long = 1440 
@@ -42,7 +41,7 @@ Public Message As String * 256 = ""
 Public BatteryVoltage As Float: Units BatteryVoltage = Volts
 Public InternalTemperature As Float: Units InternalTemperature = °C
 Public InternalHumidity As Long: Units InternalHumidity = %
-Public Current_mA As Long: Units Current_mA = mA
+Public Current As Long: Units Current = mA
 Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)
 Public Longitude As Float: Units Longitude = Decimal Degrees (E=+,W=-)
 Public BarometricPressure: Units BarometricPressure = hPa
@@ -57,15 +56,11 @@ Alias GPSReadings(7) = GPS_Satellites: Units GPS_Satellites = count
 Alias GPSReadings(8) = GPS_HDOP: Units GPS_HDOP = error estimate
 Alias GPSReadings(9) = GPS_Height: Units GPS_Height = meters
 
-DataTable(Ai1, True, DATA_TABLE_ROWS) ' Diagnostics
-  DataInterval(0, SLOW_MEASUREMENT_INTERVAL_S, Sec, 0)
+DataTable(Diagnostics, True, DATA_TABLE_ROWS) ' Diagnostics
   Sample(1, BatteryVoltage, FP2)
-  Sample(1,InternalTemperature, FP2)
+  Sample(1, InternalTemperature, FP2)
   Sample(1, InternalHumidity, FP2)
-  Average(1, Current_mA, FP2, False)
-  FieldNames("CurrentAverage:mA"): Units CurrentAverage = mA (-=Charge, +=Discharge)
-  Maximum(1, Current_mA, FP2, False, False)
-  FieldNames("CurrentMaximum:mA"): Units CurrentMaximum = mA (-=Charge, +=Discharge)
+  Sample(1, Current, FP2)
   Sample(1, Latitude, IEEE4)
   Sample(1, Longitude, IEEE4)
   Sample(1, GPS_Satellites, FP2)
@@ -143,7 +138,7 @@ Dim Current_mV As Float = 0.0
 Sub ReadCurrent
   SetVx2mV(5000) ' Step up to 5V for other internal sensors
   VoltSe(Current_mV, 1, mv2500, CURRENT_PORT, True, 0, FILTER_FREQUENCY, 1, 0) ' Read the raw mV output. Settling time is from humidity sensor
-  Current_mA = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
+  Current = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
 EndSub
 
 ' Obtain a GPS fix and extract coordinates and quality control
@@ -228,20 +223,16 @@ BeginProg
   Message = TimeStamp() + " System initialization complete."
   Scan (SCAN_INTERVAL_S, Sec, 0, 0)
     PanelTemp(InternalTemperature, FILTER_FREQUENCY)
-    If IfTime(0, SLOW_MEASUREMENT_INTERVAL_S, Sec) Then
-      ReadInternalHumidity(InternalTemperature)
-      ReadBarometricPressure()
-      ReadCurrent()
-      ReadPosition()
-    End If
-
+    ReadInternalHumidity(InternalTemperature)
+    ReadBarometricPressure()
+    ReadCurrent()
+    ReadPosition()
     Battery(BatteryVoltage)
     If BatteryVoltage < LOW_BATTERY_SHUTDOWN_V Then
       SetModemPower(False)
     ElseIf BatteryVoltage > LOW_BATTERY_SAVER_V Then
       SetModemPower(True)
     End If
-
-    CallTable Ai1
+    CallTable Diagnostics
   NextScan
 EndProg
