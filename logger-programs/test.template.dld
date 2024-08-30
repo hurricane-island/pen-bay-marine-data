@@ -92,7 +92,6 @@ EndSub
 ' to get the internal humidity.
 Dim HumidityVoltage As Float = 0.0
 Sub ReadInternalHumidity(Temperature As Float)
-  SetVx2mV(3300)
   VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000, FILTER_FREQUENCY, 1.0, 0.0)
   InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*Temperature)
 EndSub
@@ -104,7 +103,6 @@ Dim PressureTimeArraySorted(PRESSURE_TIME_AVERAGING) ' hold the sorted values fo
 Dim Pressure_Voltage, Recent as Long
 Dim PressureFirstReading As Boolean = True ' Set at compile time
 Sub ReadBarometricPressure
-  SetVx2mV(5000) ' Barometer uses 5V excitation
   VoltSe(PressureArray(), PRESSURE_READINGS, mv2500, -PRESSURE_PORT, True, 2000, 50, 0.001, 0)
   SortSpa(PressureArray(), PRESSURE_READINGS, PressureArray())
   Pressure_Voltage = PressureArray(Ceiling(PRESSURE_READINGS/2))
@@ -126,7 +124,6 @@ EndSub
 Dim Current_mV As Float = 0.0
 ' Read the voltage and calculate current draw.
 Sub ReadCurrent
-  SetVx2mV(5000) ' Step up to 5V for other internal sensors
   VoltSe(Current_mV, 1, mv2500, CURRENT_PORT, True, 0, FILTER_FREQUENCY, 1, 0) ' Read the raw mV output. Settling time is from humidity sensor
   Current = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
 EndSub
@@ -136,27 +133,15 @@ EndSub
 Dim CommaCount As Long
 Dim GPSReadingsString(GPS_PARAMETERS) As String * 16
 Dim GPSString As String * GPS_BUFFER: Units GPSString = NMEA 0183 Processed String
-Public Dim RawGPSString As String * GPS_BUFFER: Units RawGPSString = NMEA 0183 String buffer
+Dim RawGPSString As String * GPS_BUFFER: Units RawGPSString = NMEA 0183 String buffer
 Dim GPSStart As Long: Units GPSStart = Start character For NMEA Message
 Dim GPSEnd As Long: Units GPSEnd = End character For NMEA Message
 Dim GPSLength As Long: Units GPSLength = characters in NMEA Message
 Dim Comma1 As Long
 Dim Comma2 As Long
 Dim InternalCounter As Long
-Dim GPSPowerStatus As Boolean ' Set at compile time, not exec
 Sub ReadPosition
-  If NOT(GPSPowerStatus) Then
-    Message = "Powering GPS for location tracking."
-    SetVx2mV(5000)
-    GPSPowerStatus = True
-    Timer(GPS_TIMER, Sec, TIMER_RESET_AND_START) ' Start the GPS timer
-  End If
-  If (Timer(GPS_TIMER, Sec, TIMER_READ) > GPS_MAX_ON_TIME) Then
-    SetVx2mV(0) ' Turn off the power to the GPS and other internal status sensors
-    Timer(GPS_TIMER,Sec,TIMER_STOP)
-    GPSPowerStatus = False
-    Message = "GPS timer shutdown"
-  End If
+  Message = "Reading GPS."
   SerialIn(RawGPSString, GPS_PORT, 50, 0, GPS_BUFFER) ' Read in the serial data.
   SerialFlush(GPS_PORT) ' Clear out any data so a fresh reading is taken next cycle
   GPSStart = InStr(1, RawGPSString, "$GPGGA", 2) 
@@ -191,12 +176,9 @@ Sub ReadPosition
       If GPSReadingsString(5) = "W" Then
         Longitude = -Longitude
       End If
-      Message = "GPS location complete, using " + GPS_Satellites + " satellites."
-      SetVx2mV(0)
-      Timer(GPS_TIMER, Sec, TIMER_STOP)
-      GPSPowerStatus = False
     End If
   End If
+  Message = "GPS location complete, using " + GPS_Satellites + " satellites."
 EndSub
 
 BeginProg
@@ -218,10 +200,13 @@ BeginProg
   Message = "System initialization complete."
   Scan (SCAN_INTERVAL_S, Sec, 0, 0)
     PanelTemp(InternalTemperature, FILTER_FREQUENCY)
+    SetVx2mV(3300)
     ReadInternalHumidity(InternalTemperature)
+    SetVx2mV(5000)
     ReadBarometricPressure()
     ReadCurrent()
     ReadPosition()
+    SetVx2mV(0)
     Battery(BatteryVoltage)
     If BatteryVoltage < LOW_BATTERY_SHUTDOWN_V Then
       SetModemPower(False)
