@@ -30,6 +30,14 @@ Const GPS_SATELLITES_REQUIRED As Long = 4
 Const CURRENT_ZERO_mV As Long = 1244 ' Factory calibrated. To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
 Const DATA_TABLE_ROWS As Long = 3000
 
+Dim rTime(9)
+Alias rTime(1) = Year
+Alias rTime(2) = Month
+Alias rTime(3) = DayOfMonth
+Alias rTime(4) = Hour
+Alias rTime(5) = Minute
+Alias rTime(6) = Second
+
 Public Message As String * 256 = ""
 Public BatteryVoltage As Float: Units BatteryVoltage = Volts
 Public InternalTemperature As Float: Units InternalTemperature = °C
@@ -39,15 +47,6 @@ Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)
 Public Longitude As Float: Units Longitude = Decimal Degrees (E=+,W=-)
 Public BarometricPressure: Units Pressure_hPa = hPa
 Public GPSReadings(GPS_PARAMETERS) As Float
-
-Dim rTime(9)
-
-Alias rTime(1) = Year
-Alias rTime(2) = Month
-Alias rTime(3) = DayOfMonth
-Alias rTime(4) = Hour
-Alias rTime(5) = Minute
-Alias rTime(6) = Second
 Alias GPSReadings(1) = GPS_UTCtime: Units GPS_UTCtime = HHMMSS
 Alias GPSReadings(2) = GPS_Latitude_dddmm: Units GPS_Latitude_dddmm = dddmm.mmmm
 Alias GPSReadings(3) = GPS_LatitudeHemisphere: Units GPS_LatitudeHemisphere = 1=N, -1=S
@@ -75,7 +74,7 @@ EndTable
 
 Function TimeStamp As String
     RealTime(rTime)
-    Dim Value = "["
+    Dim Value As String = "["
     Value += Hour + ":": If Minute < 10 Then Value += "0" 
     Value += Minute + ":": If Second < 10 Then Value += "0"
     Value += Second
@@ -86,8 +85,8 @@ EndFunction
 ' Vx2 has high power regulator as well.
 ' Due to enable/disable circuit Vx2 can not be fully turned off.
 ' Anything >400mV is accurate.
+Dim Vx2Voltage As Long
 Sub SetVx2mV(Voltage As Long)
-  Dim Vx2Voltage As Long ' Set at compile time, value will persist
   If Vx2Voltage <> Voltage Then
     Message = TimeStamp() + " Setting Port Vx2 to " + (Vx2Voltage/1000) + "V"
     ExciteV(Vx2, Voltage, 0)
@@ -95,8 +94,8 @@ Sub SetVx2mV(Voltage As Long)
   EndIf
 EndSub
 
+Dim ModemPower As Boolean ' state of the cellular modem power, set at compile time
 Sub SetModemPower(State As Boolean)
-  Dim ModemPower As Boolean ' state of the cellular modem power, set at compile time
   If ModemPower <> State Then
     Message = TimeStamp() + " Setting Modem State to " + State
     ModemPower = State
@@ -106,20 +105,20 @@ EndSub
 
 ' Read the humidity sensor voltage and use board temperature correction
 ' to get the internal humidity.
+Dim HumidityVoltage As Float = 0.0
 Sub ReadInternalHumidity(Temperature As Float)
-  Dim HumidityVoltage As Float = 0.0
   SetVx2mV(3300)
   VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000, FILTER_FREQUENCY, 1.0, 0.0)
   InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*Temperature)
 EndSub
 
 ' Read the pressure sensor voltage and convert to barometric pressure
+Dim PressureArray(PRESSURE_READINGS) As Float ' Array to hold readings from which the median value is used
+Dim PressureTimeArray(PRESSURE_TIME_AVERAGING) As Float ' tail of pressure time series, init at compile time
+Dim PressureTimeArraySorted(PRESSURE_TIME_AVERAGING) ' hold the sorted values for median
+Dim Pressure_Voltage, Recent as Long
+Dim PressureFirstReading As Boolean = True ' Set at compile time
 Sub ReadBarometricPressure
-  Dim PressureArray(PRESSURE_READINGS) As Float ' Array to hold readings from which the median value is used
-  Dim PressureTimeArray(PRESSURE_TIME_AVERAGING) As Float ' tail of pressure time series, init at compile time
-  Dim PressureTimeArraySorted(PRESSURE_TIME_AVERAGING) ' hold the sorted values for median
-  Dim Pressure_Voltage, Recent as Long
-  Dim PressureFirstReading As Boolean = True ' Set at compile time
   SetVx2mV(5000) ' Barometer uses 5V excitation
   VoltSe(PressureArray(), PRESSURE_READINGS, mv2500, -PRESSURE_PORT, True, 2000, 50, 0.001, 0)
   SortSpa(PressureArray(), PRESSURE_READINGS, PressureArray())
@@ -139,9 +138,9 @@ Sub ReadBarometricPressure
   BarometricPressure = (0.725*PressureTimeArraySorted(Ceiling(PRESSURE_TIME_AVERAGING/2)) - 0.2625)*1000
 EndSub
 
+Dim Current_mV As Float = 0.0
 ' Read the voltage and calculate current draw.
 Sub ReadCurrent
-  Dim Current_mV As Float = 0.0
   SetVx2mV(5000) ' Step up to 5V for other internal sensors
   VoltSe(Current_mV, 1, mv2500, CURRENT_PORT, True, 0, FILTER_FREQUENCY, 1, 0) ' Read the raw mV output. Settling time is from humidity sensor
   Current_mA = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
@@ -149,19 +148,18 @@ EndSub
 
 ' Obtain a GPS fix and extract coordinates and quality control
 ' metrics.
+Dim CommaCount As Long
+Dim GPSReadingsString(GPS_PARAMETERS) As String * 16
+Dim GPSString As String * GPS_BUFFER: Units GPSString = NMEA 0183 Processed String
+Dim RawGPSString As String * GPS_BUFFER: Units RawGPSString = NMEA 0183 String buffer
+Dim GPSStart As Long: Units GPSStart = Start character For NMEA Message
+Dim GPSEnd As Long: Units GPSEnd = End character For NMEA Message
+Dim GPSLength As Long: Units GPSLength = characters in NMEA Message
+Dim Comma1 As Long
+Dim Comma2 As Long
+Dim InternalCounter As Long
+Dim GPSPowerStatus As Boolean ' Set at compile time, not exec
 Sub ReadPosition
-  Dim CommaCount As Long
-  Dim GPSReadingsString(GPS_PARAMETERS) As String * 16
-  Dim GPSString As String * GPS_BUFFER: Units GPSString = NMEA 0183 Processed String
-  Dim RawGPSString As String * GPS_BUFFER: Units RawGPSString = NMEA 0183 String buffer
-  Dim GPSStart As Long: Units GPSStart = Start character For NMEA Message
-  Dim GPSEnd As Long: Units GPSEnd = End character For NMEA Message
-  Dim GPSLength As Long: Units GPSLength = characters in NMEA Message
-  Dim Comma1 As Long
-  Dim Comma2 As Long
-  Dim InternalCounter As Long
-  Dim GPSPowerStatus As Boolean ' Set at compile time, not exec
-
   If NOT(GPSPowerStatus) Then
     Message = TimeStamp() + "Powering GPS for location tracking. "
     SetVx2mV(5000)
