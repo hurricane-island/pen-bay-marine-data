@@ -45,7 +45,7 @@ Public InternalHumidity As Long: Units InternalHumidity = %
 Public Current_mA As Long: Units Current_mA = mA
 Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)
 Public Longitude As Float: Units Longitude = Decimal Degrees (E=+,W=-)
-Public BarometricPressure: Units Pressure_hPa = hPa
+Public BarometricPressure: Units BarometricPressure = hPa
 Public GPSReadings(GPS_PARAMETERS) As Float
 Alias GPSReadings(1) = GPS_UTCtime: Units GPS_UTCtime = HHMMSS
 Alias GPSReadings(2) = GPS_Latitude_dddmm: Units GPS_Latitude_dddmm = dddmm.mmmm
@@ -211,7 +211,7 @@ EndSub
 
 BeginProg
   SetSetting("PakBusTCPClients", "(drema.konectgds.com,9200)")
-  SetSetting("PakBusAddress", $TEMPLATE_PAKBUS_ADDRESS)
+  SetSetting("PakBusAddress", 1065)
   SetSetting("CellEnabled", True)
   SetSetting("CellAPN", "so01.VZWSTATIC")
   SetSetting("CellPwrStartTime", CELL_WINDOW_START) ' When to power up the modem
