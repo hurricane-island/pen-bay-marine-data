@@ -1,4 +1,4 @@
-StationName = $TEMPLATE_STATION_NAME
+StationName = Ai1_36594
 
 Const GPS_PORT As Long = ComC2_Rx ' C2 Serial Rx
 Const TIMER_STOP As Long = 1
@@ -201,7 +201,7 @@ EndSub
 
 BeginProg
   SetSetting("PakBusTCPClients", "(drema.konectgds.com,9200)")
-  SetSetting("PakBusAddress", $TEMPLATE_PAKBUS_ADDRESS)
+  SetSetting("PakBusAddress", 1065)
   SetSetting("CellEnabled", True)
   SetSetting("CellAPN", "so01.VZWSTATIC")
   SetSetting("CellPwrStartTime", CELL_WINDOW_START) ' When to power up the modem
