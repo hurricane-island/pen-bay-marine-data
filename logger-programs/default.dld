@@ -91,7 +91,7 @@ Sub SetVx2mV(Voltage As Long)
   If Vx2Voltage <> Voltage Then
     Message = TimeStamp() + " Setting Port Vx2 to " + (Vx2Voltage/1000) + "V"
     ExciteV(Vx2, Voltage, 0)
-    Vx2State = Voltage
+    Vx2Voltage = Voltage
   EndIf
 EndSub
 
