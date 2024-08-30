@@ -12,7 +12,7 @@ Public AccessPointName As String = "so01.VZWSTATIC" ' APN for Verizon ISS
 Const METRIC As Boolean = True ' Program uses SI metric units wherever possible
 Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval, seconds 
 Const MEASUREMENT_INTERVAL_S As Long = 900 ' Sensor measurement interval, seconds
-Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 ' Slower interval for less critical measurements, such as GPS, seconds
+Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 ' less critical measurements, such as GPS
 Const DATA_STORAGE_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' Store data every measurement cycle
 Const SENSOR_WARMUP_S As Long = 0
 Public MeasureBefore_s As Long = 0 ' The time to warm up the sensor before measuring (in s).  Set to 0 to have always on
@@ -23,8 +23,8 @@ Const COMMS As Long = CELLULAR
 Const CELL_WINDOW_START As Long = 1440 ' Modem is always on when CELL_WINDOW_START = 1440
 Const CELL_WINDOW_DURATION As Long = 10
 Const CELL_WINDOW_FREQUENCY As Long = 1440  
-Const CURRENT_ZERO_mV As Long = 1244 ' mV.                    ' Factory calibrated.  To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
-Const A3_RATIO As Float = 1.000                               ' Factory calibrated.  2:1 voltage divider fitted on A3
+Const CURRENT_ZERO_mV As Long = 1244 ' Factory calibrated.  To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
+Const A3_RATIO As Float = 1.000 ' Factory calibrated.  2:1 voltage divider fitted on A3
 Const SENSOR_QTY As Long = 1 ' Number of sensors fitted to this station, repeat the measurements on sequential ports or address
 Const GPS_INTERFACE As Long = RS232
 Const TABLE_WQ As Long = 200000
@@ -498,7 +498,8 @@ Sub GPSOff
   Call WritePort(Vx2,0) ' Turn off the power to the GPS and other internal status sensors
   Message = "GPS reading complete, turning off internal sensor power"
   Timer(GPS_TIMER,Sec,TIMER_STOP)
-  GPSPowerStatus = False: ReadGPSNow = False ' And go back to waiting for the next request
+  GPSPowerStatus = False
+  ReadGPSNow = False ' And go back to waiting for the next request
 EndSub
 
 Sub ReadGPS
@@ -511,7 +512,8 @@ Sub ReadGPS
       Timer(GPS_TIMER,Sec,TIMER_RESET_AND_START) ' Start the GPS timer
     EndIf
     If (Timer(GPS_TIMER,Sec,TIMER_READ)>GPS_MAX_ON_TIME) Then
-      Call GPSOff: Message = "GPS timer shutdown"
+      Call GPSOff
+      Message = "GPS timer shutdown"
     EndIf
     SerialIn(RawGPSString,GPS_PORT,50,0,GPS_BUFFER) ' Read in the serial data.
     SerialFlush(GPS_PORT) ' Clear out any data so a fresh reading is taken next cycle
@@ -602,8 +604,8 @@ Sub Initialization
   SetSetting("PakBusTCPClients",TCP_CLIENT)
   SetSetting("PakBusAddress",PAKBUS_ADDRESS)
   Battery(BatteryVoltage)  ' Get a battery voltage reading so that on first execution it will have a reading
-  SetSetting("CellEnabled",True)  ' Make sure that the modem is turned on
-  SetSetting("CellAPN",AccessPointName) ' Configure the APN.  It is possible to set this through the constant table
+  SetSetting("CellEnabled",True) ' Make sure that the modem is turned on
+  SetSetting("CellAPN",AccessPointName) ' Possible to set this through the constant table
   SetSetting("CellPwrStartTime",CELL_WINDOW_START) ' When to power up the modem
   SetSetting("CellPwrDuration",CELL_WINDOW_DURATION) ' How long is each window
   SetSetting("CellPwrRepeat",CELL_WINDOW_FREQUENCY) ' When does the window repeat, i.e. hourly

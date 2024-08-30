@@ -4,9 +4,19 @@ const {Base64} = enc;
 
 const serviceID = process.env.XCLOUD_CLIENT_ID ?? "";
 const secretKey = process.env.XCLOUD_SECRET_KEY ?? "";
+const server = "https://cloud.xylem.com";
 const basePath = "/xcloud/data-export";
 const method = "GET";
+const queryRange = [
+    new Date("2024-07-14T00:00:00"),
+    new Date("2024-07-16T00:00:00")
+];
 
+/**
+ * Compose a valid HMAC key and output string to use as Authorization
+ * header value. This only works for GET requests, which is
+ * the only method supported by the partner data access API.
+ */
 function authHeader({
     method,
     dateHeader,
@@ -20,7 +30,7 @@ function authHeader({
         path, // path
         "", // xCloud headers
         Object.keys(data).length !== 0 ? MD5(data).toString(Base64) : "", // contentMD5
-        serviceID // client ID
+        serviceID // partner API client ID
     ].join("\n");
     const hmac = HmacSHA256(message, Base64.parse(secretKey)).toString(Base64);
     return `xCloud ${btoa(serviceID)}:${hmac}`
@@ -34,7 +44,7 @@ function authHeader({
 function getSites() {
     const path = `${basePath}/sites`
     const dateHeader = new Date().toISOString();
-    return fetch(`https://cloud.xylem.com${path}`, { 
+    return fetch(`${server}${path}`, { 
         method,
         headers: {
             Date: dateHeader,
@@ -56,7 +66,7 @@ function getSites() {
 function getDatastreams(siteId) {
     const path = `${basePath}/site/${siteId}/datastreams`;
     const dateHeader = new Date().toISOString();
-    return fetch(`https://cloud.xylem.com${path}`, { 
+    return fetch(`${server}${path}`, { 
         method,
         headers: {
             Date: dateHeader,
@@ -79,11 +89,15 @@ function getObservations(
     datastreamIds,
     interval
 ) {
-    const now = new Date().toISOString();
     const [from, until] = interval.map((each) => each.toISOString());
-    const path = `${basePath}/observations?from=${from}&until=${until}&datastreamIds=${datastreamIds.join(",")}`;
-    
-    return fetch(`https://cloud.xylem.com${path}`, { 
+    const query = new URLSearchParams({
+        from,
+        until,
+        datastreamIds
+    });
+    const path = `${basePath}/observations?${query.toString()}`;
+    const now = new Date().toISOString();
+    return fetch(`${server}${path}`, { 
         method,
         headers: {
             Date: now,
@@ -114,10 +128,7 @@ const datastreamIds = datastreams.map((datastream) => {
 console.info(`Querying observations...`);
 const observationsResponse = await getObservations(
     datastreamIds.slice(0, 1),
-    [
-        new Date("2024-07-14T00:00:00"),
-        new Date("2024-07-16T00:00:00")
-    ]
+    queryRange
 );
 const observations = await observationsResponse.json();
 console.log(JSON.stringify(observations, null, 2));

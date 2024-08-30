@@ -5,7 +5,7 @@ Public Message As String * 256 = ""
 Public PortsStatus As String * 90
 Dim PortsON As Long = 0 ' Verbose description of output ports
 Const PAKBUS_ADDRESS As Long = $TEMPLATE_PAKBUS_ADDRESS
-
+Const HISTORY_RECORDS As Long = 3
 Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval, seconds
 Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 ' Slower interval for less critical measurements, such as GPS, seconds
 
@@ -46,9 +46,8 @@ Alias Pressure(2) = Pressure_hPa: Units Pressure_hPa = hPa
 Alias Pressure(3) = Pressure_mH2O: Units Pressure_mH2O = mH2O
 Const PRESSURE_READINGS As Long = 7 ' Number of measurements to take from averaging this single reading
 Const PRESSURE_TIME_AVERAGING As Long = 5 ' The period over which to take time averaged pressure readings
-Dim PressureArray(PRESSURE_READINGS) As Float ' Array to hold readings from which the median value is used
+
 Dim PressureTimeArray(PRESSURE_TIME_AVERAGING) As Float ' time series of median filtered readings
-Dim PressureTimeArraySorted(PRESSURE_TIME_AVERAGING) ' hold the sorted values for median
 Dim PressureFirstReading As Boolean = True ' First time through, copy the initial value to all elements in array
 Public Current_mA As Long: Units Current_mA = mA              ' Use long so that only whole numbers are returned
 Dim Current_mV As Float: Units Current_mV = mV
@@ -76,10 +75,6 @@ Sub AddTime ' Adds time onto end of message, formatted to H:MM:SS
   Message += Second
 EndSub  
 
-Sub AddDate
-  Message += ", " + DayOfMonth + "/" + Month + "/" + Year + "."
-EndSub 
-
 Sub AddSeparator
   If Right(PortsStatus,1)=":" Then PortsStatus += " " Else PortsStatus += ", "
 EndSub
@@ -88,43 +83,6 @@ EndSub
 Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
   Dim StateMask As Long = 0
   Select Case PortToWrite  
-  Case C1
-    If StateToWrite Then StateMask = &B00000001 Else StateMask = 0
-    Message = "Setting C1 to ": If StateToWrite Then Message += "ON (5V)" Else Message += "OFF"
-    WriteIO(&B00000001, StateMask)
-  Case C2
-    If StateToWrite Then StateMask = &B00000010 Else StateMask = 0
-    Message = "Setting C2 to ": If StateToWrite Then Message += "ON (5V)" Else Message += "OFF"
-    WriteIO(&B00000010, StateMask)
-  Case SE1
-    If StateToWrite Then StateMask = &B00000100 Else StateMask = 0
-    Message = "Write to SE1 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
-  Case SE2
-    If StateToWrite Then StateMask = &B00001000 Else StateMask = 0
-    Message = "Write to SE2 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
-  Case SE3 ' SE3 uses a different technique to drive regulators.  On is achieved by setting the port to high impedance (i.e. as an input).  Off is an output in the off state
-    If StateToWrite Then StateMask = &B00010000 Else StateMask = 0
-    Message = "Write to SE3 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
-  Case SE4 ' SE4 uses same technique as SE3, high impedance / 0V setting, using regulator internal pull up resistor
-    If StateToWrite Then StateMask = &B00100000 Else StateMask = 0
-    If StateToWrite Then 
-      PortsConfig(&B00100000,&B00000000) ' This sets port as an input which float ons via regulator pull-up
-      Message = "Setting SE4 to an input (high impedance, turns regulator on)"
-    Else
-      WriteIO(&B00100000,StateMask)  ' This drives the output to 0V, turning off the regulator 
-      Message = "Setting SE4 to off (turns regulator off)" 
-    EndIf
-  Case SW12V ' This equates to 7
-    If StateToWrite Then StateMask = &B01000000 Else StateMask = 0
-    Message = "Setting SW12V to ": If StateToWrite Then Message += "ON (12V)" Else Message += "OFF"
-    WriteIO(&B01000000, StateMask)
-  Case P_SW ' 8
-    If StateToWrite Then StateMask = &B10000000 Else StateMask = 0
-    Message = "Write to P_SW not supported or PulseCount instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrrorLog as it may be repeated
-  Case Vx1 ' Vx1/Vx2 do not use WriteIO, it must set to the desired state
-    If StateToWrite Then Vx1Voltage = 5000 Else Vx1Voltage = 0 ' Vx1 is either 5V or 0V
-    Message = "Setting Vx1 to " + (Vx1Voltage/1000) + "V"
-    ExciteV(Vx1,Vx1Voltage,0) 
   Case Vx2 ' Vx2 has high power regulator as well.  Due to enable/disable circuit Vx2 can not be fully turned off. Anything >400mV is accurate.  
     If StateToWrite Then Vx2Voltage = 3300 Else Vx2Voltage = 0 ' Vx2 is either 3.3V or 0V
     Message = "Setting Vx2 to " + (Vx2Voltage/1000) + "V"
@@ -134,7 +92,6 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
   Case Else
     Call ErrorLog("Port not recognised.  Port: " + PortToWrite + ", State: " + StateToWrite) ' Write to errors so this doesn't disappear
   EndSelect
-  If PortToWrite = VX1 Then PortToWrite = 9  ' Change from 101 to 512 so bitwise logic works
   If PortToWrite = VX2 Then PortToWrite = 10 ' Change from 102 to 1024 so bitwise logic works
   If StateToWrite Then  ' If turning a port on
     If (PortsON AND (2^PortToWrite)) Then ' Bitwise test current state of PortToWrite in PortsON
@@ -189,7 +146,9 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
     Battery(BatteryVoltage)
     If BatteryVoltage = 0 Then PortsStatus += ". Output levels reduced when running on USB power." Else If BatteryVoltage < 11 Then PortsStatus += ". Output levels may be reduced when battery is flat."
   EndIf
-  Message += ". ": Call AddTime: Message +=". "
+  Message += ". "
+  Call AddTime
+  Message +=". "
 EndSub
 
 Dim CommsPowerOnStatus As Boolean = True ' CommsPowerOnStatus returns the state of the internal cellular modem power when controlled by battery saver and shutdown settings, but does not indicate the state due to window duration and frequency.  IPNetPower overrides all other power control options
@@ -237,70 +196,7 @@ Public GPSSatellitesRequired As Long = 4
 PreserveOneVariable(GPSSatellitesRequired)
 Const GPS_MAX_ON_TIME As Long = 180 ' If the GPS is on longer than this, the subroutine turns it off
 
-Sub GPSOff
-  Call WritePort(Vx2,0) ' Turn off the power to the GPS and other internal status sensors
-  Message = "GPS reading complete, turning off internal sensor power"
-  Timer(GPS_TIMER,Sec,TIMER_STOP)
-  GPSPowerStatus = False
-  ReadGPSNow = False ' And go back to waiting for the next request
-EndSub
 
-Sub ReadGPS
-  If ReadGPSNow Then
-    If NOT(GPSPowerStatus) Then
-      Message = "Powering GPS for location tracking. "
-      Call WritePort(Vx2,True) ' Use WritePort first so it keeps track of the status of the port
-      ExciteV(Vx2,5000,0) ' Then set it to 5V which is higher than the 3.3V default
-      GPSPowerStatus = True
-      Timer(GPS_TIMER,Sec,TIMER_RESET_AND_START) ' Start the GPS timer
-    EndIf
-    If (Timer(GPS_TIMER,Sec,TIMER_READ)>GPS_MAX_ON_TIME) Then
-      Call GPSOff: Message = "GPS timer shutdown"
-    EndIf
-    SerialIn(RawGPSString,GPS_PORT,50,0,GPS_BUFFER) ' Read in the serial data.
-    SerialFlush(GPS_PORT) ' Clear out any data so a fresh reading is taken next cycle
-    GPSStart = InStr(1,RawGPSString,GPS_HEADER,2) ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
-    GPSEnd = InStr(GPSStart+1,RawGPSString,"M",2) ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
-    If (GPSStart>0) AND (GPSEnd>0) Then
-      GPSString = Mid(RawGPSString,GPSStart,GPSEnd-GPSStart)  ' Get the part between the start and the end
-      GPSLength = Len(GPSString)
-      Comma2 = 1
-      CommaCount = 0 ' Now parse the information and convert to double precision data, starting at the start of the string
-      For InternalCounter = 1 To GPS_PARAMETERS
-        Comma1 = InStr(Comma2,GPSString,",",2): Comma2 = InStr(Comma1+1,GPSString,",",2) ' Start searching at the position of the last comma
-        If Comma2 > 0 Then
-          GPSReadingsString(InternalCounter) = Mid(GPSString,Comma1+1,Comma2-Comma1-1) ' If it isn't above zero, the string was truncated for some reason
-          CommaCount+=1
-        EndIf
-      Next InternalCounter
-      For InternalCounter = 1 To GPS_PARAMETERS
-        GPSReadings(InternalCounter) = GPSReadingsString(InternalCounter) ' Convert from string to double
-      Next InternalCounter
-      If CommaCount >= 9 AND (GPSReadings(7) >= GPSSatellitesRequired) Then
-        Latitude = Floor(GPS_Latitude_dddmm / 100.0) + (GPS_Latitude_dddmm MOD 100)/60
-        Longitude = Floor(GPS_Longitude_dddmm / 100.0) + (GPS_Longitude_dddmm MOD 100)/60
-        If GPSReadingsString(3) = "S" Then ' Add the sign to the latitude / longitude
-          GPSReadings(3) = -1
-          GPS_Latitude_dddmm = -GPS_Latitude_dddmm
-          Latitude = -Latitude
-        Else
-          GPSReadings(3) = 1
-        EndIf
-        If GPSReadingsString(5) = "W" Then
-          GPSReadings(5) = -1
-          GPS_Longitude_dddmm = -GPS_Longitude_dddmm
-          Longitude = -Longitude
-        Else
-          GPSReadings(5) = 1
-        EndIf
-        GPSFix = GPS_QualityIndicator
-        UTCTime = GPS_UTCtime: UTCDate = 0: GPSSatellitesInView = GPS_Satellites ' UTCDate isn't part of serial message
-        Message = "GPS location complete, using " + GPSReadings(7) + " satellites."
-        Call GPSOff
-      EndIf
-    EndIf
-  EndIf
-EndSub
 
 DataTable(Ai1,True,3000) ' Diagnostics
   DataInterval(0,1,Hr,0)
@@ -332,6 +228,15 @@ DataTable(Ai1,True,3000) ' Diagnostics
   Sample(1,Pressure_mH2O,FP2)
   Maximum(1,ReadAttempts,UINT2,False,False) ' Record the maximum number of ReadAttempts this interval as most sensors are measured more frequently than the Ai1 table is stored
 EndTable
+
+
+Sub GPSOff
+  Call WritePort(Vx2,0) ' Turn off the power to the GPS and other internal status sensors
+  Message = "GPS reading complete, turning off internal sensor power"
+  Timer(GPS_TIMER,Sec,TIMER_STOP)
+  GPSPowerStatus = False
+  ReadGPSNow = False ' And go back to waiting for the next request
+EndSub
 
 Sub Initialization
   ValueToLoad = 0
@@ -369,52 +274,129 @@ Sub Initialization
   ' Check that all the measurement parameters are correct and evenly divisible (or measurements wont be taken correctly)
   
   If SLOW_MEASUREMENT_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("SLOW_MEASUREMENT_INTERVAL_S (" + SLOW_MEASUREMENT_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
-  If SENSOR_WARMUP_S = 0 Then SensorProgramOn = True          ' Warmup = 0, means always on, start powered up
-  If SENSOR_WARMUP_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("SENSOR_WARMUP_S (" + SENSOR_WARMUP_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
-  DataloggerOSVersion = Right(Status.OSVersion,5)             ' Get the OS version and convert to a string, only needed at startup.  5 characters works for OS > 10.01
-  Message += "System initialization complete.": Call AddDate
+  DataloggerOSVersion = Right(Status.OSVersion,5) ' only needed at startup.  5 characters works for OS > 10.01
+  Message += "System initialization complete."
+  Message += ", " + DayOfMonth + "/" + Month + "/" + Year + "."
 EndSub
 
-Sub SystemCheck
-  If TimeIntoInterval(0,SLOW_MEASUREMENT_INTERVAL_S,sec) Then ReadStatusSensors = True
-  PanelTemp(InternalTemperature,FILTER_FREQUENCY) ' Measure each time as this is a surrogate indicator for analog errors - when it has noise in the data
-  Battery(BatteryVoltage)
-  If ReadStatusSensors Then
-    ReadGPSNow = True ' Set the flag to trigger GPS readings
-    Call WritePort(Vx2,True) ' Start with 3.3V for humidity. Must be 3V3 or the output will be above 2.5V for SE channel.  Have tested 5V sensor to read correctly at 3V3
-    VoltSe(HumidityVoltage,1,mV2500,HUMIDITY_PORT,True,50000,FILTER_FREQUENCY,1.0,0)
-    InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*InternalTemperature)
-    If InternalHumidity > 100 Then InternalHumidity = 100
-    If InternalHumidity > 80 Then Message = "Change desiccant ASAP, condensation likely.  Ref: Ai1 manual seciton 22.":  Call AddTime: Errors = Message
-    ExciteV(Vx2,5000,0) ' Barometer uses 5V excitation
-    For i = 1 To PRESSURE_READINGS
-      VoltSe(PressureArray(i),1,mv2500,PRESSURE_PORT,True,2000,50,0.001,0)
+Sub ReadInternalHumidity
+  Call WritePort(Vx2,True) ' Start with 3.3V for humidity. Must be 3V3 or the output will be above 2.5V for SE channel.  Have tested 5V sensor to read correctly at 3V3
+  VoltSe(HumidityVoltage,1,mV2500,HUMIDITY_PORT,True,50000,FILTER_FREQUENCY,1.0,0)
+  InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*InternalTemperature)
+  If InternalHumidity > 100 Then InternalHumidity = 100
+  If InternalHumidity > 80 Then Message = "Change desiccant ASAP, condensation likely.  Ref: Ai1 manual section 22."
+  Call AddTime
+  Errors = Message
+EndSub
+
+Sub ReadBarometricPressure
+  Dim PressureArray(PRESSURE_READINGS) As Float ' Array to hold readings from which the median value is used
+  Dim PressureTimeArraySorted(PRESSURE_TIME_AVERAGING) ' hold the sorted values for median
+  ExciteV(Vx2,5000,0) ' Barometer uses 5V excitation
+  For i = 1 To PRESSURE_READINGS
+    VoltSe(PressureArray(i),1,mv2500,PRESSURE_PORT,True,2000,50,0.001,0)
+  Next i
+  SortSpa(PressureArray(),PRESSURE_READINGS,PressureArray())
+  Pressure_Voltage = PressureArray(Ceiling(PRESSURE_READINGS/2))
+  If PressureFirstReading Then ' First time through the program fill the array with the initial value
+    For i = 1 To PRESSURE_TIME_AVERAGING
+      PressureTimeArray(i) = Pressure_Voltage
     Next i
-    SortSpa(PressureArray(),PRESSURE_READINGS,PressureArray())
-    Pressure_Voltage = PressureArray(Ceiling(PRESSURE_READINGS/2))
-    If PressureFirstReading Then ' First time through the program fill the array with the initial value
-      For i = 1 To PRESSURE_TIME_AVERAGING
-        PressureTimeArray(i) = Pressure_Voltage
-      Next i
-      PressureFirstReading = False ' Only do this first time through
-    Else
-      For i = 1 To PRESSURE_TIME_AVERAGING - 1
-        PressureTimeArray(i) = PressureTimeArray(i + 1)
-      Next i
-      PressureTimeArray(PRESSURE_TIME_AVERAGING) = Pressure_Voltage
-    EndIf
-    SortSpa(PressureTimeArraySorted(),PRESSURE_TIME_AVERAGING,PressureTimeArray())
-    Pressure_Voltage = PressureTimeArraySorted(Ceiling(PRESSURE_TIME_AVERAGING/2))
-	  Pressure_hPa = (0.725*Pressure_Voltage - 0.2625)*1000
-    Pressure_mH2O = (Pressure_hPa - 1013.25) * hPa_TO_m ' Offset relative to standard atmospheric pressure
-    Call WritePort(Vx2,True)
+    PressureFirstReading = False ' Only do this first time through
+  Else
+    For i = 1 To PRESSURE_TIME_AVERAGING - 1
+      PressureTimeArray(i) = PressureTimeArray(i + 1)
+    Next i
+    PressureTimeArray(PRESSURE_TIME_AVERAGING) = Pressure_Voltage
+  EndIf
+  SortSpa(PressureTimeArraySorted(),PRESSURE_TIME_AVERAGING,PressureTimeArray())
+  Pressure_Voltage = PressureTimeArraySorted(Ceiling(PRESSURE_TIME_AVERAGING/2))
+  Pressure_hPa = (0.725*Pressure_Voltage - 0.2625)*1000
+  Pressure_mH2O = (Pressure_hPa - 1013.25) * hPa_TO_m ' Offset relative to standard atmospheric pressure
+EndSub
+
+Sub ReadCurrent
+  Call WritePort(Vx2,True)
     ExciteV(Vx2,5000,0) ' Step up to 5V for other internal sensors
     VoltSe(Current_mV,1,mv2500,CURRENT_PORT,True,0,FILTER_FREQUENCY,1,0) ' Read the raw mV output. Settling time is from humidity sensor
     Current_mA = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
+    
+EndSub
+
+
+Sub ReadPosition
+  If NOT(GPSPowerStatus) Then
+    Message = "Powering GPS for location tracking. "
+    Call WritePort(Vx2,True) ' Use WritePort first so it keeps track of the status of the port
+    ExciteV(Vx2,5000,0) ' Then set it to 5V which is higher than the 3.3V default
+    GPSPowerStatus = True
+    Timer(GPS_TIMER,Sec,TIMER_RESET_AND_START) ' Start the GPS timer
+  EndIf
+  If (Timer(GPS_TIMER,Sec,TIMER_READ)>GPS_MAX_ON_TIME) Then
+    Call GPSOff
+    Message = "GPS timer shutdown"
+  EndIf
+  SerialIn(RawGPSString,GPS_PORT,50,0,GPS_BUFFER) ' Read in the serial data.
+  SerialFlush(GPS_PORT) ' Clear out any data so a fresh reading is taken next cycle
+  GPSStart = InStr(1,RawGPSString,GPS_HEADER,2) ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
+  GPSEnd = InStr(GPSStart+1,RawGPSString,"M",2) ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
+  If (GPSStart>0) AND (GPSEnd>0) Then
+    GPSString = Mid(RawGPSString,GPSStart,GPSEnd-GPSStart)  ' Get the part between the start and the end
+    GPSLength = Len(GPSString)
+    Comma2 = 1
+    CommaCount = 0 ' Now parse the information and convert to double precision data, starting at the start of the string
+    For InternalCounter = 1 To GPS_PARAMETERS
+      Comma1 = InStr(Comma2,GPSString,",",2): Comma2 = InStr(Comma1+1,GPSString,",",2) ' Start searching at the position of the last comma
+      If Comma2 > 0 Then
+        GPSReadingsString(InternalCounter) = Mid(GPSString,Comma1+1,Comma2-Comma1-1) ' If it isn't above zero, the string was truncated for some reason
+        CommaCount+=1
+      EndIf
+    Next InternalCounter
+    For InternalCounter = 1 To GPS_PARAMETERS
+      GPSReadings(InternalCounter) = GPSReadingsString(InternalCounter) ' Convert from string to double
+    Next InternalCounter
+    If CommaCount >= 9 AND (GPSReadings(7) >= GPSSatellitesRequired) Then
+      Latitude = Floor(GPS_Latitude_dddmm / 100.0) + (GPS_Latitude_dddmm MOD 100)/60
+      Longitude = Floor(GPS_Longitude_dddmm / 100.0) + (GPS_Longitude_dddmm MOD 100)/60
+      If GPSReadingsString(3) = "S" Then ' Add the sign to the latitude / longitude
+        GPSReadings(3) = -1
+        GPS_Latitude_dddmm = -GPS_Latitude_dddmm
+        Latitude = -Latitude
+      Else
+        GPSReadings(3) = 1
+      EndIf
+      If GPSReadingsString(5) = "W" Then
+        GPSReadings(5) = -1
+        GPS_Longitude_dddmm = -GPS_Longitude_dddmm
+        Longitude = -Longitude
+      Else
+        GPSReadings(5) = 1
+      EndIf
+      GPSFix = GPS_QualityIndicator
+      UTCTime = GPS_UTCtime: UTCDate = 0: GPSSatellitesInView = GPS_Satellites ' UTCDate isn't part of serial message
+      Message = "GPS location complete, using " + GPSReadings(7) + " satellites."
+      Call GPSOff
+    EndIf
+  EndIf
+EndSub
+
+Sub SystemCheck
+  If TimeIntoInterval(0,SLOW_MEASUREMENT_INTERVAL_S,sec) Then
+    ReadStatusSensors = True
+    ReadGPSNow = True
+  EndIf
+  PanelTemp(InternalTemperature,FILTER_FREQUENCY) ' Measure each time as this is a surrogate indicator for analog errors - when it has noise in the data
+  Battery(BatteryVoltage)
+  If ReadStatusSensors Then
+    Call ReadInternalHumidity
+    Call ReadBarometricPressure
+    Call ReadCurrent
     ReadStatusSensors = False ' GPS turns off internal sensor power at the completion of its measurement
   EndIf
 
-  Call ReadGPS
+  If ReadGPSNow Then
+    Call ReadPosition
+  EndIf
 
   If BatteryVoltage < LOW_BATTERY_SHUTDOWN_V Then
     CommsPowerOnStatus = false
@@ -440,7 +422,7 @@ Sub SystemCheck
   ProcessingTime = Status.ProcessTime ' Processing time is used for checking that the program executes cleanly.  Should be last instruction
 EndSub
 
-Const HISTORY_RECORDS As Long = 3
+
 Public ErrorHistory(HISTORY_RECORDS) As String * 96 ' Keep recent messages for review
 Sub ErrorLog(ErrorMessage As String * 96)
   Errors = ErrorMessage + ". " + Public.Timestamp(2,1)
