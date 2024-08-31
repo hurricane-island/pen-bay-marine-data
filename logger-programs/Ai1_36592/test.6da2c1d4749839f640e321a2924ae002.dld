@@ -1,4 +1,4 @@
-StationName = $TEMPLATE_STATION_NAME
+StationName = Ai1_36592
 
 Const CURRENT_PORT As Long = 5
 Const HUMIDITY_PORT As Long = 6
@@ -95,7 +95,7 @@ EndSub
 
 BeginProg
   SetSetting("PakBusTCPClients", "(drema.konectgds.com,9200)")
-  SetSetting("PakBusAddress", $TEMPLATE_PAKBUS_ADDRESS)
+  SetSetting("PakBusAddress", 1062)
   SetSetting("CellEnabled", True)
   SetSetting("CellAPN", "so01.VZWSTATIC")
   SetSetting("CellPwrStartTime", CELL_WINDOW_START) ' When to power up the modem
