@@ -47,6 +47,7 @@ Const HYDROSPHERE_ID = $TEMPLATE_HYDROSPHERE_ID ' The LoginID for the Hydrospher
 Const PARAMETERS_TO_SEND = 16 ' The number of parameters that will be sent to Hydrosphere.
 Dim ParameterToSend(PARAMETERS_TO_SEND) As Long               ' A pointer of type long that points to the address of each variable to send
 Public ExternalTemp As Float                                  ' First reading from the sonde, use this instead of External_Temp
+Include "CPU:definitions.dld" ' constant definitions
 Include "CPU:YSIP_CONST_Enc.CR300"  ' Compiled library for YSI sondes (EXO, ProDSS)
 Include "CPU:YSIP_CORE_Enc.CR300"
 

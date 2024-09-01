@@ -9,6 +9,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "crypto-js": "^4.2.0"
+    "crypto-js": "^4.2.0",
+    "tar": "^7.4.3"
   }
 }
