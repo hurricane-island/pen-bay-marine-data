@@ -24,8 +24,8 @@ function station(name, address) {
     writeFileSync(program, content, "utf8");
     return create({
         gzip: true,
-        file: `../logger-programs/${name}.web.obj.tar.gz`
-    }, ["../logger-programs/template/definitions.dld"])
+        file: `../logger-programs/${name}.CPU.web.obj.tar.gz`
+    }, [directory])
 }
 
 config.forEach(([name, address])=>{
