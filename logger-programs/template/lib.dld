@@ -10,7 +10,9 @@
     Const HUMIDITY_PORT As Long = 6
     Const LOW_BATTERY_SAVER_V As Float = 12.83
     Const LOW_BATTERY_SHUTDOWN_V As Float = 12.75 ' Battery protection thresholds.
-    Const SCAN_INTERVAL_S As Long = 60 ' Program scan Interval
+    Const SCAN_INTERVAL_S As Long = 60 ' Diagnostic scan Interval
+    Const MEASUREMENT_INTERVAL_S As Long = 900 ' Sensor measurement interval 
+    Const READ_ATTEMPTS_LIMIT As Long = 4 ' Try to read sonde
 #EndIf
 
 #If Section = "Additional" Then
@@ -103,12 +105,11 @@
 #EndIf
 
 #If Section = "Pressure" Then
-
     Const PRESSURE_PARAMETERS As Long = 3
     Const PRESSURE_PORT As Long = 3.3
     Const PRESSURE_READINGS As Long = 7 ' Number of measurements to take from averaging this single reading
     Const PRESSURE_TIME_AVERAGING As Long = 5 ' The period over which to take time averaged pressure readings
-    
+
     ' Read the pressure sensor voltage and convert to barometric pressure
     Dim BarometricPressure: Units BarometricPressure = hPa
     Dim PressureArray(PRESSURE_READINGS) As Float ' Array to hold readings from which the median value is used
