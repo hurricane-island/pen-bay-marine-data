@@ -116,8 +116,8 @@ Materials
         EA=129840
         EI=0.01
         GJ=0.01
-        SWL=0
-        yield=0
+        SWL=1780
+        yield=8896
 
 
 End
