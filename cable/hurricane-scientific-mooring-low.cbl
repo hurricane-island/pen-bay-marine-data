@@ -1,5 +1,5 @@
 Problem description
-    title = "Hurricane Island Scientific Mooring"
+    title = "Hurricane Island Scientific Mooring Low Tide"
     type = surface
 
 Analysis parameters
