@@ -1,0 +1,3 @@
+services:
+  lora_pkt_fwd:
+    build: .
