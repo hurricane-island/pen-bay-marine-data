@@ -1,0 +1,13 @@
+version: '2'
+volumes:
+  weewx-data:
+services:
+  weewx:
+    build: ./weewx
+    privileged: true
+    devices: 
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
+  # lora_pkt_fwd:
+  #   build: ./lora_pkt_fwd
+  #   devices:
+  #     - "/dev/ttyACM0:/dev/ttyACM0"

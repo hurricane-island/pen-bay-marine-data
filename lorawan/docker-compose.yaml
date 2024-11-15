@@ -1,5 +1,0 @@
-services:
-  lora_pkt_fwd:
-    build: .
-    devices:
-      - "/dev/ttyACM0:/dev/ttyACM0"
