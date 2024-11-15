@@ -189,11 +189,9 @@
     Dim HumidityVoltage As Float
     Dim InternalHumidity As Long: Units InternalHumidity = %
     Sub ReadInternalHumidity(Temperature As Float)
-    VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000, FILTER_FREQUENCY, 1.0, 0.0)
-    InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*Temperature)
-    EndSub
-
-    
+        VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000, FILTER_FREQUENCY, 1.0, 0.0)
+        InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*Temperature)
+    End Sub
 
     ' Read the voltage and calculate current draw.
     Dim Current As Long: Units Current = mA

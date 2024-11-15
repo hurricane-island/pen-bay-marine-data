@@ -16,9 +16,9 @@ BeginProg
   SetSetting("PakBusAddress", $TEMPLATE_PAKBUS_ADDRESS)
   SetSetting("CellEnabled", True)
   SetSetting("CellAPN", "so01.VZWSTATIC")
-  SetSetting("CellPwrStartTime", CELL_WINDOW_START) ' When to power up the modem
-  SetSetting("CellPwrDuration", CELL_WINDOW_DURATION) ' How long is each window
-  SetSetting("CellPwrRepeat", CELL_WINDOW_FREQUENCY) ' When does the window repeat, i.e. hourly
+  SetSetting("CellPwrStartTime", CELL_WINDOW_START)
+  SetSetting("CellPwrDuration", CELL_WINDOW_DURATION)
+  SetSetting("CellPwrRepeat", CELL_WINDOW_FREQUENCY)
   SetSetting("CellBillingDay", CELL_BILLING_DAY) ' When to roll over the monthly usage
   SetSetting("CellKeepAlive", "www.google.com") ' If this fails, the datalogger will re-establish
   SetSetting("CellKeepAliveTime", 30) ' How often to ping test the link

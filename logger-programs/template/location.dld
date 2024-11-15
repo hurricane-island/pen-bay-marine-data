@@ -6,7 +6,8 @@ Const COMMS As Long = CELLULAR
 Const CELL_WINDOW_START As Long = 1440
 Const CELL_WINDOW_DURATION As Long = 10
 Const CELL_WINDOW_FREQUENCY As Long = 1440  ' Modem is always on when CELL_WINDOW_START = 1440
-Const GPS_PORT As Long = ComC2_Rx                             ' C2. Serial Rx from GPS
+Const GPS_PORT As Long = ComC2_Rxcro
+ ' C2. Serial Rx from GPS
 Const TIMER_STOP As Long = 1
 Const TIMER_RESET_AND_START As Long = 2
 Const TIMER_RESET_AND_STOP As Long = 3

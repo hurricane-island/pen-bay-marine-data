@@ -5,8 +5,8 @@ const {MD5} = Crypto;
 
 const template = "../logger-programs/template/default.dld";
 const config = [
-    ["Ai1_36594", 1065], 
-    // ["Ai1_36593", 1064], 
+    // ["Ai1_36594", 1065], 
+    ["Ai1_36593", 1064], 
     // ["Ai1_36592", 1062]
 ];
 const text = readFileSync(template, "utf8");
