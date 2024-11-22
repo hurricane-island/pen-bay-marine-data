@@ -7,7 +7,16 @@ services:
     privileged: true
     devices: 
       - "/dev/ttyUSB0:/dev/ttyUSB0"
-  # lora_pkt_fwd:
-  #   build: ./lora_pkt_fwd
-  #   devices:
-  #     - "/dev/ttyACM0:/dev/ttyACM0"
+  basicstation:
+    image: ./lorawan
+    container_name: basicstation
+    restart: unless-stopped
+    privileged: true
+    network_mode: host # read main interface MAC
+    environment:
+      MODEL: "SX1302"
+      TC_KEY: "" 
+      INTERFACE: "USB"
+      TTS_REGION: "nam1"
+    devices: 
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
