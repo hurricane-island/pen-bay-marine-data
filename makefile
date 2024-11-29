@@ -7,4 +7,8 @@ test-client:
 template:
 	cd client && node template.js
 
+weewx:
+	@ docker-compose build weewx
+.PHONY: weewx
+
 .PHONY: test-client template
