@@ -1,11 +1,13 @@
-FROM python:3-alpine
+FROM python:3-alpine AS weewx
 RUN pip install --no-cache-dir \
-    CT3 configobj Pillow pyserial pyusb paho-mqtt
+    CT3 configobj Pillow pyserial pyusb
 RUN apk add --no-cache git && \
-    git clone https://github.com/weewx/weewx ~/weewx && \
-    git clone https://github.com/matthewwall/weewx-mqtt ~/weewx-mqtt
-COPY ./weewx.conf /root/weewx-data/
-# RUN python3 /root/weewx/src/weectl.py extension install -y /root/weewx-mqtt
+    git clone https://github.com/weewx/weewx ~/weewx
+FROM weewx
+RUN pip install paho-mqtt
+RUN git clone https://github.com/matthewwall/weewx-mqtt ~/weewx-mqtt
+COPY ./weewx.template /root/weewx-data/
+COPY ./template.py /root/weewx-data/
+COPY ./start.sh /
 ENTRYPOINT [ "ash" ]
-# ENTRYPOINT [ "python3" ]
-# CMD [ "/root/weewx/src/weewxd.py" ]
+CMD [ "./start.sh" ]

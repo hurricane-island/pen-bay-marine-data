@@ -2,11 +2,21 @@ version: '2'
 volumes:
   weewx-data:
 services:
+  telegraf:
+    build: ./influx
   weewx:
     build: ./weewx
     privileged: true
     devices: 
       - "/dev/ttyUSB0:/dev/ttyUSB0"
+    environment:
+      - TEMPLATE_STATION_LOCATION=Rockland
+      - TEMPLATE_STATION_LATITUDE=0.0
+      - TEMPLATE_STATION_LONGITUDE=0.0
+      - TEMPLATE_STATION_ALTITUDE=0.0
+
+  ioos_qc:
+    build: ./ioos_qc
   basicstation:
     image: ./lorawan
     container_name: basicstation

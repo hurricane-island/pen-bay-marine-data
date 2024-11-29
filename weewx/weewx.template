@@ -26,16 +26,16 @@ version = 5.1.0
 [Station]
     
     # Description of the station location, such as your town.
-    location = Rockland
+    location = $TEMPLATE_STATION_LOCATION
     
     # Latitude in decimal degrees. Negative for southern hemisphere.
-    latitude = 0.0
+    latitude = $TEMPLATE_STATION_LATITUDE
     # Longitude in decimal degrees. Negative for western hemisphere.
-    longitude = 0.0
+    longitude = $TEMPLATE_STATION_LONGITUDE
     
     # Altitude of the station, with the unit it is in. This is used only
     # if the hardware cannot supply a value.
-    altitude = 0, foot    # Choose 'foot' or 'meter' for unit
+    altitude = $TEMPLATE_STATION_ALTITUDE, foot    # Choose 'foot' or 'meter' for unit
     
     # Set to type of station hardware. There must be a corresponding stanza
     # in this file, which includes a value for the 'driver' option.
@@ -51,7 +51,7 @@ version = 5.1.0
     rain_year_start = 1
     
     # Start of week (0=Monday, 6=Sunday)
-    week_start = 6
+    week_start = 0
 
 ##############################################################################
 
