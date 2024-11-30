@@ -8,7 +8,11 @@ template:
 	cd client && node template.js
 
 weewx:
-	@ docker-compose build weewx
+	@ balena build weewx -f weather
 .PHONY: weewx
+
+deploy:
+	@ balena deploy weather weewx
+.PHONY: deploy
 
 .PHONY: test-client template

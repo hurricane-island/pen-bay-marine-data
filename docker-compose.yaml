@@ -14,19 +14,18 @@ services:
       - TEMPLATE_STATION_LATITUDE=0.0
       - TEMPLATE_STATION_LONGITUDE=0.0
       - TEMPLATE_STATION_ALTITUDE=0.0
-
   ioos_qc:
     build: ./ioos_qc
-  basicstation:
-    image: ./lorawan
-    container_name: basicstation
-    restart: unless-stopped
-    privileged: true
-    network_mode: host # read main interface MAC
-    environment:
-      MODEL: "SX1302"
-      TC_KEY: "" 
-      INTERFACE: "USB"
-      TTS_REGION: "nam1"
-    devices: 
-      - "/dev/ttyUSB0:/dev/ttyUSB0"
+  # basicstation:
+  #   image: ./lorawan
+  #   container_name: basicstation
+  #   restart: unless-stopped
+  #   privileged: true
+  #   network_mode: host # read main interface MAC
+  #   environment:
+  #     MODEL: "SX1302"
+  #     TC_KEY: "" 
+  #     INTERFACE: "USB"
+  #     TTS_REGION: "nam1"
+  #   devices: 
+  #     - "/dev/ttyUSB0:/dev/ttyUSB0"
