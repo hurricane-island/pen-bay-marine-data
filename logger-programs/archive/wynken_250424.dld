@@ -47,12 +47,11 @@ Const YSIPPORT As Long = ComRS232: Public Ai1WipesSonde As Boolean = True: Prese
 ' Available                                                   ' P_SW.
 ' Available                                                   ' P_LL.  Can not be used for output.
 
-
-Const HYDROSPHERE_ID = "MQZcL-pd0ZF-z1cNk-oMFUE"              ' The LoginID for the Hydrosphere site.
+Const HYDROSPHERE_ID = "MQZcL-pd0ZF-z1cNk-oMFUE" ' The LoginID for the Hydrosphere site.
 Const PARAMETERS_TO_SEND = 11 ' The number of parameters that will be sent to Hydrosphere.
 Dim ParameterToSend(PARAMETERS_TO_SEND) As Long               ' A pointer of type long that points to the address of each variable to send
 Public ExternalTemp As Float                                  ' First reading from the sonde, use this instead of External_Temp
-Include "CPU:YSIP_CONST_Enc.CR300"                            ' Compiled library for YSI sondes (EXO, ProDSS)
+Include "CPU:YSIP_CONST_Enc.CR300"
 Include "CPU:YSIP_CORE_Enc.CR300"
 
 Dim Ai1OSVersion As Float = 0.75
@@ -228,7 +227,6 @@ Dim CellBillingDay = 1 ' Day of Month                         ' For data usage c
 Public Control_____________ As Boolean = false                ' This groups all the program control flags into one section for ease of use
 Dim ReadGPSNow As Boolean = false: Units ReadGPSNow = True = Trigger a new GPS reading ' Set by setting ReadStatusSensors true
 Dim SendToHydrosphere As Boolean                              ' Set true to initiate data record and transfer.  Also set true after StoreData routine
-
 
 Sub Communications
   RealTime(rTime)                                             ' Have If time statements at the top so none are missed from long scan times
