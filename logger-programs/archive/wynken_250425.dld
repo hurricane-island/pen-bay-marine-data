@@ -1,4 +1,4 @@
-StationName = $TEMPLATE_STATION_NAME                                       ' Program for AiBUOY-V . Model Ai1BUOY-V
+StationName = "Wynken" ' Program for AiBUOY-V . Model Ai1BUOY-V
 ' 
 ' Wiring Details:
 ' YSI EXO (Uses RS485): MCBH6F. 1(Orange)=N/C, 2(Black)=GND(U3), 3(Red)=BAT, 4=N/C, 5(Yellow)=RS485B(U1), 6(White)=RS485A(U2).  RS485 Internally wired to ComRS232. 115,200 N/8/1
@@ -13,13 +13,13 @@ Const EXO2 As Long = 2: Const EXO3 As Long = 3: Const OTT_CBS As Long = 4: Const
 Const SDI12 As Long = 1: Const RS232 As Long = 2: Const ANALOG As Long = 3: Const RS485 As Long = 4: Const ADD As Long = 1: Const SUBTRACT As Long = 2: Const ABSOLUTE As Long = 1: Const DIFFERENTIAL As Long = 2: Const AIRMAR As Long = 3: Const AMAZON As Long = 13: Const PROSWAP As Long = 14
 '--------------------------------------------------------------------------------------------------
 Public Errors As String * 128 = "": Public Message As String * 256 = "": Public PortsStatus As String * 90: Dim PortsON As Long = 0    ' Verbose description of output ports
-Const PAKBUS_ADDRESS As Long = $TEMPLATE_PAKBUS_ADDRESS: Const TCP_CLIENT As String = "(drema.konectgds.com,9200)" ' Pakbus Router Configuration
+Const PAKBUS_ADDRESS As Long = 1065: Const TCP_CLIENT As String = "(drema.konectgds.com,9200)" ' Pakbus Router Configuration
 Public AccessPointName As String = "so01.VZWSTATIC"           ' APN for Verizon ISS
 
 ' Factory configuration constants
 Const METRIC As Boolean = True                                ' Program uses SI metric units wherever possible
 Const SCAN_INTERVAL_S As Long = 5 ' s                         ' Program scan Interval. 
-Const MEASUREMENT_INTERVAL_S As Long = 900 's                 ' Sensor measurement interval
+Const MEASUREMENT_INTERVAL_S As Long = 3600 's                 ' Sensor measurement interval
 Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 's           ' Slower interval for less critical measurements, such as GPS
 Const DATA_STORAGE_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' Store data every measurement cycle
 Const SENSOR_WARMUP_S As Long = 0: Public MeasureBefore_s As Long = 0: PreserveOneVariable(MeasureBefore_s) ' The time to warm up the sensor before measuring (in s).  Set to 0 to have always on
@@ -30,13 +30,6 @@ Const A3_RATIO As Float = 1.000                               ' Factory calibrat
 Const SENSOR_QTY As Long = 1  ' Number of sensors fitted to this station, repeat the measurements on sequential ports or address
 Const GPS_INTERFACE As Long = RS232
 Const TABLE_WQ As Long = 200000: Const SONDE_USED As Boolean = TRUE: Const SONDE_USES_RS485 As Boolean = True: Const SONDEVALUES_TBL_SIZE As Long = 5000
-
-
-
-
-
-
-
 
 
 Const PRESSURE_TYPE As Long = ABSOLUTE: Const PRESSURE_FSR_PSI As Float = 43.5: Const TRANSFER As Float = 0.1 ' Pressure sensor configuration
@@ -53,17 +46,15 @@ Const GPS_PORT As Long = ComC2_Rx                             ' C2. Serial Rx fr
 Const YSIPPORT As Long = ComRS232: Public Ai1WipesSonde As Boolean = True: PreserveOneVariable(Ai1WipesSonde) ' RS232 Port with RS485 adapter
 ' Available                                                   ' P_SW.
 ' Available                                                   ' P_LL.  Can not be used for output.
-'------------------------------------------------------------------------------------------------------
 
 
-
-Const HYDROSPHERE_ID = $TEMPLATE_HYDROSPHERE_ID              ' The LoginID for the Hydrosphere site.
-Const PARAMETERS_TO_SEND = 16                                 ' The number of parameters that will be sent to Hydrosphere.
+Const HYDROSPHERE_ID = "MQZcL-pd0ZF-z1cNk-oMFUE"              ' The LoginID for the Hydrosphere site.
+Const PARAMETERS_TO_SEND = 11 ' The number of parameters that will be sent to Hydrosphere.
 Dim ParameterToSend(PARAMETERS_TO_SEND) As Long               ' A pointer of type long that points to the address of each variable to send
 Public ExternalTemp As Float                                  ' First reading from the sonde, use this instead of External_Temp
 Include "CPU:YSIP_CONST_Enc.CR300"                            ' Compiled library for YSI sondes (EXO, ProDSS)
 Include "CPU:YSIP_CORE_Enc.CR300"
-'-A1i OPERATING SYSTEM-----------------------------------------------------------------------------------------------------------------------
+
 Dim Ai1OSVersion As Float = 0.75
 Dim DataloggerOSVersion As Float                              ' Used for holding CR300 OS version
 Const FILTER_FREQUENCY As Long = 4000                         ' Set to 50 or 60 for situations with AC noise, otherwise 4000Hz provides quickest processing
@@ -336,9 +327,8 @@ Sub MeasureWaterQuality
 EndSub
 
 
-  
-'---HYDROSPHERE-CENTRAL---------------------------------------
-Const HYDROSPHERE_HOST As String = "stormcentral.waterlog.com": Const HYDROSPHERE_PORT As Long = 32212
+Const HYDROSPHERE_HOST As String = "stormcentral.waterlog.com"
+Const HYDROSPHERE_PORT As Long = 32212
 Const HYDROSPHERE_MAX_RETRIES As Long = 5                     ' Number of retries for Hydrosphere connection attempts
 Const HYDROSPHERE_BUFFER_SIZE As Long = 96                    ' How many sets of readings can be stored/Bufferd in the logger waiting for good comms.  96 is required for 15min data, for 12 hours - if daily updates are used
 Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s, i.e. 5s
@@ -356,7 +346,7 @@ Dim HydrosphereRetries As Long
 
 Sub Hydrosphere
   If SendToHydrosphere = True Then
-    HydrosphereRetries = 0 '---------------------------------- Send the buffer
+    HydrosphereRetries = 0 ' Send the buffer
     Message = "Hydrosphere (": Call AddTime: Message += "). "
     HydrosphereID_EditInProgram = HYDROSPHERE_ID
     If HydrosphereBufferNextPointer > 1 Then
@@ -372,9 +362,9 @@ Sub Hydrosphere
           TCPClose(HydrosphereSocket)
         Else
           Message += "No connection. "
-          SerialOutResult = 0                                 ' Make sure that the last OK is not still in the status
+          SerialOutResult = 0 ' Make sure that the last OK is not still in the status
         EndIf
-        If SerialOutResult = 2 Then                           ' If "OK" was sent
+        If SerialOutResult = 2 Then ' If "OK" was sent
           If HydrosphereBufferNextPointer > 2 Then            ' If we still have at least 2 data values in the Buffer (one of which was just sent), move the Buffer forward by one.
             For i = 1 To (HydrosphereBufferNextPointer - 2)
               HydrosphereDataBuffer(i) = HydrosphereDataBuffer(i+1)
@@ -394,7 +384,7 @@ Sub Hydrosphere
     SendToHydrosphere = False
   EndIf ' If SendToHydrosphere = True
 EndSub ' Hydrosphere
-'---SENSOR MEASUREMENTS---------------------------------------
+
 Sub SensorMeasurements  ' Time commands at the top, so slow commands don't interfere
   If TimeIntoInterval(0,DATA_STORAGE_INTERVAL_S,Sec) Then StoreData = True
   If TimeIntoInterval(0,1,Day) Then
@@ -423,18 +413,19 @@ Sub SensorMeasurements  ' Time commands at the top, so slow commands don't inter
       Call WritePort(SENSOR_POWER_PORT,True)
       SensorPowerStatus = True
     EndIf
-    SensorProgramOn = false                                   ' Only do this once
+    SensorProgramOn = false ' Only do this once
   EndIf
-  If (ReadNow OR ReadFast) AND NOT(ReadPause) Then '---------- Measurements performed when required
+  If (ReadNow OR ReadFast) AND NOT(ReadPause) Then
     Call MeasureWaterQuality
     ReadNow = false
-  EndIf ' End ReadNow
-  If StoreData Then ' ------------------ DATA STORAGE.  Needs to be separate so it can store exactly at the interval
+  EndIf
+
+  If StoreData Then ' Needs to be separate so it can store exactly at the interval
     ' StoreData does not store data with RS485 sondes, must take measurements first, and measurements must be valid or CallTable is skipped (see above)
-    Call LoadData                                             ' Load the array for addresses of variables to use
-    For i = 1 To PARAMETERS_TO_SEND                           ' Load the arrays of user selected values to send
+    Call LoadData ' Load the array for addresses of variables to use
+    For i = 1 To PARAMETERS_TO_SEND
       HydrosphereDescription(i) = !(ParameterToSend(i))       ' The () around the pointer address means return the name of that memory location
-      AddressToRead = (ParameterToSend(i))                    ' NOTE: You can not read the value at ParameterToSend(i) directly into HydrosphereValues(i) because the order of operation means that it 
+      AddressToRead = (ParameterToSend(i)) ' NOTE: You can not read the value directly
       HydrosphereValues(i) = !AddressToRead
     Next i
     RealTime(rTime)
@@ -570,7 +561,7 @@ Sub ReadGPS
   EndIf ' If ReadGPSNow
 EndSub ' ReadGPS
 
-DataTable(Ai1,True,3000) ' Records status information for remote diagnostics
+DataTable(Ai1,True,3000)                                      ' Records status information for remote diagnostics
   DataInterval(0,1,Hr,0)
   Sample(1,BatteryVoltage,FP2)
   Sample(1,InternalTemperature,FP2)
@@ -599,6 +590,7 @@ DataTable(Ai1,True,3000) ' Records status information for remote diagnostics
   Maximum(1,ReadAttempts,UINT2,False,False)                   ' Record the maximum number of ReadAttempts this interval as most sensors are measured more frequently than the Ai1 table is stored
 EndTable
 
+'---INITIALIZATOIN-ROUTINE------------------------------------
 Sub Initialization
   ValueToLoad = 0: AddressToRead = 0 ' Stops a warning if not used
   Call GPSOff                                                 ' First time starting up, turn the GPS off to put the power output port and regulator in a known state
@@ -720,17 +712,25 @@ Sub ErrorLog(ErrorMessage As String * 96)
   ErrorHistory(HISTORY_RECORDS) = Errors
   LastProgramCounter = ProgramCounter                         ' Keep track of the program counter when this occured
 EndSub
-' -END OF Ai1 OPERATING SYSTEM--------------------------------
 
 
-                             
-
-
-
-Sub LoadData                                           ' Load variables to array.  If a name is wrong, it will compile but the name will be blank (check spelling, underscores, etc)
-  ParameterToSend(1) = @ExternalTemp: ParameterToSend(2) = @SpConductivity_us: ParameterToSend(3) = @Pressure_abs: ParameterToSend(4) = @Turbidity: ParameterToSend(5) = @ODO
-  ParameterToSend(6) = @ODO_Sat: ParameterToSend(7) = @pH: ParameterToSend(8) = @pH_mV: ParameterToSend(9) = @Chlorophyll_ugL: ParameterToSend(10) = @Chlorophyll_RFU
-  ParameterToSend(11) = @BGA_PC_ugL: ParameterToSend(12) = @BGA_PC_RFU: ParameterToSend(13) = @BatteryVoltage: ParameterToSend(14) = @InternalHumidity: ParameterToSend(15) = @Latitude: ParameterToSend(16) = @Longitude
+Sub LoadData ' Load variables to array.  If a name is wrong, it will compile but the name will be blank (check spelling, underscores, etc)
+  ParameterToSend(1) = @ExternalTemp
+  ParameterToSend(2) = @SpConductivity_us
+  ParameterToSend(3) = @Pressure_abs
+  ParameterToSend(4) = @Chlorophyll_ugL
+  ParameterToSend(5) = @Chlorophyll_RFU
+  ParameterToSend(6) = @BGA_PC_ugL
+  ParameterToSend(7) = @BGA_PC_RFU
+  ParameterToSend(8) = @BatteryVoltage
+  ParameterToSend(9) = @InternalHumidity
+  ParameterToSend(10) = @Latitude
+  ParameterToSend(11) = @Longitude
+  ' ParameterToSend(4) = @Turbidity
+  ' ParameterToSend(5) = @ODO
+  ' ParameterToSend(6) = @ODO_Sat
+  ' ParameterToSend(7) = @pH
+  ' ParameterToSend(8) = @pH_mV
 EndSub
 
 '----------------- Main Program ---------------------------------------------------------------------

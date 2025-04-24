@@ -59,4 +59,5 @@ logger-programs/*.tdf
 
 logger-programs/*
 !logger-programs/template/
+!logger-programs/archive/
 *.tdf
