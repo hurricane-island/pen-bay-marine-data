@@ -1,0 +1,15 @@
+[workspace]
+authors = ["Keeney <nkeeney@oceanics.io>"]
+channels = ["conda-forge"]
+name = "pen-bay-marine-data"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.13.3,<3.14"
+pandas = ">=2.2.3,<3"
+
+[pypi-dependencies]
+"influxdb3-python" = "~=0.12.0"

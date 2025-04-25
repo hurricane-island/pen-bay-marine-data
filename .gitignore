@@ -60,3 +60,7 @@ logger-programs/*.tdf
 logger-programs/*
 !logger-programs/template/
 *.tdf
+
+# pixi environments
+.pixi
+*.egg-info

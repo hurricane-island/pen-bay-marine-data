@@ -1,15 +1,11 @@
-test-client:
-	cd client && node index.js
-.PHONY: test-client
-
 template:
 	cd client && node template.js
 .PHONY: template
 
 weather:
-	@ balena build weather-stations --fleet weather --noparent-check
+	@ balena build --fleet weather
 .PHONY: weather
 
 deploy:
-	@ balena deploy weather weather-stations
+	@ balena deploy weather
 .PHONY: deploy

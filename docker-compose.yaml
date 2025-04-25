@@ -13,7 +13,7 @@ services:
       - TEMPLATE_STATION_LONGITUDE=0.0
       - TEMPLATE_STATION_ALTITUDE=0.0
   basicstation:
-    image: ./lorawan
+    image: xoseperez/basicstation
     container_name: basicstation
     restart: unless-stopped
     privileged: true
