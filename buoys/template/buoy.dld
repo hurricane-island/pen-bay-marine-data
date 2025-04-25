@@ -9,12 +9,11 @@ Const PARAMETERS_TO_SEND = 11 ' The number of parameters that will be sent to Hy
 ' RS485 Option Port (Uses RS232 via ComRS232)
 ' 
 ' Refer to section 13.3.2 "Hydrosphere Configuration" in the Ai1 manual for details on setting up the Hydrosphere parameters to suit this site
-'------------------------------ Names used to improve readability --------------------------------------
 Const NONE As Long = 0: Const CELLULAR As Long = 1: Const WIFI As Long = 2: Const RADIO As Long = 3: Const IRIDIUM As Long = 4: Const TRANSPARENT As Long = 5: Const LORAWAN As Long = 6: Const RADTRANS As Long = 7: Const JOIN As Long = 0: Const CREATE As Long = 1
 Const LITHIUM As Long = 1: Const LITHIUM_12V As Long = 2: Const LEAD_ACID As Long = 3: Const EXT As Long = 4: Const SUPPLY_3V3 As Float = 3.3: Const SUPPLY_5V As Float = 5: Const RISING_EDGE As Long = 1: Const HIGH_LEVEL As Long = 2: Const FALLING_EDGE As Long = 3: Const LOW_LEVEL As Long = 4 ' Types of event activationA11
 Const EXO2 As Long = 2: Const EXO3 As Long = 3: Const OTT_CBS As Long = 4: Const AT200 As Long = 5: Const YSI6SERIES As Long = 6: Const ULTRA As Long = 7: Const LEVEL_4TO20 As Long = 8: Const RADAR As Long = 9: Const ULTRA_SERIAL As Long = 10: Const SUNA As Long = 11: Const VEGAPULS As Long = 12
 Const SDI12 As Long = 1: Const RS232 As Long = 2: Const ANALOG As Long = 3: Const RS485 As Long = 4: Const ADD As Long = 1: Const SUBTRACT As Long = 2: Const ABSOLUTE As Long = 1: Const DIFFERENTIAL As Long = 2: Const AIRMAR As Long = 3: Const AMAZON As Long = 13: Const PROSWAP As Long = 14
-'--------------------------------------------------------------------------------------------------
+
 Public Errors As String * 128 = "": Public Message As String * 256 = "": Public PortsStatus As String * 90: Dim PortsON As Long = 0    ' Verbose description of output ports
 Const TCP_CLIENT As String = "(drema.konectgds.com,9200)" ' Pakbus Router Configuration
 Public AccessPointName As String = "so01.VZWSTATIC"           ' APN for Verizon ISS
@@ -25,28 +24,39 @@ Const SCAN_INTERVAL_S As Long = 5 ' s                         ' Program scan Int
 Const MEASUREMENT_INTERVAL_S As Long = 3600 's                 ' Sensor measurement interval
 Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 's           ' Slower interval for less critical measurements, such as GPS
 Const DATA_STORAGE_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' Store data every measurement cycle
-Const SENSOR_WARMUP_S As Long = 0: Public MeasureBefore_s As Long = 0: PreserveOneVariable(MeasureBefore_s) ' The time to warm up the sensor before measuring (in s).  Set to 0 to have always on
+Const SENSOR_WARMUP_S As Long = 0
+Public MeasureBefore_s As Long = 0
+PreserveOneVariable(MeasureBefore_s) ' The time to warm up the sensor before measuring (in s).  Set to 0 to have always on
 Const LOW_BATTERY_SAVER_V = 12.83: Const LOW_BATTERY_SHUTDOWN_V = 12.75' V  ' Battery protection thresholds.  SAVER: Slow meas/no night comms.  SHUTDOWN: Slowest meas/No comms
-Const COMMS As Long = CELLULAR   : Const CELL_WINDOW_START As Long = 1440: Const CELL_WINDOW_DURATION As Long = 10: Const CELL_WINDOW_FREQUENCY As Long = 1440  ' Modem is always on when CELL_WINDOW_START = 1440
+Const COMMS As Long = CELLULAR
+Const CELL_WINDOW_START As Long = 1440
+Const CELL_WINDOW_DURATION As Long = 10
+Const CELL_WINDOW_FREQUENCY As Long = 1440  ' Modem is always on when CELL_WINDOW_START = 1440
 Const CURRENT_ZERO_mV As Long = 1250 ' mV.                    ' Factory calibrated.  To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
 Const A3_RATIO As Float = 1.000                               ' Factory calibrated.  2:1 voltage divider fitted on A3
 Const SENSOR_QTY As Long = 1  ' Number of sensors fitted to this station, repeat the measurements on sequential ports or address
 Const GPS_INTERFACE As Long = RS232
-Const TABLE_WQ As Long = 200000: Const SONDE_USED As Boolean = TRUE: Const SONDE_USES_RS485 As Boolean = True: Const SONDEVALUES_TBL_SIZE As Long = 5000
+Const TABLE_WQ As Long = 200000
+Const SONDE_USED As Boolean = TRUE
+Const SONDE_USES_RS485 As Boolean = True
+Const SONDEVALUES_TBL_SIZE As Long = 5000
+Const PRESSURE_TYPE As Long = ABSOLUTE
+Const PRESSURE_FSR_PSI As Float = 43.5
+Const TRANSFER As Float = 0.1 ' Pressure sensor configuration
 
-
-Const PRESSURE_TYPE As Long = ABSOLUTE: Const PRESSURE_FSR_PSI As Float = 43.5: Const TRANSFER As Float = 0.1 ' Pressure sensor configuration
-'----------------- I/O ALLOCATION---------------------------------------------------------------------
 ' Available                                                   ' A1 Terminal (SE1)
 ' Available                                                   ' A2 Terminal (SE2)
-Const PRESSURE_PORT As Long = 3:  Const PRESSURE_INTERFACE As Long = ANALOG   ' A3 Terminal (SE3). Internal pressure sensor.  Absolute sensor requires 2:1 voltage divider
+Const PRESSURE_PORT As Long = 3
+Const PRESSURE_INTERFACE As Long = ANALOG   ' A3 Terminal (SE3). Internal pressure sensor.  Absolute sensor requires 2:1 voltage divider
 ' Available                                                   ' Internal SE4
                                                               ' Vx1. Vx1 used for powering RS485 adapter, 5V.
 ' Internal Sensor Power Port                                  ' Vx2. Internal functions expect this to be 5V
 Const SENSOR_POWER_PORT As Long = SW12V                       ' SW12. Used for controlling power to sensors
 ' Available                                                   ' C1. Recommended to keep for SDI12 in the future
 Const GPS_PORT As Long = ComC2_Rx                             ' C2. Serial Rx from GPS
-Const YSIPPORT As Long = ComRS232: Public Ai1WipesSonde As Boolean = True: PreserveOneVariable(Ai1WipesSonde) ' RS232 Port with RS485 adapter
+Const YSIPPORT As Long = ComRS232
+Public Ai1WipesSonde As Boolean = True
+PreserveOneVariable(Ai1WipesSonde) ' RS232 Port with RS485 adapter
 ' Available                                                   ' P_SW.
 ' Available                                                   ' P_LL.  Can not be used for output.
 
@@ -59,23 +69,62 @@ Dim Ai1OSVersion As Float = 0.75
 Dim DataloggerOSVersion As Float                              ' Used for holding CR300 OS version
 Const FILTER_FREQUENCY As Long = 4000                         ' Set to 50 or 60 for situations with AC noise, otherwise 4000Hz provides quickest processing
 ' General Constants to aide readability
-Const READ_COILS As Long = 1: Const READ_DISCRETE_INPUTS As Long = 2: Const READ_HOLDING_REGISTERS As Long = 3: Const READ_INPUT_REGISTERS As Long = 4: Const WRITE_SINGLE_COIL As Long = 5: Const WRITE_SINGLE_REGISTER As Long = 6: Const WRITE_MULTIPLE_COILS As Long = 15: Const WRITE_MULTIPLE_REGISTERS As Long = 16
-Const RTU_32_FLOAT_OR_LONG_CDAB As Long = 0: Const RTU_16_SIGNED_INTEGER As Long = 1: Const RTU_32_FLOAT_OR_LONG_ABCD As Long = 2: Const RTU_16_UNSIGNED_INTEGER As Long = 3: Const ASCII_4_BYTES_CDAB As Long = 10: Const ASCII_2_BYTES As Long = 11: Const ASCII_4_BYTES_ABCD As Long = 12
-Const TIMER_STOP As Long = 1: Const TIMER_RESET_AND_START As Long = 2: Const TIMER_RESET_AND_STOP As Long = 3: Const TIMER_READ As Long = 4: Const ALLOW_SLEEP As Long = 1
-Const GPS_TIMER As Long = 11: Const WEB_TIMER As Long = 12: Const SENSOR_TIMER As Long = 13: Const PUMP_TIMER As Long = 14: Const IRIDIUM_TIMER As Long = 15: Const MODBUS_TIMER As Long = 16: Const DISPLAY_TIMER As Long = 17: Const SAMPLER_TIMER As Long = 18: Const INSITU_SENSOR_TIMER As Long = 19: Const EVENT_TIMER As Long = 20 ' TIMERS. 
-Const ONE_SHOT As Long = 0: Const TIME_BASED As Long = 1: Const RISING_STAGE As Long = 2: Const RISING_AND_FALLING_STAGE As Long = 3 ' Types of sampler activation
-Const CRLF = CHR(13) + CHR(10): Const CR = CHR(13): Const LF = CHR(10): Const SPACE = CHR(32): Const ESC = CHR(27)
-Const hPa_TO_m As Float = 0.0101972: Const PSI_TO_hPa As Float = 68.94757
-Const FORWARD As Long = 1: Const REVERSE As Long = 2: Const STOPPED As Long = 0: Const RUNNING As Long = 1
-Const CURRENT_PORT As Long = 5: Const HUMIDITY_PORT As Long = 6
+Const READ_COILS As Long = 1
+Const READ_DISCRETE_INPUTS As Long = 2
+Const READ_HOLDING_REGISTERS As Long = 3
+Const READ_INPUT_REGISTERS As Long = 4
+Const WRITE_SINGLE_COIL As Long = 5
+Const WRITE_SINGLE_REGISTER As Long = 6
+Const WRITE_MULTIPLE_COILS As Long = 15
+Const WRITE_MULTIPLE_REGISTERS As Long = 16
+Const RTU_32_FLOAT_OR_LONG_CDAB As Long = 0
+Const RTU_16_SIGNED_INTEGER As Long = 1
+Const RTU_32_FLOAT_OR_LONG_ABCD As Long = 2
+Const RTU_16_UNSIGNED_INTEGER As Long = 3
+Const ASCII_4_BYTES_CDAB As Long = 10
+Const ASCII_2_BYTES As Long = 11
+Const ASCII_4_BYTES_ABCD As Long = 12
+Const TIMER_STOP As Long = 1
+Const TIMER_RESET_AND_START As Long = 2
+Const TIMER_RESET_AND_STOP As Long = 3
+Const TIMER_READ As Long = 4
+Const ALLOW_SLEEP As Long = 1
+Const GPS_TIMER As Long = 11
+Const WEB_TIMER As Long = 12
+Const SENSOR_TIMER As Long = 13
+Const PUMP_TIMER As Long = 14
+Const IRIDIUM_TIMER As Long = 15
+Const MODBUS_TIMER As Long = 16
+Const DISPLAY_TIMER As Long = 17
+Const SAMPLER_TIMER As Long = 18
+Const INSITU_SENSOR_TIMER As Long = 19
+Const EVENT_TIMER As Long = 20
+Const ONE_SHOT As Long = 0
+Const TIME_BASED As Long = 1
+Const RISING_STAGE As Long = 2
+Const RISING_AND_FALLING_STAGE As Long = 3 ' Types of sampler activation
+Const CRLF = CHR(13) + CHR(10)
+Const CR = CHR(13)
+Const LF = CHR(10)
+Const SPACE = CHR(32)
+Const ESC = CHR(27)
+Const hPa_TO_m As Float = 0.0101972
+Const PSI_TO_hPa As Float = 68.94757
+Const FORWARD As Long = 1
+Const REVERSE As Long = 2
+Const STOPPED As Long = 0
+Const RUNNING As Long = 1
+Const CURRENT_PORT As Long = 5
+Const HUMIDITY_PORT As Long = 6
 
-'---STATUS----------------------------------------------------
+
 Const READ_ATTEMPTS_LIMIT As Long = 4
 Public ReadAttempts As Long                                   ' Keep track of how many times the sensor read was attempted
 Dim ProgramCounter As Long: Units ProgramCounter = Cycles     ' Keep track of how many program cycles since power up
 Dim LastProgramCounter As Long: Units LastProgramCounter = Cycles
 Public BatteryVoltage As Float: Units BatteryVoltage = Volts
-Dim Vx1Voltage As Long: Dim Vx2Voltage As Long                ' Keep track of the excitation port voltage so that it can safely be turned off after status readings  
+Dim Vx1Voltage As Long
+Dim Vx2Voltage As Long                ' Keep track of the excitation port voltage so that it can safely be turned off after status readings  
 Const PRESSURE_SUPPLY As Float = 5.0                          ' All use 5V for maximum output
 Const PRESSURE_ZERO_OFFSET As Float = TRANSFER * PRESSURE_SUPPLY
 Const PRESSURE_FSR As Float = (1 - TRANSFER) * PRESSURE_SUPPLY
@@ -222,11 +271,11 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)   ' Fixes the proble
   Message += ". ": Call AddTime: Message +=". "
 EndSub
 
-'---COMMUNICATIONS--------------------------------------------
+
 Dim CommsPowerOnStatus As Boolean = True                      ' CommsPowerOnStatus returns the state of the internal cellular modem power when controlled by battery saver and shutdown settings, but does not indicate the state due to window duration and frequency.  IPNetPower overrides all other power control options
 Dim CellBillingDay = 1 ' Day of Month                         ' For data usage calculations, to know which day of month the billing cycle resets
-Public Control_____________ As Boolean = false                ' This groups all the program control flags into one section for ease of use
-Dim ReadGPSNow As Boolean = false: Units ReadGPSNow = True = Trigger a new GPS reading ' Set by setting ReadStatusSensors true
+Public Control_____________ As Boolean = False                ' This groups all the program control flags into one section for ease of use
+Dim ReadGPSNow As Boolean = False: Units ReadGPSNow = True = Trigger a new GPS reading ' Set by setting ReadStatusSensors true
 Dim SendToHydrosphere As Boolean                              ' Set true to initiate data record and transfer.  Also set true after StoreData routine
 
 Sub Communications
@@ -237,7 +286,7 @@ EndSub ' Sub Communications
 Public ReadFast As Boolean = False: Units ReadFast = True = Read each Scan interval
 Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
 Public ReadPause As Boolean = False: Units ReadPause = True = Pause New Sensor Readings
-Public ReadStatusSensors As Boolean = false
+Public ReadStatusSensors As Boolean = False
 Public StoreData As Boolean = False: Units StoreData = True = Save Data Record  ' Allows program control (time and event based) as well as user control
 Public ForceStoreData As Boolean = False
 Public SensorHoldPowerOn As Boolean = False: Units SensorHoldPowerOn = True = Keep Sensor On
@@ -423,13 +472,13 @@ Sub SensorMeasurements  ' Time commands at the top, so slow commands don't inter
     ' StoreData does not store data with RS485 sondes, must take measurements first, and measurements must be valid or CallTable is skipped (see above)
     Call LoadData ' Load the array for addresses of variables to use
     For i = 1 To PARAMETERS_TO_SEND
-      HydrosphereDescription(i) = !(ParameterToSend(i))       ' The () around the pointer address means return the name of that memory location
-      AddressToRead = (ParameterToSend(i)) ' NOTE: You can not read the value directly
+      HydrosphereDescription(i) = !(ParameterToSend(i)) ' name of memory location is the canonical vendor name
+      AddressToRead = (ParameterToSend(i)) ' Cannot read the value directly
       HydrosphereValues(i) = !AddressToRead
     Next i
     RealTime(rTime)
     HydrosphereData = "D=" + FormatFloat(Month,"%02.0f") + "/" + FormatFloat(DayOfMonth,"%02.0f") + "/" + FormatFloat((Year MOD 100),"%02.0f") + "," + FormatFloat(Hour,"%02.0f") + ":" + FormatFloat(Minute,"%02.0f") + ":" + FormatFloat(Second,"%02.0f") + ","
-    HydrosphereNames = "SN=" '-------------------------- Load the buffer with data to send
+    HydrosphereNames = "SN="
     For i = 1 To PARAMETERS_TO_SEND
       HydrosphereNames += HydrosphereDescription(i)
       HydrosphereData += HydrosphereValues(i)
@@ -451,10 +500,10 @@ Sub SensorMeasurements  ' Time commands at the top, so slow commands don't inter
   EndIf
   If NOT(SensorHoldPowerOn) AND (SensorHoldPowerOff OR SensorProgramOff) Then
     If SensorPowerStatus Then                                 ' Only turn off if currently on
-      Call WritePort(SENSOR_POWER_PORT,False)                 ' Turn off if instructed
+      Call WritePort(SENSOR_POWER_PORT,False)
       SensorPowerStatus = False
     EndIf
-    SensorProgramOff = false                                  ' Only do this once
+    SensorProgramOff = False                                  ' Only do this once
   EndIf
     If SensorKeepRS485On AND NOT(SensorKeepRS485OnLast) Then
       Message = "Turning on RS485 adapter based on SensorKeepRS485On setting"
@@ -466,7 +515,8 @@ Sub SensorMeasurements  ' Time commands at the top, so slow commands don't inter
     EndIf
     SensorKeepRS485OnLast = SensorKeepRS485On
 EndSub
-'---GPS-------------------------------------------------------
+
+
 Const GPS_PARAMETERS As Long = 9                              ' 1=Time(UTC),2=Date,3=Lat(ddmm),4=Lat(.mmmmmm),5=Long(ddmm),6=Long(.mmmmmm),7=Alt,8=Fix,9=#Sat
 Dim GPSReadings(GPS_PARAMETERS) As Float
 Public GPSString As String * GPS_BUFFER: Units GPSString = NMEA 0183 Processed String
@@ -589,27 +639,28 @@ DataTable(Ai1,True,3000)                                      ' Records status i
   Maximum(1,ReadAttempts,UINT2,False,False)                   ' Record the maximum number of ReadAttempts this interval as most sensors are measured more frequently than the Ai1 table is stored
 EndTable
 
-'---INITIALIZATOIN-ROUTINE------------------------------------
+
 Sub Initialization
-  ValueToLoad = 0: AddressToRead = 0 ' Stops a warning if not used
+  ValueToLoad = 0
+  AddressToRead = 0 ' Stops a warning if not used
   Call GPSOff                                                 ' First time starting up, turn the GPS off to put the power output port and regulator in a known state
-  SerialOpen(GPS_PORT,GPS_BAUD,0,0,GPS_BUFFER,ALLOW_SLEEP)    ' Open GPS port
+  SerialOpen(GPS_PORT,GPS_BAUD, 0, 0, GPS_BUFFER,ALLOW_SLEEP)    ' Open GPS port
   Message = "Initializing... "
   RealTime(rTime)
   Call ErrorLog("Program restart")                            ' Record the program restart in the error log
   Delay(0,500,mSec)                                           ' Have a short delay incase multiple messages are generated
   Control_____________ = false: Measurements________ = false: i = 0  ' Just to stop a compile warning that it is unused
-  SetSetting("PakBusTCPClients",TCP_CLIENT)
-  SetSetting("PakBusAddress",PAKBUS_ADDRESS)
+  SetSetting("PakBusTCPClients", TCP_CLIENT)
+  SetSetting("PakBusAddress", PAKBUS_ADDRESS)
   Battery(BatteryVoltage)                                     ' Get a battery voltage reading so that on first execution it will have a reading
-  SetSetting("CellEnabled",True)                              ' Make sure that the modem is turned on
-  SetSetting("CellAPN",AccessPointName)                       ' Configure the APN.  It is possible to set this through the constant table
-  SetSetting("CellPwrStartTime",CELL_WINDOW_START)            ' When to power up the modem
-  SetSetting("CellPwrDuration",CELL_WINDOW_DURATION)          ' How long is each window
-  SetSetting("CellPwrRepeat",CELL_WINDOW_FREQUENCY)           ' When does the window repeat, i.e. hourly
-  SetSetting("CellBillingDay",CellBillingDay)                 ' When to roll over the monthly usage
-  SetSetting("CellKeepAlive","www.google.com")                ' URL to ping to verify network connectivity.  If this fails, the datalogger will re-establish
-  SetSetting("CellKeepAliveTime",30)                          ' How often to ping test the link
+  SetSetting("CellEnabled", True)                              ' Make sure that the modem is turned on
+  SetSetting("CellAPN", AccessPointName)                       ' Configure the APN.  It is possible to set this through the constant table
+  SetSetting("CellPwrStartTime", CELL_WINDOW_START)            ' When to power up the modem
+  SetSetting("CellPwrDuration", CELL_WINDOW_DURATION)          ' How long is each window
+  SetSetting("CellPwrRepeat", CELL_WINDOW_FREQUENCY)           ' When does the window repeat, i.e. hourly
+  SetSetting("CellBillingDay", CellBillingDay)                 ' When to roll over the monthly usage
+  SetSetting("CellKeepAlive", "www.google.com")                ' URL to ping to verify network connectivity.  If this fails, the datalogger will re-establish
+  SetSetting("CellKeepAliveTime", 30)                          ' How often to ping test the link
   CommsPowerOnStatus = true: IPNetPower(5,1,0)                ' Make sure that it is turned on
 	Call WritePort(Vx1,True)
   Call WritePort(SW12V,True)
@@ -635,7 +686,7 @@ Sub Initialization
   Message += "System initialization complete.": Call AddDate
 EndSub
 
-'---SYSTEM-CHECKS---------------------------------------------
+
 Sub SystemCheck
   If TimeIntoInterval(0,SLOW_MEASUREMENT_INTERVAL_S,sec) Then ReadStatusSensors = True
   PanelTemp(InternalTemperature,FILTER_FREQUENCY)             ' Measure each time as this is a surrogate indicator for analog errors - when it has noise in the data
@@ -644,8 +695,7 @@ Sub SystemCheck
     ReadGPSNow = True                                         ' Set the flag to trigger GPS readings
     Call WritePort(Vx2,True)                                  ' Start with 3.3V for humidity. Must be 3V3 or the output will be above 2.5V for SE channel.  Have tested 5V sensor to read correctly at 3V3
     VoltSe(HumidityVoltage,1,mV2500,HUMIDITY_PORT,True,50000,FILTER_FREQUENCY,1.0,0)
-    ' InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.006363)/(1.0546-0.00216*InternalTemperature) ' Old calibration
-    InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*InternalTemperature) ' Equation was slightly updated for new sensor, includes temperature compensation.  Better for 100%
+    InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*InternalTemperature)
     If InternalHumidity > 100 Then InternalHumidity = 100
     If InternalHumidity > 80 Then Message = "Change desiccant ASAP, condensation likely.  Ref: Ai1 manual seciton 22.":  Call AddTime: Errors = Message
     ExciteV(Vx2,5000,0)                                       ' Barometer uses 5V excitation
@@ -713,7 +763,7 @@ Sub ErrorLog(ErrorMessage As String * 96)
 EndSub
 
 
-Sub LoadData ' Load variables to array.  If a name is wrong, it will compile but the name will be blank (check spelling, underscores, etc)
+Sub LoadData ' Names but be spelled correctly
   ParameterToSend(1) = @ExternalTemp
   ParameterToSend(2) = @SpConductivity_us
   ParameterToSend(3) = @Pressure_abs
@@ -732,15 +782,11 @@ Sub LoadData ' Load variables to array.  If a name is wrong, it will compile but
   ' ParameterToSend(8) = @pH_mV
 EndSub
 
-'----------------- Main Program ---------------------------------------------------------------------
 BeginProg
   Call Initialization
   Scan (SCAN_INTERVAL_S,Sec,0,0)
     ' Add any other custom sensor measurements here
-
-    Call SensorMeasurements                                   ' Any enabled sensors will be measured, refer to main constants table
-
-
+    Call SensorMeasurements
     ' Add any other communications or control instructions here
   NextScan
 
