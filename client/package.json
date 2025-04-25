@@ -7,9 +7,5 @@
   "author": "Keeney <nkeeney@hurricaneisland.net>",
   "license": "MIT",
   "private": true,
-  "type": "module",
-  "dependencies": {
-    "crypto-js": "^4.2.0",
-    "tar": "^7.4.3"
-  }
+  "type": "module"
 }

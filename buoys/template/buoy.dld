@@ -1,4 +1,7 @@
-StationName = "Wynken" ' Program for AiBUOY-V . Model Ai1BUOY-V
+StationName = $STATION_NAME ' Program for AiBUOY-V . Model Ai1BUOY-V
+Const HYDROSPHERE_ID = $CLIENT_ID ' The LoginID for the Hydrosphere site.
+Const PAKBUS_ADDRESS As Long = $PAKBUS_ADDRESS ' network address
+Const PARAMETERS_TO_SEND = 11 ' The number of parameters that will be sent to Hydrosphere.
 ' 
 ' Wiring Details:
 ' YSI EXO (Uses RS485): MCBH6F. 1(Orange)=N/C, 2(Black)=GND(U3), 3(Red)=BAT, 4=N/C, 5(Yellow)=RS485B(U1), 6(White)=RS485A(U2).  RS485 Internally wired to ComRS232. 115,200 N/8/1
@@ -13,7 +16,7 @@ Const EXO2 As Long = 2: Const EXO3 As Long = 3: Const OTT_CBS As Long = 4: Const
 Const SDI12 As Long = 1: Const RS232 As Long = 2: Const ANALOG As Long = 3: Const RS485 As Long = 4: Const ADD As Long = 1: Const SUBTRACT As Long = 2: Const ABSOLUTE As Long = 1: Const DIFFERENTIAL As Long = 2: Const AIRMAR As Long = 3: Const AMAZON As Long = 13: Const PROSWAP As Long = 14
 '--------------------------------------------------------------------------------------------------
 Public Errors As String * 128 = "": Public Message As String * 256 = "": Public PortsStatus As String * 90: Dim PortsON As Long = 0    ' Verbose description of output ports
-Const PAKBUS_ADDRESS As Long = 1065: Const TCP_CLIENT As String = "(drema.konectgds.com,9200)" ' Pakbus Router Configuration
+Const TCP_CLIENT As String = "(drema.konectgds.com,9200)" ' Pakbus Router Configuration
 Public AccessPointName As String = "so01.VZWSTATIC"           ' APN for Verizon ISS
 
 ' Factory configuration constants
@@ -47,8 +50,6 @@ Const YSIPPORT As Long = ComRS232: Public Ai1WipesSonde As Boolean = True: Prese
 ' Available                                                   ' P_SW.
 ' Available                                                   ' P_LL.  Can not be used for output.
 
-Const HYDROSPHERE_ID = "MQZcL-pd0ZF-z1cNk-oMFUE" ' The LoginID for the Hydrosphere site.
-Const PARAMETERS_TO_SEND = 11 ' The number of parameters that will be sent to Hydrosphere.
 Dim ParameterToSend(PARAMETERS_TO_SEND) As Long               ' A pointer of type long that points to the address of each variable to send
 Public ExternalTemp As Float                                  ' First reading from the sonde, use this instead of External_Temp
 Include "CPU:YSIP_CONST_Enc.CR300"
