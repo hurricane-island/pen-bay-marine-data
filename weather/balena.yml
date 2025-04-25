@@ -1,4 +1,4 @@
-name: weewx
+name: weather
 type: sw.block
 description: >-
   Weather Station Block
