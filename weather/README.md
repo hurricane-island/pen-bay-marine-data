@@ -24,3 +24,9 @@ If you go to the Balena Cloud logs for a specific device once these are running,
 You'll need to get the Gateway EUI to register on The Things Network.
 
 This can be done by opening a shell into `basicstation` and running the `gateway_eui` script. This will be used in TNN interface when creating the gateway. Choose to authenticate with LNS and download the access key. Copy this into the device level override of the `TC_KEY` environment variable.
+
+The `weather` container also has sqlite installed to query the WeeWx database.
+
+Run `sqlite3 root/weewx-data/archive/weewx.sdb -readonly` to enter readonly mode. Entering `.tables` will list the tables available to query. `The query PRAGMA table_info(<TABLE_NAME>);` will show information about the table columns. WeeWx has a wide `archive` table, and tables for each parameter.
+
+You can count the number of records with `SELECT COUNT(1) FROM archive;`
