@@ -9,3 +9,7 @@ weather:
 deploy:
 	@ balena deploy weather
 .PHONY: deploy
+
+develop:
+	@ balena deploy weather-dev --build --nocache
+.PHONY: deploy-dev

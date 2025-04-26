@@ -4,6 +4,8 @@ volumes:
 services:
   weather:
     build: ./weather
+    container_name: weather
+    restart: unless-stopped
     privileged: true
     devices: 
       - "/dev/ttyUSB0:/dev/ttyUSB0"
@@ -18,10 +20,15 @@ services:
     restart: unless-stopped
     privileged: true
     network_mode: host # read main interface MAC
-    environment:
-      MODEL: "SX1302"
-      TC_KEY: "" 
-      INTERFACE: "USB"
-      TTS_REGION: "nam1"
     devices: 
       - "/dev/ttyUSB0:/dev/ttyUSB0"
+    environment:
+      DEVICE: "AUTO"
+      GATEWAY_EUI_SOURCE: "eth0"
+      HAS_GPS: "0" # 1 if GNSS module
+      INTERFACE: "USB" # USB or SPI
+      MODEL: "SX1302"
+      TC_KEY: "" # LNS registration key from TTN interface
+      TLS_SNI: "true"
+      TTS_REGION: "nam1"
+      TTS_TENANT: "neracoos"
