@@ -5,9 +5,10 @@ RUN apk update && \
     git clone https://github.com/hurricane-island/weewx-influx.git /root/weewx-influx && \
     pip install --no-cache-dir /root/weewx overrides
 FROM weewx
-RUN mkdir -p /root/weewx-data/bin/user && \
-    cp /root/weewx-influx/bin/user/influx.py /root/weewx-data/bin/user/influx.py
-COPY ./weewx.template.conf ./template.py /root/weewx-data/
+WORKDIR /root
+RUN mkdir -p weewx-data/bin/user && \
+    cp weewx-influx/bin/user/influx.py weewx-data/bin/user/influx.py
+COPY ./weewx.template.conf ./template.py weewx-data/
 COPY ./start.sh /
 ENTRYPOINT [ "ash" ]
 CMD [ "./start.sh" ]
