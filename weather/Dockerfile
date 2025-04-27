@@ -9,6 +9,6 @@ WORKDIR /root
 RUN mkdir -p weewx-data/bin/user && \
     cp weewx-influx/bin/user/influx.py weewx-data/bin/user/influx.py
 COPY ./weewx.template.conf ./template.py weewx-data/
-COPY ./start.sh /
+COPY ./start.sh ./
 ENTRYPOINT [ "ash" ]
 CMD [ "./start.sh" ]
