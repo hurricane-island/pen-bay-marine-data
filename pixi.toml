@@ -1,5 +1,5 @@
 [workspace]
-authors = ["Keeney <nkeeney@oceanics.io>"]
+authors = ["Keeney <nkeeney@hurricaneisland.net>"]
 channels = ["conda-forge"]
 name = "pen-bay-marine-data"
 platforms = ["osx-arm64"]

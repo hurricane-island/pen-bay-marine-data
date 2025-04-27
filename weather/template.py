@@ -1,10 +1,25 @@
-# Run inside the docker container on startup to populate the conf file from the container environment
-import os;
-with open('/root/weewx-data/weewx.template.conf', 'r') as file:
-  filedata = file.read()
-filedata = filedata.replace('$TEMPLATE_STATION_LOCATION', os.getenv('TEMPLATE_STATION_LOCATION'))
-filedata = filedata.replace('$TEMPLATE_STATION_LATITUDE', os.getenv('TEMPLATE_STATION_LATITUDE'))
-filedata = filedata.replace('$TEMPLATE_STATION_LONGITUDE', os.getenv('TEMPLATE_STATION_LONGITUDE'))
-filedata = filedata.replace('$TEMPLATE_STATION_ALTITUDE', os.getenv('TEMPLATE_STATION_ALTITUDE'))
-with open('/root/weewx-data/weewx.conf', 'w') as file:
-  file.write(filedata)
+"""
+Run inside the docker container on startup to populate the conf file 
+from the container environment. Replaces WeeWx installation procedure.
+"""
+if __name__ == "__main__":
+    from os import getenv
+    with open('/root/weewx-data/weewx.template.conf', 'r', encoding='utf-8') as file:
+        filedata = file.read()
+
+    variables = [
+        'TEMPLATE_STATION_LOCATION',
+        'TEMPLATE_STATION_LATITUDE',
+        'TEMPLATE_STATION_LONGITUDE',
+        'TEMPLATE_STATION_ALTITUDE',
+        'INFLUX_API_TOKEN',
+        'INFLUX_MEASUREMENT',
+        'INFLUX_BUCKET',
+        'INFLUX_SERVER_URL'
+    ]
+    for var in variables:
+        slug = "$" + var
+        filedata = filedata.replace(slug, getenv(var))
+
+    with open('/root/weewx-data/weewx.conf', 'w', encoding='utf-8') as file:
+        file.write(filedata)

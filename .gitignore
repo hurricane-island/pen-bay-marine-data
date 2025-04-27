@@ -64,3 +64,4 @@ logger-programs/*
 # pixi environments
 .pixi
 *.egg-info
+weather/weewx.conf

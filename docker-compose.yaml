@@ -10,10 +10,14 @@ services:
     devices: 
       - "/dev/ttyUSB0:/dev/ttyUSB0"
     environment:
-      - TEMPLATE_STATION_LOCATION=Rockland
-      - TEMPLATE_STATION_LATITUDE=0.0
-      - TEMPLATE_STATION_LONGITUDE=0.0
-      - TEMPLATE_STATION_ALTITUDE=0.0
+      TEMPLATE_STATION_LOCATION: Rockland
+      TEMPLATE_STATION_LATITUDE: "0.0"
+      TEMPLATE_STATION_LONGITUDE: "0.0"
+      TEMPLATE_STATION_ALTITUDE: "0.0"
+      INFLUX_SERVER_URL: ""
+      INFLUX_BUCKET: ""
+      INFLUX_API_TOKEN: ""
+      INFLUX_MEASUREMENT: ""
   basicstation:
     image: xoseperez/basicstation
     container_name: basicstation
