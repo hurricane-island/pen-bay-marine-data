@@ -3,7 +3,7 @@ RUN apk update && \
     apk add --no-cache git sqlite && \
     git clone https://github.com/weewx/weewx /root/weewx && \
     git clone https://github.com/hurricane-island/weewx-influx.git /root/weewx-influx && \
-    pip install --no-cache-dir /root/weewx overrides
+    pip install --no-cache-dir /root/weewx overrides influxdb3-python
 FROM weewx
 WORKDIR /root
 RUN mkdir -p weewx-data/bin/user && \
