@@ -17,7 +17,8 @@ if __name__ == "__main__":
         'INFLUX_API_TOKEN',
         'INFLUX_MEASUREMENT',
         'INFLUX_BUCKET',
-        'INFLUX_SERVER_URL'
+        'INFLUX_SERVER_URL',
+        'INFLUX_BINDING'
     ]
     for var in variables:
         slug = "$" + var

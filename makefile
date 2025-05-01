@@ -12,4 +12,4 @@ deploy:
 
 develop:
 	@ balena deploy weather-dev --build --nocache
-.PHONY: deploy-dev
+.PHONY: develop
