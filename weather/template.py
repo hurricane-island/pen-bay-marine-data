@@ -2,9 +2,11 @@
 Run inside the docker container on startup to populate the conf file 
 from the container environment. Replaces WeeWx installation procedure.
 """
+TEMPLATE = "/root/weewx-data/weewx.template.conf"
+CONFIG = '/root/weewx-data/weewx.conf'
 if __name__ == "__main__":
     from os import getenv
-    with open('/root/weewx-data/weewx.template.conf', 'r', encoding='utf-8') as file:
+    with open(TEMPLATE, 'r', encoding='utf-8') as file:
         filedata = file.read()
 
     variables = [
@@ -19,7 +21,7 @@ if __name__ == "__main__":
     ]
     for var in variables:
         slug = "$" + var
-        filedata = filedata.replace(slug, getenv(var))
+        filedata: str = filedata.replace(slug, getenv(var))
 
-    with open('/root/weewx-data/weewx.conf', 'w', encoding='utf-8') as file:
+    with open(CONFIG, 'w', encoding='utf-8') as file:
         file.write(filedata)

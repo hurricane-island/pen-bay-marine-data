@@ -30,3 +30,18 @@ The `weather` container also has sqlite installed to query the WeeWx database.
 Run `sqlite3 root/weewx-data/archive/weewx.sdb -readonly` to enter readonly mode. Entering `.tables` will list the tables available to query. The query `PRAGMA table_info(<TABLE_NAME>);` will show information about the table columns. WeeWx has a wide `archive` table, and tables for each parameter.
 
 You can count the number of records with `SELECT COUNT(1) FROM archive;`
+
+## Troubleshooting
+
+### Log level
+
+Set `debug=2` in configuration file.
+
+Rebuild and deploy to the desired fleet.
+
+https://docs.balena.io/learn/manage/device-logs/
+
+### Delete volume
+
+Use the `Purge Data` option in the Actions menu for the device or fleet. This is needed to get rid of the sqlite db. 
+
