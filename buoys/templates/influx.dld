@@ -1,0 +1,147 @@
+StationName = "bench_test"
+
+Const CELL_BILLING_DAY As Long = 1 ' For data usage calculations, to know which day of month the billing cycle resets
+Const CELL_WINDOW_DURATION As Long = 10
+Const CELL_WINDOW_FREQUENCY As Long = 1440 
+Const CELL_WINDOW_START As Long = 1440 ' Always on = 1440
+Const CURRENT_PORT As Long = 5
+Const CURRENT_ZERO_mV As Long = 1244 ' To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
+Const DATA_TABLE_ROWS As Long = 3000
+Const FILTER_FREQUENCY As Long = 4000 ' Set to 50 or 60 for AC noise, otherwise 4000Hz is quickest processing
+Const HUMIDITY_PORT As Long = 6
+Const LOW_BATTERY_SAVER_V As Float = 12.83
+Const LOW_BATTERY_SHUTDOWN_V As Float = 12.75 ' Battery protection thresholds.
+Const SCAN_INTERVAL_S As Long = 60 ' Diagnostic scan Interval
+Const MEASUREMENT_INTERVAL_S As Long = 900 ' Sensor measurement interval 
+Const READ_ATTEMPTS_LIMIT As Long = 4 ' Try to read sonde
+
+Const PRESSURE_PARAMETERS As Long = 3
+Const PRESSURE_PORT As Long = 3.3
+Const PRESSURE_READINGS As Long = 7 ' Number of measurements to take from averaging this single reading
+Const PRESSURE_TIME_AVERAGING As Long = 5 ' The period over which to take time averaged pressure readings
+
+' Read the pressure sensor voltage and convert to barometric pressure
+Dim BarometricPressure: Units BarometricPressure = hPa
+Dim PressureArray(PRESSURE_READINGS) As Float ' Array to hold readings from which the median value is used
+Dim PressureTimeArray(PRESSURE_TIME_AVERAGING) As Float ' tail of pressure time series, init at compile time
+Dim PressureTimeArraySorted(PRESSURE_TIME_AVERAGING) ' hold the sorted values for median
+Dim Pressure_Voltage, Recent as Long
+Dim PressureFirstReading As Boolean = True ' Set at compile time
+Sub ReadBarometricPressure
+    VoltSe(PressureArray(), PRESSURE_READINGS, mv2500, -PRESSURE_PORT, True, 2000, 50, 0.001, 0)
+    SortSpa(PressureArray(), PRESSURE_READINGS, PressureArray())
+    Pressure_Voltage = PressureArray(Ceiling(PRESSURE_READINGS/2))
+    If PressureFirstReading Then ' First time through the program fill the array with the initial value
+        For Recent = 1 To PRESSURE_TIME_AVERAGING
+            PressureTimeArray(Recent) = Pressure_Voltage
+        Next Recent
+        PressureFirstReading = False
+    Else
+        For Recent = 1 To PRESSURE_TIME_AVERAGING - 1
+            PressureTimeArray(Recent) = PressureTimeArray(Recent + 1)
+        Next Recent
+        PressureTimeArray(PRESSURE_TIME_AVERAGING) = Pressure_Voltage
+    End If
+    SortSpa(PressureTimeArraySorted(), PRESSURE_TIME_AVERAGING, PressureTimeArray())
+    BarometricPressure = (0.725*PressureTimeArraySorted(Ceiling(PRESSURE_TIME_AVERAGING/2)) - 0.2625)*1000
+End Sub
+
+
+Public Message As String * 256 = ""
+Dim BatteryVoltage As Float: Units BatteryVoltage = Volts
+Dim InternalTemperature As Float: Units InternalTemperature = °C
+
+' Vx2 has high power regulator as well.
+' Due to enable/disable circuit Vx2 can not be fully turned off.
+' Anything >400mV is accurate.
+Dim Vx2Voltage As Long
+Sub SetVx2mV(Voltage As Long)
+    If Vx2Voltage <> Voltage Then
+        Message = "Setting Port Vx2 to " + (Vx2Voltage/1000) + "V"
+        ExciteV(Vx2, Voltage, 0)
+        Vx2Voltage = Voltage
+    End If
+End Sub
+
+Dim ModemPower As Boolean ' state of the cellular modem power
+Sub SetModemPower(State As Boolean)
+    If ModemPower <> State Then
+        Message = "Setting Modem State to " + State
+        ModemPower = State
+        IPNetPower(5, State)
+    End If
+End Sub
+
+' Read the humidity sensor voltage and use board temperature correction
+' to get the internal humidity.
+Dim HumidityVoltage As Float
+Dim InternalHumidity As Long: Units InternalHumidity = %
+Sub ReadInternalHumidity(Temperature As Float)
+    VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000, FILTER_FREQUENCY, 1.0, 0.0)
+    InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*Temperature)
+End Sub
+
+' Read the voltage and calculate current draw.
+Dim Current As Long: Units Current = mA
+Dim Current_mV As Float = 0.0
+Sub ReadCurrent
+    VoltSe(Current_mV, 1, mv2500, CURRENT_PORT, True, 0, FILTER_FREQUENCY, 1, 0)
+    Current = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
+End Sub
+
+
+Dim api_token As String * 128 = 
+Public http_header As String * 256
+Dim http_header_content As String * 100 = "Content-Type:text/plain; charset=utf-8"
+Dim http_header_auth As String * 256 = "Authorization: Token $INFLUX_API_TOKEN"
+Public http_post_response As String * 256
+Public http_post_tx As Long
+Public http_body As String * 512
+Public time_stamp as Long
+Dim server_url As String * 256 = "$INFLUX_SERVER_URL/api/v2/write?bucket=$INFLUX_BUCKET&precision=s"
+
+
+DataTable(Diagnostics, True, DATA_TABLE_ROWS) ' Diagnostics
+  Sample(1, BatteryVoltage, FP2)
+  Sample(1, InternalTemperature, FP2)
+  Sample(1, InternalHumidity, FP2)
+  Sample(1, Current, FP2)
+  Sample(1, BarometricPressure, FP2)
+EndTable
+
+BeginProg
+  SetSetting("PakBusTCPClients", "(drema.konectgds.com,9200)")
+  SetSetting("PakBusAddress", 1064)
+  SetSetting("CellEnabled", True)
+  SetSetting("CellAPN", "so01.VZWSTATIC")
+  SetSetting("CellPwrStartTime", CELL_WINDOW_START)
+  SetSetting("CellPwrDuration", CELL_WINDOW_DURATION)
+  SetSetting("CellPwrRepeat", CELL_WINDOW_FREQUENCY)
+  SetSetting("CellBillingDay", CELL_BILLING_DAY) ' When to roll over the monthly usage
+  SetSetting("CellKeepAlive", "www.google.com") ' If this fails, the datalogger will re-establish
+  SetSetting("CellKeepAliveTime", 30) ' How often to ping test the link
+  SetVx2mV(0)
+  SetModemPower(True)
+
+  
+  Scan (SCAN_INTERVAL_S, Sec, 0, 0)
+    PanelTemp(InternalTemperature, FILTER_FREQUENCY)
+    SetVx2mV(3300)
+    ReadInternalHumidity(InternalTemperature)
+    SetVx2mV(5000)
+    ReadBarometricPressure()
+    ReadCurrent()
+    SetVx2mV(0)
+    Battery(BatteryVoltage)
+    http_header = http_header_auth + CHR(13) + CHR(10) + http_header_content
+    time_stamp = Public.TimeStamp(0,1)
+    http_body = "$INFLUX_MEASUREMENT,station=$TEMPLATE_STATION_NAME battery=" + BatteryVoltage + ",pressure=" + BarometricPressure + " " + time_stamp
+    http_post_tx = HttpPost(server_url, http_body, http_post_response, http_header)
+    If BatteryVoltage < LOW_BATTERY_SHUTDOWN_V Then
+      SetModemPower(False)
+    ElseIf BatteryVoltage > LOW_BATTERY_SAVER_V Then
+      SetModemPower(True)
+    End If
+    CallTable Diagnostics
+  NextScan
+EndProg
