@@ -420,8 +420,8 @@ EndSub
 
 Const HYDROSPHERE_HOST As String = "stormcentral.waterlog.com"
 Const HYDROSPHERE_PORT As Long = 32212
-Const HYDROSPHERE_MAX_RETRIES As Long = 5                     ' Number of retries for Hydrosphere connection attempts
-Const HYDROSPHERE_BUFFER_SIZE As Long = 96                    ' How many sets of readings can be stored/Bufferd in the logger waiting for good comms.  96 is required for 15min data, for 12 hours - if daily updates are used
+Const HYDROSPHERE_MAX_RETRIES As Long = 5 ' Number of retries for Hydrosphere connection attempts
+Const HYDROSPHERE_BUFFER_SIZE As Long = 96 ' How many sets of readings can be stored/Bufferd in the logger waiting for good comms.  96 is required for 15min data, for 12 hours - if daily updates are used
 Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s, i.e. 5s
 Public HydrosphereID_EditInProgram As String = HYDROSPHERE_ID ' The ID in the form of abcde-abcde-abcde-abcde, defined in main program
 Public HydrosphereData As String *(22+PARAMETERS_TO_SEND*10) ' The string representing one full record to send to Hydrosphere
@@ -456,7 +456,7 @@ Sub Hydrosphere
           SerialOutResult = 0 ' Make sure that the last OK is not still in the status
         EndIf
         If SerialOutResult = 2 Then ' If "OK" was sent
-          If HydrosphereBufferNextPointer > 2 Then            ' If we still have at least 2 data values in the Buffer (one of which was just sent), move the Buffer forward by one.
+          If HydrosphereBufferNextPointer > 2 Then ' If we still have at least 2 data values in the Buffer (one of which was just sent), move the Buffer forward by one.
             For i = 1 To (HydrosphereBufferNextPointer - 2)
               HydrosphereDataBuffer(i) = HydrosphereDataBuffer(i+1)
             Next i
@@ -467,31 +467,31 @@ Sub Hydrosphere
         Else
           Message += "No OK (" + SerialOutResult + "). "
           If HydrosphereRetries = HYDROSPHERE_MAX_RETRIES Then Message += "Failed. " + HydrosphereRetries + "/" + HYDROSPHERE_MAX_RETRIES + " tries."
-        EndIf ' End if "OK" was sent
+        EndIf
       Loop
     Else
       Message += "No data to send. Use StoreData first. "
-    EndIf ' If HydrosphereBufferNextPointer > 1
+    EndIf
     SendToHydrosphere = False
   EndIf
 EndSub
 
-Sub SensorMeasurements  ' Time commands at the top, so slow commands don't interfere
+Sub SensorMeasurements ' Time commands at the top, so slow commands don't interfere
   If TimeIntoInterval(0,DATA_STORAGE_INTERVAL_S,Sec) Then StoreData = True
   If TimeIntoInterval(0,1,Day) Then
     ReadPause = False
     ReadFast = False
   EndIf
-  If ReadNow Then                                             ' If ReadNow is on here then it is set manually, not by program control
+  If ReadNow Then ' If ReadNow is on here then it is set manually, not by program control
     If SensorPowerStatus = False Then
       Call WritePort(SENSOR_POWER_PORT,True)
       SensorPowerStatus = True
       ' The duration of the delay depends on the instrument.  Some power up quickly (ultrasonic <1s, Display <2s), some take a long time (EXO takes 30s before responding to SDI12)
       Message = "Sensor always on, delay for 2s only"
-      Delay(0,2,Sec)                                          ' Ultrasonic needs 0.35s.  Display needs 2s.  This will throw out subsequent time instructions, but manual readings don't happen often
+      Delay(0,2,Sec) ' Ultrasonic needs 0.35s.  Display needs 2s.  This will throw out subsequent time instructions, but manual readings don't happen often
     EndIf ' If SensorPowerStatus
-    StoreData = True                                          ' Store data from this reading as well
-    If SENSOR_WARMUP_S > 0 Then SensorProgramOff = True       ' Turn off power at the end of the manual reading
+    StoreData = True ' Store data from this reading as well
+    If SENSOR_WARMUP_S > 0 Then SensorProgramOff = True ' Turn off power at the end of the manual reading
   EndIf
   If MeasureBefore_s > 0 Then
     If TimeIntoInterval((MEASUREMENT_INTERVAL_S - MeasureBefore_s),MEASUREMENT_INTERVAL_S,Sec) Then ReadNow = True ' If MeasureBefore_s is non zero, it takes measurement before the interval so it is ready
@@ -500,7 +500,7 @@ Sub SensorMeasurements  ' Time commands at the top, so slow commands don't inter
   EndIf
   If TimeIntoInterval(0,MEASUREMENT_INTERVAL_S,Sec) Then SensorProgramOn = True ' Sensor is always powered on
   If NOT(SensorHoldPowerOff) AND (SensorHoldPowerOn OR SensorProgramOn OR ReadFast) Then ' Turn on if instructed by either the user or the program.  Turning off is after the measurement
-    If SensorPowerStatus = False Then                         ' Only turn it on if it is not already
+    If SensorPowerStatus = False Then ' Only turn it on if it is not already
       Call WritePort(SENSOR_POWER_PORT,True)
       SensorPowerStatus = True
     EndIf
@@ -538,15 +538,15 @@ Sub SensorMeasurements  ' Time commands at the top, so slow commands don't inter
     StoreData = False                                         ' Only do this one time
   EndIf
   If ForceStoreData Then
-    CallTable SondeValues              ' This can force data storage for processes like FTP that won't do a transfer
+    CallTable SondeValues ' This can force data storage for processes like FTP that won't do a transfer
     ForceStoreData = False
   EndIf
   If NOT(SensorHoldPowerOn) AND (SensorHoldPowerOff OR SensorProgramOff) Then
-    If SensorPowerStatus Then                                 ' Only turn off if currently on
+    If SensorPowerStatus Then ' Only turn off if currently on
       Call WritePort(SENSOR_POWER_PORT,False)
       SensorPowerStatus = False
     EndIf
-    SensorProgramOff = False                                  ' Only do this once
+    SensorProgramOff = False ' Only do this once
   EndIf
     If SensorKeepRS485On AND NOT(SensorKeepRS485OnLast) Then
       Message = "Turning on RS485 adapter based on SensorKeepRS485On setting"
@@ -560,11 +560,11 @@ Sub SensorMeasurements  ' Time commands at the top, so slow commands don't inter
 EndSub
 
 
-Const GPS_PARAMETERS As Long = 9                              ' 1=Time(UTC),2=Date,3=Lat(ddmm),4=Lat(.mmmmmm),5=Long(ddmm),6=Long(.mmmmmm),7=Alt,8=Fix,9=#Sat
+Const GPS_PARAMETERS As Long = 9 ' 1=Time(UTC),2=Date,3=Lat(ddmm),4=Lat(.mmmmmm),5=Long(ddmm),6=Long(.mmmmmm),7=Alt,8=Fix,9=#Sat
 Dim GPSReadings(GPS_PARAMETERS) As Float
 Public GPSString As String * GPS_BUFFER: Units GPSString = NMEA 0183 Processed String
-Const GPS_HEADER As String = "$GPGGA"                         ' This is the header of the GPS string
-Dim CommaCount As Long                                        ' Use to make sure I have enough data
+Const GPS_HEADER As String = "$GPGGA" ' This is the header of the GPS string
+Dim CommaCount As Long ' Use to make sure I have enough data
 Dim GPSReadingsString(GPS_PARAMETERS) As String * 16
 Dim RawGPSString As String * GPS_BUFFER: Units RawGPSString = NMEA 0183 String buffer
 Dim GPSStart As Long: Units GPSStart = Start character For NMEA Message
@@ -586,8 +586,10 @@ Public UTCTime As Long: Units UTCTime = HHMMSS
 Dim UTCDate As Long: Units UTCDate = YYMMDD
 Dim GPSFix As Long: Units GPSFix = 0=No FIX, 1=FIX, 2=DIFFERENTIAL FIX
 Public GPSSatellitesInView As Long: Units GPSSatellitesInView = GPS Satellites visible
-PreserveOneVariable(Latitude): PreserveOneVariable(Longitude) ' Save these values so a power cycle does not reset them and cause the icon to jump around
-Public GPSSatellitesRequired As Long = 4: PreserveOneVariable(GPSSatellitesRequired) ' Specifies the required satellites for an accurate GPS fix.  Up to 7 or 8 is possible
+PreserveOneVariable(Latitude):
+PreserveOneVariable(Longitude) ' Save these values so a power cycle does not reset them and cause the icon to jump around
+Public GPSSatellitesRequired As Long = 4
+PreserveOneVariable(GPSSatellitesRequired) ' Specifies the required satellites for an accurate GPS fix.  Up to 7 or 8 is possible
 Const GPS_MAX_ON_TIME As Long = 180 ' s                       ' If the GPS is on longer than this, the subroutine turns it off
 
 Sub GPSOff
@@ -618,7 +620,8 @@ Sub ReadGPS
       GPSLength = Len(GPSString)
       Comma2=1: CommaCount = 0                                ' Now parse the information and convert to double precision data, starting at the start of the string
       For InternalCounter = 1 To GPS_PARAMETERS
-        Comma1 = InStr(Comma2,GPSString,",",2): Comma2 = InStr(Comma1+1,GPSString,",",2) ' Start searching at the position of the last comma
+        Comma1 = InStr(Comma2,GPSString,",",2)
+        Comma2 = InStr(Comma1+1,GPSString,",",2) ' Start searching at the position of the last comma
         If Comma2 > 0 Then
           GPSReadingsString(InternalCounter) = Mid(GPSString,Comma1+1,Comma2-Comma1-1) ' If it isn't above zero, the string was truncated for some reason
           CommaCount+=1
@@ -704,13 +707,17 @@ Sub Initialization
   SetSetting("CellBillingDay", CellBillingDay)                 ' When to roll over the monthly usage
   SetSetting("CellKeepAlive", "www.google.com")                ' URL to ping to verify network connectivity.  If this fails, the datalogger will re-establish
   SetSetting("CellKeepAliveTime", 30)                          ' How often to ping test the link
-  CommsPowerOnStatus = true: IPNetPower(5,1,0)                ' Make sure that it is turned on
+  CommsPowerOnStatus = true
+  IPNetPower(5,1,0)                ' Make sure that it is turned on
 	Call WritePort(Vx1,True)
   Call WritePort(SW12V,True)
 	For i = 25 To 1 Step -1
-	  Delay(0,1,Sec): Message = "Powering sonde (" + i + "s remaining)" ' Wait for sonde to power up
+	  Delay(0,1,Sec)
+    Message = "Powering sonde (" + i + "s remaining)" ' Wait for sonde to power up
 	Next i
-	YSIPInit(): findSonde(3): Message = "Sonde initialized. "
+	YSIPInit()
+  findSonde(3)
+  Message = "Sonde initialized. "
 	Call WritePort(Vx1,0)                                        ' Turn off RS485 adapter.  Don't check SensorKeepRS485On because this is during initialization
 	If SENSOR_WARMUP_S > 0 Then Call WritePort(SW12V,0)          ' Unless sensor power is to be held on, switch off the sonde
   If Status.LithiumBattery < 3.0 Then                         ' Check diagnostics are record to ErrorLog if a problem
@@ -726,7 +733,8 @@ Sub Initialization
   If SENSOR_WARMUP_S = 0 Then SensorProgramOn = True          ' Warmup = 0, means always on, start powered up
   If SENSOR_WARMUP_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("SENSOR_WARMUP_S (" + SENSOR_WARMUP_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
   DataloggerOSVersion = Right(Status.OSVersion,5)             ' Get the OS version and convert to a string, only needed at startup.  5 characters works for OS > 10.01
-  Message += "System initialization complete.": Call AddDate
+  Message += "System initialization complete."
+  Call AddDate
 EndSub
 
 
@@ -784,17 +792,17 @@ Sub SystemCheck
       IPNetPower(5,0,0)
     Else  
       If CommsPowerOnStatus = false Then
-        If ProgramCounter > LastProgramCounter + 10 Then      ' Only cycle power if not recently done
+        If ProgramCounter > LastProgramCounter + 10 Then ' Only cycle power if not recently done
           Call ErrorLog("Battery power restored, resuming normal operation.  Ref: Ai1_manual section 9.2")
           CommsPowerOnStatus = true
-          IPNetPower(5,1,0)       ' Apply power to the modem
+          IPNetPower(5,1,0) ' Apply power to the modem
         EndIf
       EndIf
     EndIf
   EndIf
   CallTable Ai1
-  ProgramCounter += 1                                         ' Increment the program counter
-  ProcessingTime = Status.ProcessTime                         ' Processing time is used for checking that the program executes cleanly.  Should be last instruction
+  ProgramCounter += 1 ' Increment the program counter
+  ProcessingTime = Status.ProcessTime ' Processing time is used for checking that the program executes cleanly.  Should be last instruction
 EndSub
 
 Const HISTORY_RECORDS As Long = 3
@@ -805,7 +813,7 @@ Sub ErrorLog(ErrorMessage As String * 96)
     ErrorHistory(i) = ErrorHistory(i+1)
   Next i
   ErrorHistory(HISTORY_RECORDS) = Errors
-  LastProgramCounter = ProgramCounter                         ' Keep track of the program counter when this occured
+  LastProgramCounter = ProgramCounter ' Keep track of the program counter when this occured
 EndSub
 
 
