@@ -9,12 +9,53 @@ Const PARAMETERS_TO_SEND = 11 ' The number of parameters that will be sent to Hy
 ' RS485 Option Port (Uses RS232 via ComRS232)
 ' 
 ' Refer to section 13.3.2 "Hydrosphere Configuration" in the Ai1 manual for details on setting up the Hydrosphere parameters to suit this site
-Const NONE As Long = 0: Const CELLULAR As Long = 1: Const WIFI As Long = 2: Const RADIO As Long = 3: Const IRIDIUM As Long = 4: Const TRANSPARENT As Long = 5: Const LORAWAN As Long = 6: Const RADTRANS As Long = 7: Const JOIN As Long = 0: Const CREATE As Long = 1
-Const LITHIUM As Long = 1: Const LITHIUM_12V As Long = 2: Const LEAD_ACID As Long = 3: Const EXT As Long = 4: Const SUPPLY_3V3 As Float = 3.3: Const SUPPLY_5V As Float = 5: Const RISING_EDGE As Long = 1: Const HIGH_LEVEL As Long = 2: Const FALLING_EDGE As Long = 3: Const LOW_LEVEL As Long = 4 ' Types of event activationA11
-Const EXO2 As Long = 2: Const EXO3 As Long = 3: Const OTT_CBS As Long = 4: Const AT200 As Long = 5: Const YSI6SERIES As Long = 6: Const ULTRA As Long = 7: Const LEVEL_4TO20 As Long = 8: Const RADAR As Long = 9: Const ULTRA_SERIAL As Long = 10: Const SUNA As Long = 11: Const VEGAPULS As Long = 12
-Const SDI12 As Long = 1: Const RS232 As Long = 2: Const ANALOG As Long = 3: Const RS485 As Long = 4: Const ADD As Long = 1: Const SUBTRACT As Long = 2: Const ABSOLUTE As Long = 1: Const DIFFERENTIAL As Long = 2: Const AIRMAR As Long = 3: Const AMAZON As Long = 13: Const PROSWAP As Long = 14
+Const NONE As Long = 0
+Const CELLULAR As Long = 1
+Const WIFI As Long = 2
+Const RADIO As Long = 3
+Const IRIDIUM As Long = 4
+Const TRANSPARENT As Long = 5
+Const LORAWAN As Long = 6
+Const RADTRANS As Long = 7
+Const JOIN As Long = 0
+Const CREATE As Long = 1
+Const LITHIUM As Long = 1
+Const LITHIUM_12V As Long = 2
+Const LEAD_ACID As Long = 3
+Const EXT As Long = 4:
+Const SUPPLY_3V3 As Float = 3.3
+Const SUPPLY_5V As Float = 5
+Const RISING_EDGE As Long = 1
+Const HIGH_LEVEL As Long = 2
+Const FALLING_EDGE As Long = 3
+Const LOW_LEVEL As Long = 4 ' Types of event activationA11
+Const EXO2 As Long = 2
+Const EXO3 As Long = 3
+Const OTT_CBS As Long = 4
+Const AT200 As Long = 5
+Const YSI6SERIES As Long = 6
+Const ULTRA As Long = 7
+Const LEVEL_4TO20 As Long = 8
+Const RADAR As Long = 9
+Const ULTRA_SERIAL As Long = 10
+Const SUNA As Long = 11
+Const VEGAPULS As Long = 12
+Const SDI12 As Long = 1
+Const RS232 As Long = 2
+Const ANALOG As Long = 3
+Const RS485 As Long = 4
+Const ADD As Long = 1
+Const SUBTRACT As Long = 2
+Const ABSOLUTE As Long = 1
+Const DIFFERENTIAL As Long = 2
+Const AIRMAR As Long = 3
+Const AMAZON As Long = 13
+Const PROSWAP As Long = 14
 
-Public Errors As String * 128 = "": Public Message As String * 256 = "": Public PortsStatus As String * 90: Dim PortsON As Long = 0    ' Verbose description of output ports
+Public Errors As String * 128 = ""
+Public Message As String * 256 = ""
+Public PortsStatus As String * 90
+Dim PortsON As Long = 0    ' Verbose description of output ports
 Const TCP_CLIENT As String = "(drema.konectgds.com,9200)" ' Pakbus Router Configuration
 Public AccessPointName As String = "so01.VZWSTATIC"           ' APN for Verizon ISS
 
@@ -27,7 +68,8 @@ Const DATA_STORAGE_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' Store data ever
 Const SENSOR_WARMUP_S As Long = 0
 Public MeasureBefore_s As Long = 0
 PreserveOneVariable(MeasureBefore_s) ' The time to warm up the sensor before measuring (in s).  Set to 0 to have always on
-Const LOW_BATTERY_SAVER_V = 12.83: Const LOW_BATTERY_SHUTDOWN_V = 12.75' V  ' Battery protection thresholds.  SAVER: Slow meas/no night comms.  SHUTDOWN: Slowest meas/No comms
+Const LOW_BATTERY_SAVER_V = 12.83
+Const LOW_BATTERY_SHUTDOWN_V = 12.75' V  ' Battery protection thresholds.  SAVER: Slow meas/no night comms.  SHUTDOWN: Slowest meas/No comms
 Const COMMS As Long = CELLULAR
 Const CELL_WINDOW_START As Long = 1440
 Const CELL_WINDOW_DURATION As Long = 10
@@ -272,14 +314,14 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)   ' Fixes the proble
 EndSub
 
 
-Dim CommsPowerOnStatus As Boolean = True                      ' CommsPowerOnStatus returns the state of the internal cellular modem power when controlled by battery saver and shutdown settings, but does not indicate the state due to window duration and frequency.  IPNetPower overrides all other power control options
+Dim CommsPowerOnStatus As Boolean = True  ' CommsPowerOnStatus returns the state of the internal cellular modem power when controlled by battery saver and shutdown settings, but does not indicate the state due to window duration and frequency.  IPNetPower overrides all other power control options
 Dim CellBillingDay = 1 ' Day of Month                         ' For data usage calculations, to know which day of month the billing cycle resets
 Public Control_____________ As Boolean = False                ' This groups all the program control flags into one section for ease of use
 Dim ReadGPSNow As Boolean = False: Units ReadGPSNow = True = Trigger a new GPS reading ' Set by setting ReadStatusSensors true
 Dim SendToHydrosphere As Boolean                              ' Set true to initiate data record and transfer.  Also set true after StoreData routine
 
 Sub Communications
-  RealTime(rTime)                                             ' Have If time statements at the top so none are missed from long scan times
+  RealTime(rTime) ' Have If time statements at the top so none are missed from long scan times
   Call Hydrosphere
 EndSub ' Sub Communications
 
@@ -300,7 +342,7 @@ Public GPSPowerStatus As Boolean
 Units GPSPowerStatus = Returns True If GPS Is ON ' Have the GPS power status appear next to the sensor power status
 Const GPS_BAUD As Long = 9600
 Const GPS_BUFFER As Long = 512                                ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
-'---WATER-QUALITY---------------------------------------------
+
 Public SondeReadFailed As Boolean = False
 Const DONT_STORE_WQ_TABLE As Boolean = True                   ' Don't store WQ data table, this is done in the YSPI program
 Dim WQTemporaryRS485(YSISWATH) As Float                       ' A temporary array to be used to hold returned values prior to confirming as valid
@@ -338,7 +380,8 @@ Sub MeasureWaterQuality
   	Next i
   EndIf
   Message = "Reading sonde and updating available parameters. "
-	sondeCheck(): getSondeParams()                               ' Handle any sonde changes and update parameters
+	sondeCheck()
+  getSondeParams()                               ' Handle any sonde changes and update parameters
 	ReadAttempts = 0
 	Do
 	  ReadAttempts += 1
@@ -430,8 +473,8 @@ Sub Hydrosphere
       Message += "No data to send. Use StoreData first. "
     EndIf ' If HydrosphereBufferNextPointer > 1
     SendToHydrosphere = False
-  EndIf ' If SendToHydrosphere = True
-EndSub ' Hydrosphere
+  EndIf
+EndSub
 
 Sub SensorMeasurements  ' Time commands at the top, so slow commands don't interfere
   If TimeIntoInterval(0,DATA_STORAGE_INTERVAL_S,Sec) Then StoreData = True
@@ -610,7 +653,7 @@ Sub ReadGPS
   EndIf ' If ReadGPSNow
 EndSub ' ReadGPS
 
-DataTable(Ai1,True,3000)                                      ' Records status information for remote diagnostics
+DataTable(Ai1,True,3000) ' Records status information for remote diagnostics
   DataInterval(0,1,Hr,0)
   Sample(1,BatteryVoltage,FP2)
   Sample(1,InternalTemperature,FP2)
@@ -622,7 +665,7 @@ DataTable(Ai1,True,3000)                                      ' Records status i
   Sample(1,Status.SerialNumber,UINT2)
   Sample(1,DataloggerOSVersion,FP2)
   Sample(1,Ai1OSVersion,FP2)
-  Sample(1,Status.ProgSignature,UINT2): FieldNames("ProgramSignature:0-65535)"): Units ProgramSignature = (0-65535)' Store the program signature to know when a program has changed
+  Sample(1,Status.ProgSignature,UINT2): FieldNames("ProgramSignature:0-65535)"): Units ProgramSignature = (0-65535) ' Store the program signature to know when a program has changed
   Sample(1,ProgramCounter,Long)
   Sample(1,Status.StartUpCode,FP2): FieldNames("StartUpCode:0=Ok,-1=Power Loss,-2=Watchdog"): Units StartUpCode = (0=Ok, -1=Power, -2=Watchdog)
   Sample(1,Status.WatchdogErrors,FP2): FieldNames("WatchdogErrors:Watchdog Errors Since Compile"): Units WatchdogErrors = Errors Since Compile
@@ -689,59 +732,62 @@ EndSub
 
 Sub SystemCheck
   If TimeIntoInterval(0,SLOW_MEASUREMENT_INTERVAL_S,sec) Then ReadStatusSensors = True
-  PanelTemp(InternalTemperature,FILTER_FREQUENCY)             ' Measure each time as this is a surrogate indicator for analog errors - when it has noise in the data
-  Battery(BatteryVoltage)                                     ' Measure using the CR300 battery voltage hardware
+  PanelTemp(InternalTemperature,FILTER_FREQUENCY) ' Measure each time as this is a surrogate indicator for analog errors - when it has noise in the data
+  Battery(BatteryVoltage) ' Measure using the CR300 battery voltage hardware
   If ReadStatusSensors Then
-    ReadGPSNow = True                                         ' Set the flag to trigger GPS readings
-    Call WritePort(Vx2,True)                                  ' Start with 3.3V for humidity. Must be 3V3 or the output will be above 2.5V for SE channel.  Have tested 5V sensor to read correctly at 3V3
+    ReadGPSNow = True
+    Call WritePort(Vx2,True) ' Start with 3.3V for humidity. Must be 3V3 or the output will be above 2.5V for SE channel.  Have tested 5V sensor to read correctly at 3V3
     VoltSe(HumidityVoltage,1,mV2500,HUMIDITY_PORT,True,50000,FILTER_FREQUENCY,1.0,0)
     InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*InternalTemperature)
     If InternalHumidity > 100 Then InternalHumidity = 100
     If InternalHumidity > 80 Then Message = "Change desiccant ASAP, condensation likely.  Ref: Ai1 manual seciton 22.":  Call AddTime: Errors = Message
-    ExciteV(Vx2,5000,0)                                       ' Barometer uses 5V excitation
+    ExciteV(Vx2,5000,0) ' Barometer uses 5V excitation
     For i = 1 To PRESSURE_READINGS
       VoltSe(PressureArray(i),1,mv2500,PRESSURE_PORT,True,2000,50,0.001,0) ' Measure the voltage of the barometric pressure sensor.  Sensor uses 5V excitation.  0.001 convert to volts
     Next i
     SortSpa (PressureArray(),PRESSURE_READINGS,PressureArray())
     Pressure_Voltage = PressureArray(Ceiling(PRESSURE_READINGS/2))
-    If PressureFirstReading Then                              ' First time through the program fill the array with the initial value
+    If PressureFirstReading Then ' First time through the program fill the array with the initial value
       For i = 1 To PRESSURE_TIME_AVERAGING
         PressureTimeArray(i) = Pressure_Voltage
       Next i
-      PressureFirstReading = False                            ' Only do this first time through
+      PressureFirstReading = False ' Only do this first time through
     Else
       For i = 1 To PRESSURE_TIME_AVERAGING - 1
         PressureTimeArray(i) = PressureTimeArray(i + 1)
       Next i
       PressureTimeArray(PRESSURE_TIME_AVERAGING) = Pressure_Voltage
     EndIf
-    SortSpa( PressureTimeArraySorted(),PRESSURE_TIME_AVERAGING,PressureTimeArray())
+    SortSpa(PressureTimeArraySorted(), PRESSURE_TIME_AVERAGING, PressureTimeArray())
     Pressure_Voltage = PressureTimeArraySorted(Ceiling(PRESSURE_TIME_AVERAGING/2))
 	  Pressure_hPa = (0.725*Pressure_Voltage-0.2625)*1000
-    Pressure_mH2O = (Pressure_hPa - 1013.25) * hPa_TO_m       ' Offset relative to standard atmospheric pressure
+    Pressure_mH2O = (Pressure_hPa - 1013.25) * hPa_TO_m ' Offset relative to standard atmospheric pressure
     Call WritePort(Vx2,True)
-    ExciteV(Vx2,5000,0)                                       ' Step up to 5V for other internal sensors
+    ExciteV(Vx2,5000,0) ' Step up to 5V for other internal sensors
     VoltSe(Current_mV,1,mv2500,CURRENT_PORT,True,0,FILTER_FREQUENCY,1,0) ' Read the raw mV output. Settling time is from humidity sensor
-    Current_mA = (Current_mV - CURRENT_ZERO_mV) * 5           ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
-    ReadStatusSensors = False                                 ' GPS turns off internal sensor power at the completion of its measurement
+    Current_mA = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
+    ReadStatusSensors = False ' GPS turns off internal sensor power at the completion of its measurement
   EndIf
   Call ReadGPS
   If BatteryVoltage < LOW_BATTERY_SHUTDOWN_V Then
-    If ReadNow Then                                           ' If this is a brownout when making a reading, just display the error message so it isn't lost
+    If ReadNow Then ' If this is a brownout when making a reading, just display the error message so it isn't lost
       If(Left(Errors,17) <> Left("Low Battery Warning",17)) Then Call ErrorLog("Low Battery Warning, Brownout during measurement. " + BatteryVoltage + "V.  Note only" )
-    Else                                                      ' But if it is not during a measurement then turn off the modem as well
-      CommsPowerOnStatus = false: IPNetPower(5,0,0)
+    Else  ' But if it is not during a measurement then turn off the modem as well
+      CommsPowerOnStatus = false
+      IPNetPower(5,0,0)
       If(Left(Errors,17) <> Left("Low Battery Shutdown",17)) Then Call ErrorLog("Low Battery Shutdown, Modem off. " + BatteryVoltage + "V.  Ref: Ai1_manual section 9.2" ) ' Only store is this is a new message
     EndIf
   Else
     If (BatteryVoltage < LOW_BATTERY_SAVER_V) AND ((Hour < 6) OR (Hour > 18)) Then
       If(Left(Errors,17) <> Left("Low Battery Saver",17)) Then Call ErrorLog("Low Battery Saver, Communications turned off overnight. " + BatteryVoltage + "V.  Ref: Ai1_manual section 9.2") ' Only store if this is a new message
-      CommsPowerOnStatus = false: IPNetPower(5,0,0)
+      CommsPowerOnStatus = false
+      IPNetPower(5,0,0)
     Else  
       If CommsPowerOnStatus = false Then
         If ProgramCounter > LastProgramCounter + 10 Then      ' Only cycle power if not recently done
           Call ErrorLog("Battery power restored, resuming normal operation.  Ref: Ai1_manual section 9.2")
-          CommsPowerOnStatus = true: IPNetPower(5,1,0)       ' Apply power to the modem
+          CommsPowerOnStatus = true
+          IPNetPower(5,1,0)       ' Apply power to the modem
         EndIf
       EndIf
     EndIf
@@ -790,13 +836,13 @@ BeginProg
     ' Add any other communications or control instructions here
   NextScan
 
-  SlowSequence                                                ' System background checks in a separate sequence so it does not slow down other functions
+  SlowSequence ' System background checks in a separate sequence so it does not slow down other functions
     Scan (SCAN_INTERVAL_S,Sec,0,0)
       Call SystemCheck
     NextScan
   EndSequence
 
-  SlowSequence                                                ' Communications management in a separate sequence so it does not slow down other functions
+  SlowSequence ' Communications management in a separate sequence so it does not slow down other functions
     Scan (SCAN_INTERVAL_S,Sec,0,0)
       ' Any other time specific instructions should go before the communications subroutine
       Call Communications
