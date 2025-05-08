@@ -489,7 +489,7 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
       ' The duration of the delay depends on the instrument.  Some power up quickly (ultrasonic <1s, Display <2s), some take a long time (EXO takes 30s before responding to SDI12)
       Message = "Sensor always on, delay for 2s only"
       Delay(0,2,Sec) ' Ultrasonic needs 0.35s.  Display needs 2s.  This will throw out subsequent time instructions, but manual readings don't happen often
-    EndIf ' If SensorPowerStatus
+    EndIf
     StoreData = True ' Store data from this reading as well
     If SENSOR_WARMUP_S > 0 Then SensorProgramOff = True ' Turn off power at the end of the manual reading
   EndIf
@@ -534,8 +534,8 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
       HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CR
       HydrosphereBufferNextPointer += 1
     EndIf
-    SendToHydrosphere = True  ' If new data has been saved, then next time through, send it to Hydrosphere
-    StoreData = False                                         ' Only do this one time
+    SendToHydrosphere = True ' If new data has been saved, then next time through, send it to Hydrosphere
+    StoreData = False ' Only do this one time
   EndIf
   If ForceStoreData Then
     CallTable SondeValues ' This can force data storage for processes like FTP that won't do a transfer
@@ -609,7 +609,8 @@ Sub ReadGPS
       Timer(GPS_TIMER,Sec,TIMER_RESET_AND_START)              ' Start the GPS timer
     EndIf
     If (Timer(GPS_TIMER,Sec,TIMER_READ)>GPS_MAX_ON_TIME) Then
-      Call GPSOff: Message = "GPS timer shutdown"
+      Call GPSOff
+      Message = "GPS timer shutdown"
     EndIf
     SerialIn(RawGPSString,GPS_PORT,50,0,GPS_BUFFER)           ' Read in the serial data.  Termination is the time when characters stop being received (i.e. a break)
     SerialFlush(GPS_PORT)                                     ' Clear out any data so a fresh reading is taken next cycle
@@ -648,13 +649,15 @@ Sub ReadGPS
           GPSReadings(5) = 1
         EndIf
         GPSFix = GPS_QualityIndicator
-        UTCTime = GPS_UTCtime: UTCDate = 0: GPSSatellitesInView = GPS_Satellites ' UTCDate isn't part of serial message
+        UTCTime = GPS_UTCtime
+        UTCDate = 0
+        GPSSatellitesInView = GPS_Satellites ' UTCDate isn't part of serial message
         Message = "GPS location complete, using " + GPSReadings(7) + " satellites."
         Call GPSOff
-      EndIf ' If we have a fix
-    EndIf ' If we have a complete string
-  EndIf ' If ReadGPSNow
-EndSub ' ReadGPS
+      EndIf
+    EndIf
+  EndIf
+EndSub
 
 DataTable(Ai1,True,3000) ' Records status information for remote diagnostics
   DataInterval(0,1,Hr,0)
@@ -682,19 +685,19 @@ DataTable(Ai1,True,3000) ' Records status information for remote diagnostics
   Sample(1,Longitude,IEEE4)
   Sample(1,GPSSatellitesInView,FP2)
   Sample(1,Pressure_mH2O,FP2)
-  Maximum(1,ReadAttempts,UINT2,False,False)                   ' Record the maximum number of ReadAttempts this interval as most sensors are measured more frequently than the Ai1 table is stored
+  Maximum(1,ReadAttempts,UINT2,False,False) ' Record the maximum number of ReadAttempts this interval as most sensors are measured more frequently than the Ai1 table is stored
 EndTable
 
 
 Sub Initialization
   ValueToLoad = 0
   AddressToRead = 0 ' Stops a warning if not used
-  Call GPSOff                                                 ' First time starting up, turn the GPS off to put the power output port and regulator in a known state
-  SerialOpen(GPS_PORT,GPS_BAUD, 0, 0, GPS_BUFFER,ALLOW_SLEEP)    ' Open GPS port
+  Call GPSOff ' First time starting up, turn the GPS off to put the power output port and regulator in a known state
+  SerialOpen(GPS_PORT,GPS_BAUD, 0, 0, GPS_BUFFER,ALLOW_SLEEP) ' Open GPS port
   Message = "Initializing... "
   RealTime(rTime)
-  Call ErrorLog("Program restart")                            ' Record the program restart in the error log
-  Delay(0,500,mSec)                                           ' Have a short delay incase multiple messages are generated
+  Call ErrorLog("Program restart") ' Record the program restart in the error log
+  Delay(0,500,mSec) ' Have a short delay incase multiple messages are generated
   Control_____________ = false: Measurements________ = false: i = 0  ' Just to stop a compile warning that it is unused
   SetSetting("PakBusTCPClients", TCP_CLIENT)
   SetSetting("PakBusAddress", PAKBUS_ADDRESS)
@@ -708,7 +711,7 @@ Sub Initialization
   SetSetting("CellKeepAlive", "www.google.com")                ' URL to ping to verify network connectivity.  If this fails, the datalogger will re-establish
   SetSetting("CellKeepAliveTime", 30)                          ' How often to ping test the link
   CommsPowerOnStatus = true
-  IPNetPower(5,1,0)                ' Make sure that it is turned on
+  IPNetPower(5,1,0) ' Make sure that it is turned on
 	Call WritePort(Vx1,True)
   Call WritePort(SW12V,True)
 	For i = 25 To 1 Step -1
