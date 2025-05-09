@@ -26,6 +26,7 @@ services:
     network_mode: host # read main interface MAC
     devices: 
       - "/dev/ttyUSB0:/dev/ttyUSB0"
+      - "/dev/ttyACM0:/dev/ttyACM0"
     environment:
       DEVICE: "AUTO"
       GATEWAY_EUI_SOURCE: "eth0"
@@ -36,3 +37,8 @@ services:
       TLS_SNI: "true"
       TTS_REGION: "nam1"
       TTS_TENANT: "neracoos"
+  alloy:
+    build: ./grafana
+    privileged: true
+    ports:
+      - "12345:12345" # Map Alloy's HTTP port to your host
