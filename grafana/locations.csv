@@ -1,6 +1,4 @@
-#group,false,false,false,false,false
-#datatype,measurement,tag,double,double,dateTime
-m,name,latitude,longitude,time
-locations,Workshop,44.103835,-69.104476,2025-05-04T00:00:00Z
-locations,Wynken,44.0420272,-68.891064,2025-05-04T00:00:00Z
-locations,Apprenticeshop,44.110132,-69.106652,2025-05-04T00:00:00Z
+name,latitude,longitude
+Workshop,44.103835,-69.104476
+Wynken,44.0420272,-68.891064
+Apprenticeshop,44.110132,-69.106652
