@@ -47,4 +47,4 @@ services:
       ALLOY_SCRAPE_INTERVAL: "60s"
       ALLOY_LOGS_URL: "https://logs-prod-036.grafana.net/loki/api/v1/push"
       ALLOY_LOGS_ID: "1202223"
-      ALLOY_API_KEY: ""
+      ALLOY_API_KEY: "" # Integration key for Grafana Cloud, set in Balena Cloud
