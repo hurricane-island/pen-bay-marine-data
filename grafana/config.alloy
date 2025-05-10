@@ -1,3 +1,63 @@
+prometheus.exporter.self "alloy_check" { }
+
+discovery.relabel "alloy_check" {
+  targets = prometheus.exporter.self.alloy_check.targets
+
+  rule {
+    target_label = "instance"
+    replacement  = constants.hostname
+  }
+
+  rule {
+    target_label = "alloy_hostname"
+    replacement  = constants.hostname
+  }
+
+  rule {
+    target_label = "job"
+    replacement  = "integrations/alloy-check"
+  }
+}
+
+prometheus.scrape "alloy_check" {
+  targets    = discovery.relabel.alloy_check.output
+  forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+  scrape_interval = sys.env("ALLOY_SCRAPE_INTERVAL")
+}
+
+prometheus.relabel "alloy_check" {
+  forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+  rule {
+    source_labels = ["__name__"]
+    regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+    action        = "keep"
+  }
+}
+
+prometheus.remote_write "metrics_service" {
+  endpoint {
+    url = sys.env("ALLOY_METRICS_URL")
+
+    basic_auth {
+      username = sys.env("ALLOY_METRICS_ID")
+      password = sys.env("ALLOY_API_KEY")
+    }
+  }
+}
+
+loki.write "grafana_cloud_loki" {
+  endpoint {
+    url = sys.env("ALLOY_LOGS_URL")
+
+    basic_auth {
+      username = sys.env("ALLOY_LOGS_ID")
+      password = sys.env("ALLOY_API_KEY")
+    }
+  }
+}
+
 prometheus.exporter.unix "integrations_node_exporter" { }
 
 discovery.relabel "integrations_node_exporter" {

@@ -40,5 +40,11 @@ services:
   alloy:
     build: ./grafana
     privileged: true
-    ports:
-      - "12345:12345" # Map Alloy's HTTP port to your host
+    environment:
+      ARCH: "arm64"
+      ALLOY_METRICS_URL: "https://prometheus-prod-56-prod-us-east-2.grafana.net/api/prom/push" 
+      ALLOY_METRICS_ID: "2413093"
+      ALLOY_SCRAPE_INTERVAL: "60s"
+      ALLOY_LOGS_URL: "https://logs-prod-036.grafana.net/loki/api/v1/push"
+      ALLOY_LOGS_ID: "1202223"
+      ALLOY_API_KEY: ""
