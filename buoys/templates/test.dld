@@ -1,7 +1,8 @@
-StationName = "bench_test"
+StationName = bench_test
 IncludeSection("Constants", "CPU:lib.dld")
 IncludeSection("Pressure", "CPU:lib.dld")
 IncludeSection("IO", "CPU:lib.dld")
+Const PAKBUS_ADDRESS As Long = 1062 ' network address
 
 DataTable(Diagnostics, True, DATA_TABLE_ROWS) ' Diagnostics
   Sample(1, BatteryVoltage, FP2)
@@ -13,7 +14,7 @@ EndTable
 
 BeginProg
   SetSetting("PakBusTCPClients", "(drema.konectgds.com,9200)")
-  SetSetting("PakBusAddress", 1064)
+  SetSetting("PakBusAddress", PAKBUS_ADDRESS)
   SetSetting("CellEnabled", True)
   SetSetting("CellAPN", "so01.VZWSTATIC")
   SetSetting("CellPwrStartTime", CELL_WINDOW_START)
