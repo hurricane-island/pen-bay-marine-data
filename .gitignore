@@ -59,6 +59,7 @@ logger-programs/*.tdf
 
 logger-programs/*
 !logger-programs/template/
+buoys/firmware/*
 *.tdf
 
 # pixi environments

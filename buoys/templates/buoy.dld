@@ -1,5 +1,5 @@
-StationName = $STATION_NAME ' Program for AiBUOY-V . Model Ai1BUOY-V
-Const HYDROSPHERE_ID = $CLIENT_ID ' The LoginID for the Hydrosphere site.
+StationName = $STATION_NAME ' No quotes!
+Const HYDROSPHERE_ID = "$CLIENT_ID" ' The LoginID for the Hydrosphere site.
 Const PAKBUS_ADDRESS As Long = $PAKBUS_ADDRESS ' network address
 Const PARAMETERS_TO_SEND = 11 ' The number of parameters that will be sent to Hydrosphere.
 ' 

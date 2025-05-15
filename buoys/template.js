@@ -1,9 +1,9 @@
 import {readFileSync, writeFileSync, mkdirSync, existsSync,} from "fs";
 
 function station(template, name, address, clientId) {
-    const source = `../logger-programs/template/${template}.dld`;
+    const source = `../buoys/templates/${template}.dld`;
     const text = readFileSync(source, "utf8");
-    const directory = `../logger-programs/firmware/${name}`;
+    const directory = `../buoys/firmware/${name}`;
     if (!existsSync(directory)) mkdirSync(directory)
     const content = text
         .replace("$STATION_NAME", name)
