@@ -4,12 +4,12 @@ const {Base64} = enc;
 
 const serviceID = process.env.XCLOUD_CLIENT_ID ?? "";
 const secretKey = process.env.XCLOUD_SECRET_KEY ?? "";
-const server = "https://cloud.xylem.com";
-const basePath = "/xcloud/data-export";
+const server = "https://cloud.xylem.com/xcloud/data-export";
 const method = "GET";
+const today = new Date();
 const queryRange = [
-    new Date("2024-07-14T00:00:00"),
-    new Date("2024-07-16T00:00:00")
+    today - 1000 * 60 * 60 * 24 * 7, // one week ago
+    today
 ];
 
 /**
@@ -42,7 +42,7 @@ function authHeader({
  * can be used to construction queries for individual data streams.
  */
 function getSites() {
-    const path = `${basePath}/sites`
+    const path = `/sites`
     const dateHeader = new Date().toISOString();
     return fetch(`${server}${path}`, { 
         method,
@@ -64,7 +64,7 @@ function getSites() {
  * returns a server error, rather than a 404 error.
  */
 function getDatastreams(siteId) {
-    const path = `${basePath}/site/${siteId}/datastreams`;
+    const path = `/site/${siteId}/datastreams`;
     const dateHeader = new Date().toISOString();
     return fetch(`${server}${path}`, { 
         method,
@@ -95,7 +95,7 @@ function getObservations(
         until,
         datastreamIds
     });
-    const path = `${basePath}/observations?${query.toString()}`;
+    const path = `/observations?${query.toString()}`;
     const now = new Date().toISOString();
     return fetch(`${server}${path}`, { 
         method,
