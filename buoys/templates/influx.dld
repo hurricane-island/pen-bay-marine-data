@@ -89,8 +89,6 @@ Sub ReadCurrent
     Current = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
 End Sub
 
-
-Dim api_token As String * 128 = 
 Public http_header As String * 256
 Dim http_header_content As String * 100 = "Content-Type:text/plain; charset=utf-8"
 Dim http_header_auth As String * 256 = "Authorization: Token $INFLUX_API_TOKEN"
