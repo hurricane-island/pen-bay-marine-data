@@ -1,4 +1,4 @@
-StationName = "bench_test"
+StationName = bench_test
 
 Const CELL_BILLING_DAY As Long = 1 ' For data usage calculations, to know which day of month the billing cycle resets
 Const CELL_WINDOW_DURATION As Long = 10
