@@ -826,8 +826,8 @@ Sub LoadData ' Names but be spelled correctly
   ParameterToSend(3) = @Pressure_abs
   ParameterToSend(4) = @Chlorophyll_ugL
   ParameterToSend(5) = @Chlorophyll_RFU
-  ParameterToSend(6) = @BGA_PC_ugL
-  ParameterToSend(7) = @BGA_PC_RFU
+  ParameterToSend(6) = @BGA_PE_ugL
+  ParameterToSend(7) = @BGA_PE_RFU
   ParameterToSend(8) = @BatteryVoltage
   ParameterToSend(9) = @InternalHumidity
   ParameterToSend(10) = @Latitude
