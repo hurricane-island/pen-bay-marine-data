@@ -1,5 +1,5 @@
 StationName = $TEMPLATE_STATION_NAME                                       ' Program for AiBUOY-V . Model Ai1BUOY-V
-' 
+' (c) Xylem
 ' Wiring Details:
 ' YSI EXO (Uses RS485): MCBH6F. 1(Orange)=N/C, 2(Black)=GND(U3), 3(Red)=BAT, 4=N/C, 5(Yellow)=RS485B(U1), 6(White)=RS485A(U2).  RS485 Internally wired to ComRS232. 115,200 N/8/1
 ' Barometer Internally wired using Vx2 and A3
