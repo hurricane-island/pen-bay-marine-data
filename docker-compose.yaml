@@ -38,7 +38,7 @@ services:
       TTS_REGION: "nam1"
       TTS_TENANT: "neracoos"
   alloy:
-    build: ./grafana/weather-alloy
+    build: ./weather-alloy
     privileged: true
     environment:
       ARCH: "arm64"
@@ -48,4 +48,3 @@ services:
       ALLOY_LOGS_URL: "https://logs-prod-036.grafana.net/loki/api/v1/push"
       ALLOY_LOGS_ID: "1202223"
       ALLOY_API_KEY: "" # Integration key for Grafana Cloud, set in Balena Cloud
-  grafana:
