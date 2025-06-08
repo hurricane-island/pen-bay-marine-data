@@ -243,7 +243,7 @@ Dim CommsPowerOnStatus As Boolean = True  ' CommsPowerOnStatus returns the state
 Dim CellBillingDay = 1 ' Day of Month                         ' For data usage calculations, to know which day of month the billing cycle resets
 Public Control_____________ As Boolean = False                ' This groups all the program control flags into one section for ease of use
 Dim ReadGPSNow As Boolean = False: Units ReadGPSNow = True = Trigger a new GPS reading ' Set by setting ReadStatusSensors true
-Dim SendToHydrosphere As Boolean                              ' Set true to initiate data record and transfer.  Also set true after StoreData routine
+Dim SendToHydrosphere As Boolean ' Set true to initiate data record and transfer.  Also set true after StoreData routine
 
 Sub Communications
   RealTime(rTime) ' Have If time statements at the top so none are missed from long scan times
@@ -260,16 +260,15 @@ Public SensorHoldPowerOn As Boolean = False: Units SensorHoldPowerOn = True = Ke
 Public SensorHoldPowerOff As Boolean = False: Units SensorHoldPowerOff = True = Keep Sensor Off
 Public SensorKeepRS485On As Boolean = False                   ' Set true if power is to be kept on between readings.  May be useful to see the full boot-up message from the sonde.  No, it stops this working at all.  Only get a couple of bytes, 00 FF
 Dim SensorKeepRS485OnLast As Boolean = False                  ' Keep track of when this is first turned on, so you can power up the adapter
-Dim SensorProgramOn As Boolean = False: Dim SensorProgramOff As Boolean = False ' Program controlled power operation 
+Dim SensorProgramOn As Boolean = False
+Dim SensorProgramOff As Boolean = False ' Program controlled power operation 
 Public Measurements________ As Boolean = False
 Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON ' No longer need this public, have PortsStatus
-Public GPSPowerStatus As Boolean
-Units GPSPowerStatus = Returns True If GPS Is ON ' Have the GPS power status appear next to the sensor power status
+Public GPSPowerStatus As Boolean: Units GPSPowerStatus = Returns True If GPS Is ON ' Have the GPS power status appear next to the sensor power status
 Const GPS_BAUD As Long = 9600
 Const GPS_BUFFER As Long = 512                                ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
 
 Public SondeReadFailed As Boolean = False
-Const DONT_STORE_WQ_TABLE As Boolean = True                   ' Don't store WQ data table, this is done in the YSPI program
 Dim WQTemporaryRS485(YSISWATH) As Float                       ' A temporary array to be used to hold returned values prior to confirming as valid
 Alias SondeValuesSorted(45) = Sonde_Future1
 Alias SondeValuesSorted(46) = Sonde_Future2
@@ -287,7 +286,6 @@ Alias SondeValuesSorted(57) = Sonde_Future13
 Alias SondeValuesSorted(58) = Sonde_Future14
 Alias SondeValuesSorted(59) = Sonde_Future15
 Alias SondeValuesSorted(60) = Sonde_Future16
-Const USE_WQ As Boolean = True
 
 Sub MeasureWaterQuality
   Message = "Powering RS485 adapter for communications"
@@ -344,7 +342,6 @@ Sub MeasureWaterQuality
   	Call WritePort(Vx1, False) ' sonde in lower power state
   End If
 EndSub
-
 
 
 Public HydrosphereID_EditInProgram As String = HYDROSPHERE_ID ' The ID in the form of abcde-abcde-abcde-abcde, defined in main program
@@ -510,7 +507,7 @@ Public UTCTime As Long: Units UTCTime = HHMMSS
 Dim UTCDate As Long: Units UTCDate = YYMMDD
 Dim GPSFix As Long: Units GPSFix = 0=No FIX, 1=FIX, 2=DIFFERENTIAL FIX
 Public GPSSatellitesInView As Long: Units GPSSatellitesInView = GPS Satellites visible
-PreserveOneVariable(Latitude):
+PreserveOneVariable(Latitude)
 PreserveOneVariable(Longitude) ' Save these values so a power cycle does not reset them and cause the icon to jump around
 Public GPSSatellitesRequired As Long = 4
 PreserveOneVariable(GPSSatellitesRequired) ' Specifies the required satellites for an accurate GPS fix.  Up to 7 or 8 is possible
@@ -622,7 +619,9 @@ Sub Initialization
   RealTime(rTime)
   Call ErrorLog("Program restart") ' Record the program restart in the error log
   Delay(0,500,mSec) ' Have a short delay incase multiple messages are generated
-  Control_____________ = false: Measurements________ = false: i = 0  ' Just to stop a compile warning that it is unused
+  Control_____________ = false
+  Measurements________ = false
+  i = 0  ' Just to stop a compile warning that it is unused
   SetSetting("PakBusTCPClients", TCP_CLIENT)
   SetSetting("PakBusAddress", PAKBUS_ADDRESS)
   Battery(BatteryVoltage)                                     ' Get a battery voltage reading so that on first execution it will have a reading
