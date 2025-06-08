@@ -86,13 +86,13 @@ Const HUMIDITY_PORT As Long = 6
 
 
 Const READ_ATTEMPTS_LIMIT As Long = 4
-Public ReadAttempts As Long                                   ' Keep track of how many times the sensor read was attempted
-Dim ProgramCounter As Long: Units ProgramCounter = Cycles     ' Keep track of how many program cycles since power up
-Dim LastProgramCounter As Long: Units LastProgramCounter = Cycles
+Public ReadAttempts As Long ' Times sensor read was attempted
+Dim ProgramCounter As Long: Units ProgramCounter = Cycles ' Program cycles since power up
+Dim LastProgramCounter As Long: Units LastProgramCounter = Cycles ' Error tracking
 Public BatteryVoltage As Float: Units BatteryVoltage = Volts
 Dim Vx1Voltage As Long
-Dim Vx2Voltage As Long                ' Keep track of the excitation port voltage so that it can safely be turned off after status readings  
-Const PRESSURE_SUPPLY As Float = 5.0                          ' All use 5V for maximum output
+Dim Vx2Voltage As Long ' Keep track of the excitation port voltage so that it can safely be turned off after status readings  
+Const PRESSURE_SUPPLY As Float = 5.0 ' All use 5V for maximum output
 Const PRESSURE_ZERO_OFFSET As Float = TRANSFER * PRESSURE_SUPPLY
 Const PRESSURE_FSR As Float = (1 - TRANSFER) * PRESSURE_SUPPLY
 Const PRESSURE_PARAMETERS As Long = 3
@@ -100,13 +100,13 @@ Public Pressure(PRESSURE_PARAMETERS) As Float
 Alias Pressure(1) = Pressure_Voltage: Units Pressure_Voltage = Volts
 Alias Pressure(2) = Pressure_hPa: Units Pressure_hPa = hPa
 Alias Pressure(3) = Pressure_mH2O: Units Pressure_mH2O = mH2O
-Const PRESSURE_READINGS As Long = 7                           ' Number of measurements to take from averaging this single reading
-Const PRESSURE_TIME_AVERAGING As Long = 5                     ' The period over which to take time averaged pressure readings
-Dim PressureArray(PRESSURE_READINGS) As Float                 ' Array to hold readings from which the median value is used
-Dim PressureTimeArray(PRESSURE_TIME_AVERAGING) As Float       ' Array to hold the time series of median filtered readings
-Dim PressureTimeArraySorted(PRESSURE_TIME_AVERAGING)          ' To hold the sorted values for median selection
-Dim PressureFirstReading As Boolean = True                    ' First time through, copy the initial value to all elements in array
-Public Current_mA As Long: Units Current_mA = mA              ' Use long so that only whole numbers are returned
+Const PRESSURE_READINGS As Long = 7 ' Number of measurements to take from averaging this single reading
+Const PRESSURE_TIME_AVERAGING As Long = 5 ' The period over which to take time averaged pressure readings
+Dim PressureArray(PRESSURE_READINGS) As Float ' Array to hold readings from which the median value is used
+Dim PressureTimeArray(PRESSURE_TIME_AVERAGING) As Float ' Array to hold the time series of median filtered readings
+Dim PressureTimeArraySorted(PRESSURE_TIME_AVERAGING) ' To hold the sorted values for median selection
+Dim PressureFirstReading As Boolean = True ' First time through, copy the initial value to all elements in array
+Public Current_mA As Long: Units Current_mA = mA ' Use long so that only whole numbers are returned
 Dim Current_mV As Float: Units Current_mV = mV
 Public InternalTemperature As Float: Units InternalTemperature = °C
 Public InternalHumidity As Long: Units InternalHumidity = % ' Report only whole numbers
@@ -295,31 +295,31 @@ Sub MeasureWaterQuality
   If NOT sondefound Then findSonde(3)                         ' If the sonde hasn't been found, then attempt to find first
   If Ai1WipesSonde Then ' When using Sample&Hold in the sonde, the sonde controls the wiping frequency, no need to duplicate here
     Message = "Allowing time for sonde wiper."
-  	startWipe() ' Wipe the sonde, full wipe is 2 in each direction, takes approximately 22s, although have seen errors on stations with 25s
-  	getWipeStatus()
-  	For i = 40 To 1 Step -1
-  	  Delay(0, 1, Sec) ' Wait for sonde power
-  	  Message = "Allowing time for sonde wiper (" + i + "s remaining)"
-  	Next i
+    startWipe() ' Wipe the sonde, full wipe is 2 in each direction, takes approximately 22s, although have seen errors on stations with 25s
+    getWipeStatus()
+    For i = 40 To 1 Step -1
+      Delay(0, 1, Sec) ' Wait for sonde power
+      Message = "Allowing time for sonde wiper (" + i + "s remaining)"
+    Next i
   End If
   Message = "Reading sonde and updating available parameters. "
-	sondeCheck()
+  sondeCheck()
   getSondeParams() ' Handle any sonde changes and update parameters
-	ReadAttempts = 0
-	Do
-	  ReadAttempts += 1
-	  Message = "Reading sonde values, attempt " + ReadAttempts
-	  Sonde_External_Voltage = NaN: External_Temp = NaN: Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
-	  getSondeValues() ' Populate available parameters
-	  sortYSIPData()
-	  ExternalTemp = External_Temp ' Map the temperature reading so that Hydrosphere and Satellite naming will work
-	  SondeReadFailed = False
-	  If (Sonde_External_Voltage = NaN) AND (WiperPosition = NAN) Then SondeReadFailed = True ' NAN's occur if there is no communications to sonde
-	  If (Sonde_External_Voltage = 0)   AND (WiperPosition = 0)   Then SondeReadFailed = True ' 0's can occur if the sonde has failed to measure sensors yet, but ready to talk
-	Loop While (SondeReadFailed AND (ReadAttempts <= READ_ATTEMPTS_LIMIT)) ' Repeat if the read failed (any non-NaN value will mark success)
-	If SondeReadFailed Then ' Restore the previous values
-	  SondeValuesSorted() = WQTemporaryRS485()
-	  Message = "No valid Data ("
+  ReadAttempts = 0
+  Do
+    ReadAttempts += 1
+    Message = "Reading sonde values, attempt " + ReadAttempts
+    Sonde_External_Voltage = NaN: External_Temp = NaN: Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
+    getSondeValues() ' Populate available parameters
+    sortYSIPData()
+    ExternalTemp = External_Temp ' Map the temperature reading so that Hydrosphere and Satellite naming will work
+    SondeReadFailed = False
+    If (Sonde_External_Voltage = NaN) AND (WiperPosition = NAN) Then SondeReadFailed = True ' NAN's occur if there is no communications to sonde
+    If (Sonde_External_Voltage = 0)   AND (WiperPosition = 0)   Then SondeReadFailed = True ' 0's can occur if the sonde has failed to measure sensors yet, but ready to talk
+  Loop While (SondeReadFailed AND (ReadAttempts <= READ_ATTEMPTS_LIMIT)) ' Repeat if the read failed (any non-NaN value will mark success)
+  If SondeReadFailed Then ' Restore the previous values
+    SondeValuesSorted() = WQTemporaryRS485()
+    Message = "No valid Data ("
     If Sonde_External_Voltage = NaN Then 
       Message += "NAN returned"
     ElseIf Sonde_External_Voltage = 0 Then Message += "Zero's returned"
@@ -329,17 +329,17 @@ Sub MeasureWaterQuality
     Call AddTime
     Call AddDate
     Errors = Message ' Message only, not logged
- 	Else
-	  Message = "Sonde read completed"
-	  getSondeSN()
-	  CallTable SondeValues ' Only store if successful
+   Else
+    Message = "Sonde read completed"
+    getSondeSN()
+    CallTable SondeValues ' Only store if successful
   End If
-	CallTable YSISondeMeta
-	If SensorKeepRS485On Then
-	  Message += ".  Keeping RS485 powered on (override by SensorKeepRS485On)" ' Set by program control for testing.  High power.
-	Else
+  CallTable YSISondeMeta
+  If SensorKeepRS485On Then
+    Message += ".  Keeping RS485 powered on (override by SensorKeepRS485On)" ' Set by program control for testing.  High power.
+  Else
     Message += ".  Shutting down RS485 adapter"
-  	Call WritePort(Vx1, False) ' sonde in lower power state
+    Call WritePort(Vx1, False) ' sonde in lower power state
   End If
 EndSub
 
@@ -635,17 +635,17 @@ Sub Initialization
   SetSetting("CellKeepAliveTime", 30)                          ' How often to ping test the link
   CommsPowerOnStatus = true
   IPNetPower(5,1,0) ' Make sure that it is turned on
-	Call WritePort(Vx1,True)
+  Call WritePort(Vx1,True)
   Call WritePort(SW12V,True)
-	For i = 25 To 1 Step -1
-	  Delay(0,1,Sec)
+  For i = 25 To 1 Step -1
+    Delay(0,1,Sec)
     Message = "Powering sonde (" + i + "s remaining)" ' Wait for sonde to power up
-	Next i
-	YSIPInit()
+  Next i
+  YSIPInit()
   findSonde(3)
   Message = "Sonde initialized. "
-	Call WritePort(Vx1,0)                                        ' Turn off RS485 adapter.  Don't check SensorKeepRS485On because this is during initialization
-	If SENSOR_WARMUP_S > 0 Then Call WritePort(SW12V,0)          ' Unless sensor power is to be held on, switch off the sonde
+  Call WritePort(Vx1,0)                                        ' Turn off RS485 adapter.  Don't check SensorKeepRS485On because this is during initialization
+  If SENSOR_WARMUP_S > 0 Then Call WritePort(SW12V,0)          ' Unless sensor power is to be held on, switch off the sonde
   If Status.LithiumBattery < 3.0 Then                         ' Check diagnostics are record to ErrorLog if a problem
     Call ErrorLog("Low (or no) Lithium Battery = " + Status.LithiumBattery): Delay(0,500,mSec) ' Log with delay incase multiple messages are generated
   End If
@@ -694,15 +694,17 @@ Sub SystemCheck
     End If
     SortSpa(PressureTimeArraySorted(), PRESSURE_TIME_AVERAGING, PressureTimeArray())
     Pressure_Voltage = PressureTimeArraySorted(Ceiling(PRESSURE_TIME_AVERAGING/2))
-	  Pressure_hPa = (0.725*Pressure_Voltage-0.2625)*1000
+    Pressure_hPa = (0.725*Pressure_Voltage-0.2625)*1000
     Pressure_mH2O = (Pressure_hPa - 1013.25) * hPa_TO_m ' Offset relative to standard atmospheric pressure
-    Call WritePort(Vx2,True)
-    ExciteV(Vx2,5000,0) ' Step up to 5V for other internal sensors
-    VoltSe(Current_mV,1,mv2500,CURRENT_PORT,True,0,FILTER_FREQUENCY,1,0) ' Read the raw mV output. Settling time is from humidity sensor
+    Call WritePort(Vx2, True)
+    ExciteV(Vx2, 5000, 0) ' Step up to 5V for other internal sensors
+    VoltSe(Current_mV, 1, mv2500, CURRENT_PORT, True, 0, FILTER_FREQUENCY, 1, 0) ' Read the raw mV output. Settling time is from humidity sensor
     Current_mA = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
     ReadStatusSensors = False ' GPS turns off internal sensor power at the completion of its measurement
   End If
+
   Call ReadGPS
+
   If BatteryVoltage < LOW_BATTERY_SHUTDOWN_V Then
     If ReadNow Then ' If this is a brownout when making a reading, just display the error message so it isn't lost
       If(Left(Errors,17) <> Left("Low Battery Warning",17)) Then Call ErrorLog("Low Battery Warning, Brownout during measurement. " + BatteryVoltage + "V.  Note only" )
@@ -715,13 +717,13 @@ Sub SystemCheck
     If (BatteryVoltage < LOW_BATTERY_SAVER_V) AND ((Hour < 6) OR (Hour > 18)) Then
       If(Left(Errors,17) <> Left("Low Battery Saver",17)) Then Call ErrorLog("Low Battery Saver, Communications turned off overnight. " + BatteryVoltage + "V.  Ref: Ai1_manual section 9.2") ' Only store if this is a new message
       CommsPowerOnStatus = false
-      IPNetPower(5,0,0)
+      IPNetPower(5, 0, 0)
     Else  
       If CommsPowerOnStatus = false Then
         If ProgramCounter > LastProgramCounter + 10 Then ' Only cycle power if not recently done
           Call ErrorLog("Battery power restored, resuming normal operation.  Ref: Ai1_manual section 9.2")
           CommsPowerOnStatus = true
-          IPNetPower(5,1,0) ' Apply power to the modem
+          IPNetPower(5, 1, 0) ' Modem on
         End If
       End If
     End If
@@ -732,14 +734,14 @@ Sub SystemCheck
 EndSub
 
 Const HISTORY_RECORDS As Long = 3
-Public ErrorHistory(HISTORY_RECORDS) As String * 96           ' Keep the recent messages available for review
+Public ErrorHistory(HISTORY_RECORDS) As String * 96 ' Retain recent messages
 Sub ErrorLog(ErrorMessage As String * 96)
   Errors = ErrorMessage + ". " + Public.Timestamp(2,1)
   For i = 1 To (HISTORY_RECORDS - 1)
     ErrorHistory(i) = ErrorHistory(i+1)
   Next i
   ErrorHistory(HISTORY_RECORDS) = Errors
-  LastProgramCounter = ProgramCounter ' Keep track of the program counter when this occured
+  LastProgramCounter = ProgramCounter ' Program cycle when error occurred
 EndSub
 
 
