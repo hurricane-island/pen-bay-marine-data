@@ -397,21 +397,25 @@ Sub Hydrosphere
 EndSub
 
 Sub SensorMeasurements ' Time commands at the top, so slow commands don't interfere
-  If TimeIntoInterval(0,DATA_STORAGE_INTERVAL_S,Sec) Then StoreData = True
-  If TimeIntoInterval(0,1,Day) Then
+  If TimeIntoInterval(0, DATA_STORAGE_INTERVAL_S, Sec) Then 
+    StoreData = True
+  End If
+  If TimeIntoInterval(0, 1, Day) Then
     ReadPause = False
     ReadFast = False
   End If
   If ReadNow Then ' If ReadNow is on here then it is set manually, not by program control
     If SensorPowerStatus = False Then
-      Call WritePort(SENSOR_POWER_PORT,True)
+      Call WritePort(SENSOR_POWER_PORT, True)
       SensorPowerStatus = True
       ' The duration of the delay depends on the instrument.  Some power up quickly (ultrasonic <1s, Display <2s), some take a long time (EXO takes 30s before responding to SDI12)
       Message = "Sensor always on, delay for 2s only"
       Delay(0,2,Sec) ' Ultrasonic needs 0.35s.  Display needs 2s.  This will throw out subsequent time instructions, but manual readings don't happen often
     End If
-    StoreData = True ' Store data from this reading as well
-    If SENSOR_WARMUP_S > 0 Then SensorProgramOff = True ' Turn off power at the end of the manual reading
+    StoreData = True
+    If SENSOR_WARMUP_S > 0 Then 
+      SensorProgramOff = True ' Turn off power at the end of the manual reading
+    End If
   End If
   If MeasureBefore_s > 0 Then
     If TimeIntoInterval((MEASUREMENT_INTERVAL_S - MeasureBefore_s),MEASUREMENT_INTERVAL_S,Sec) Then ReadNow = True ' If MeasureBefore_s is non zero, it takes measurement before the interval so it is ready
@@ -431,7 +435,7 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
     ReadNow = false
   End If
 
-  If StoreData Then ' Needs to be separate so it can store exactly at the interval
+  If StoreData Then ' store exactly at the interval
     ' StoreData does not store data with RS485 sondes, must take measurements first, and measurements must be valid or CallTable is skipped (see above)
     Call LoadData ' Load the array for addresses of variables to use
     For i = 1 To PARAMETERS_TO_SEND
@@ -640,7 +644,7 @@ Sub Initialization
   findSonde(3)
   Message = "Sonde initialized. "
   Call WritePort(Vx1,0)                                        ' Turn off RS485 adapter.  Don't check SensorKeepRS485On because this is during initialization
-  If SENSOR_WARMUP_S > 0 Then Call WritePort(SW12V,0)          ' Unless sensor power is to be held on, switch off the sonde
+  If SENSOR_WARMUP_S > 0 Then Call WritePort(SW12V,0) ' Unless sensor power is to be held on, switch off the sonde
   If Status.LithiumBattery < 3.0 Then                         ' Check diagnostics are record to ErrorLog if a problem
     Call ErrorLog("Low (or no) Lithium Battery = " + Status.LithiumBattery): Delay(0,500,mSec) ' Log with delay incase multiple messages are generated
   End If
@@ -650,10 +654,16 @@ Sub Initialization
   ' Check that all the measurement parameters are correct and evenly divisible (or measurements wont be taken correctly)
   If MEASUREMENT_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("MEASUREMENT_INTERVAL_S (" + MEASUREMENT_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
   If SLOW_MEASUREMENT_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("SLOW_MEASUREMENT_INTERVAL_S (" + SLOW_MEASUREMENT_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
-  If DATA_STORAGE_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("DATA_STORAGE_INTERVAL_S (" + DATA_STORAGE_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
-  If SENSOR_WARMUP_S = 0 Then SensorProgramOn = True          ' Warmup = 0, means always on, start powered up
-  If SENSOR_WARMUP_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("SENSOR_WARMUP_S (" + SENSOR_WARMUP_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
-  DataloggerOSVersion = Right(Status.OSVersion,5)             ' Get the OS version and convert to a string, only needed at startup.  5 characters works for OS > 10.01
+  If DATA_STORAGE_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then
+    Call ErrorLog("DATA_STORAGE_INTERVAL_S (" + DATA_STORAGE_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
+  End If
+  If SENSOR_WARMUP_S = 0 Then
+    SensorProgramOn = True ' Warmup = 0, means always on, start powered up
+  End If
+  If SENSOR_WARMUP_S MOD SCAN_INTERVAL_S > 0 Then 
+    Call ErrorLog("SENSOR_WARMUP_S (" + SENSOR_WARMUP_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
+  End If
+  DataloggerOSVersion = Right(Status.OSVersion, 5) ' Get the OS version and convert to a string, only needed at startup.  5 characters works for OS > 10.01
   Message += "System initialization complete."
   Call AddDate
 EndSub
