@@ -248,9 +248,7 @@ Sub Communications
   Call Hydrosphere
 EndSub ' Sub Communications
 
-Public ReadFast As Boolean = False: Units ReadFast = True = Read each Scan interval
 Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
-Public ReadPause As Boolean = False: Units ReadPause = True = Pause New Sensor Readings
 Public ReadStatusSensors As Boolean = False
 Public StoreData As Boolean = False: Units StoreData = True = Save Data Record  ' Allows program control (time and event based) as well as user control
 Public SensorHoldPowerOn As Boolean = False: Units SensorHoldPowerOn = True = Keep Sensor On
@@ -398,20 +396,16 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
   If TimeIntoInterval(0, DATA_STORAGE_INTERVAL_S, Sec) Then 
     StoreData = True
   End If
-  If TimeIntoInterval(0, 1, Day) Then
-    ReadPause = False
-    ReadFast = False
-  End If
   If TimeIntoInterval(0,MEASUREMENT_INTERVAL_S,Sec) Then ReadNow = True
   If TimeIntoInterval(0,MEASUREMENT_INTERVAL_S,Sec) Then SensorProgramOn = True ' always on
-  If NOT(SensorHoldPowerOff) AND (SensorHoldPowerOn OR SensorProgramOn OR ReadFast) Then ' Turn on if instructed by either the user or the program.  Turning off is after the measurement
+  If NOT(SensorHoldPowerOff) AND (SensorHoldPowerOn OR SensorProgramOn) Then ' Turn on if instructed by either the user or the program.  Turning off is after the measurement
     If SensorPowerStatus = False Then ' Only turn it on if it is not already
       Call WritePort(SENSOR_POWER_PORT,True)
       SensorPowerStatus = True
     End If
     SensorProgramOn = false ' Only do this once
   End If
-  If (ReadNow OR ReadFast) AND NOT(ReadPause) Then
+  If (ReadNow) Then
     Call MeasureWaterQuality
     ReadNow = false
   End If
