@@ -248,8 +248,6 @@ EndSub ' Sub Communications
 
 Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
 Public ReadStatusSensors As Boolean = False
-Public SensorHoldPowerOn As Boolean = False: Units SensorHoldPowerOn = True = Keep Sensor On
-Public SensorHoldPowerOff As Boolean = False: Units SensorHoldPowerOff = True = Keep Sensor Off
 Public SensorKeepRS485On As Boolean = False                   ' Set true if power is to be kept on between readings.  May be useful to see the full boot-up message from the sonde.  No, it stops this working at all.  Only get a couple of bytes, 00 FF
 Dim SensorKeepRS485OnLast As Boolean = False                  ' Keep track of when this is first turned on, so you can power up the adapter
 Dim SensorProgramOn As Boolean = False
@@ -301,7 +299,9 @@ Sub MeasureWaterQuality
   Do
     ReadAttempts += 1
     Message = "Reading sonde values, attempt " + ReadAttempts
-    Sonde_External_Voltage = NaN: External_Temp = NaN: Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
+    Sonde_External_Voltage = NaN
+    External_Temp = NaN
+    Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
     getSondeValues() ' Populate available parameters
     sortYSIPData()
     ExternalTemp = External_Temp ' Map the temperature reading so that Hydrosphere and Satellite naming will work
@@ -321,7 +321,7 @@ Sub MeasureWaterQuality
     Call AddTime
     Call AddDate
     Errors = Message ' Message only, not logged
-   Else
+  Else
     Message = "Sonde read completed"
     getSondeSN()
     CallTable SondeValues ' Only store if successful
@@ -395,7 +395,7 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
     ReadNow = True
     SensorProgramOn = True ' always on
   End If
-  If NOT (SensorHoldPowerOff) AND (SensorHoldPowerOn OR SensorProgramOn) Then
+  If (SensorProgramOn) Then
     ' Turn on if instructed by either the user or the program. Turning off is after the measurement
     If NOT (SensorPowerStatus) Then ' Only turn it on if it is not already
       Call WritePort(SENSOR_POWER_PORT, True)
@@ -448,22 +448,22 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
     End If
     SendToHydrosphere = True ' If new data saved, then next time through, send it to Hydrosphere
   End If
-  If NOT(SensorHoldPowerOn) AND (SensorHoldPowerOff OR SensorProgramOff) Then
+  If (SensorProgramOff) Then
     If SensorPowerStatus Then ' Only turn off if currently on
       Call WritePort(SENSOR_POWER_PORT, False)
       SensorPowerStatus = False
     End If
     SensorProgramOff = False ' Only do this once
   End If
-    If SensorKeepRS485On AND NOT(SensorKeepRS485OnLast) Then
-      Message = "Turning on RS485 adapter based on SensorKeepRS485On setting"
-      Call WritePort(Vx1, True)
-    End If
-    If NOT(SensorKeepRS485On) AND SensorKeepRS485OnLast Then
-      Message = "Turning off RS485 adapter based on SensorKeepRS485On setting"
-      Call WritePort(Vx1, False)
-    End If
-    SensorKeepRS485OnLast = SensorKeepRS485On
+  If SensorKeepRS485On AND NOT(SensorKeepRS485OnLast) Then
+    Message = "Turning on RS485 adapter based on SensorKeepRS485On setting"
+    Call WritePort(Vx1, True)
+  End If
+  If NOT(SensorKeepRS485On) AND SensorKeepRS485OnLast Then
+    Message = "Turning off RS485 adapter based on SensorKeepRS485On setting"
+    Call WritePort(Vx1, False)
+  End If
+  SensorKeepRS485OnLast = SensorKeepRS485On
 EndSub
 
 
@@ -574,7 +574,6 @@ DataTable(Ai1,True,3000) ' Records status information for remote diagnostics
   Sample(1,InternalHumidity,FP2)
   Average(1,Current_mA,FP2,False): FieldNames("CurrentAverage:mA"): Units CurrentAverage = mA (-=Charge, +=Discharge) ' Can not use UINT2, must be FP2
   Maximum(1,Current_mA,FP2,False,False): FieldNames("CurrentMaximum:mA"): Units CurrentMaximum = mA (-=Charge, +=Discharge)
-  Sample(1,SensorHoldPowerOn,Boolean)
   Sample(1,ProcessingTime,UINT2)
   Sample(1,Status.SerialNumber,UINT2)
   Sample(1,DataloggerOSVersion,FP2)
