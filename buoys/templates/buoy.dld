@@ -31,8 +31,6 @@ Const MEASUREMENT_INTERVAL_S As Long = 3600 's                 ' Sensor measurem
 Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 's           ' Slower interval for less critical measurements, such as GPS
 Const DATA_STORAGE_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' Store data every measurement cycle
 Const SENSOR_WARMUP_S As Long = 0
-Public MeasureBefore_s As Long = 0
-PreserveOneVariable(MeasureBefore_s) ' The time to warm up the sensor before measuring (in s).  Set to 0 to have always on
 Const LOW_BATTERY_SAVER_V = 12.83
 Const LOW_BATTERY_SHUTDOWN_V = 12.75' V  ' Battery protection thresholds.  SAVER: Slow meas/no night comms.  SHUTDOWN: Slowest meas/No comms
 Const COMMS As Long = CELLULAR
@@ -410,19 +408,16 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
       SensorPowerStatus = True
       ' The duration of the delay depends on the instrument.  Some power up quickly (ultrasonic <1s, Display <2s), some take a long time (EXO takes 30s before responding to SDI12)
       Message = "Sensor always on, delay for 2s only"
-      Delay(0,2,Sec) ' Ultrasonic needs 0.35s.  Display needs 2s.  This will throw out subsequent time instructions, but manual readings don't happen often
+      Delay(0, 2, Sec) ' Display needs 2s.  This will throw out subsequent time instructions, but manual readings don't happen often
     End If
     StoreData = True
     If SENSOR_WARMUP_S > 0 Then 
       SensorProgramOff = True ' Turn off power at the end of the manual reading
     End If
   End If
-  If MeasureBefore_s > 0 Then
-    If TimeIntoInterval((MEASUREMENT_INTERVAL_S - MeasureBefore_s),MEASUREMENT_INTERVAL_S,Sec) Then ReadNow = True ' If MeasureBefore_s is non zero, it takes measurement before the interval so it is ready
-  Else
-    If TimeIntoInterval(0,MEASUREMENT_INTERVAL_S,Sec) Then ReadNow = True
-  End If
-  If TimeIntoInterval(0,MEASUREMENT_INTERVAL_S,Sec) Then SensorProgramOn = True ' Sensor is always powered on
+  
+  If TimeIntoInterval(0,MEASUREMENT_INTERVAL_S,Sec) Then ReadNow = True
+  If TimeIntoInterval(0,MEASUREMENT_INTERVAL_S,Sec) Then SensorProgramOn = True ' always on
   If NOT(SensorHoldPowerOff) AND (SensorHoldPowerOn OR SensorProgramOn OR ReadFast) Then ' Turn on if instructed by either the user or the program.  Turning off is after the measurement
     If SensorPowerStatus = False Then ' Only turn it on if it is not already
       Call WritePort(SENSOR_POWER_PORT,True)
