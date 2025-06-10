@@ -8,7 +8,7 @@ Const HYDROSPHERE_HOST As String = "stormcentral.waterlog.com"
 Const HYDROSPHERE_PORT As Long = 32212
 Const HYDROSPHERE_MAX_RETRIES As Long = 5 ' Hydrosphere connection attempts
 Const HYDROSPHERE_BUFFER_SIZE As Long = 96 ' Readings stored while waiting for comms.  96 is required for 15min data, for 12 hours - if daily updates are used
-Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s, i.e. 5s
+Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s
 
 ' Refer to section 13.3.2 "Hydrosphere Configuration" in the Ai1 manual for details on setting up the Hydrosphere parameters to suit this site
 Const CELLULAR As Long = 1
@@ -25,12 +25,10 @@ Public PortsStatus As String * 90
 Dim PortsON As Long = 0
 
 ' Factory configuration constants
-Const METRIC As Boolean = True                                ' Program uses SI metric units wherever possible
-Const SCAN_INTERVAL_S As Long = 5 ' s                         ' Program scan Interval. 
-Const MEASUREMENT_INTERVAL_S As Long = 3600 's                 ' Sensor measurement interval
-Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 's           ' Slower interval for less critical measurements, such as GPS
+Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval.
+Const MEASUREMENT_INTERVAL_S As Long = 3600 ' Sensor measurement interval
+Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 ' interval for less critical measurements, such as GPS
 Const DATA_STORAGE_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' Store data every measurement cycle
-Const SENSOR_WARMUP_S As Long = 0
 Const LOW_BATTERY_SAVER_V = 12.83
 Const LOW_BATTERY_SHUTDOWN_V = 12.75' V  ' Battery protection thresholds.  SAVER: Slow meas/no night comms.  SHUTDOWN: Slowest meas/No comms
 Const COMMS As Long = CELLULAR
@@ -634,9 +632,6 @@ Sub Initialization
   findSonde(3)
   Message = "Sonde initialized. "
   Call WritePort(Vx1,0)                                        ' Turn off RS485 adapter.  Don't check SensorKeepRS485On because this is during initialization
-  If SENSOR_WARMUP_S > 0 Then
-    Call WritePort(SW12V, 0) ' Unless sensor power is to be held on, switch off the sonde
-  End If
   If Status.LithiumBattery < 3.0 Then ' Check diagnostics are record to ErrorLog if a problem
     Call ErrorLog("Low (or no) Lithium Battery = " + Status.LithiumBattery)
     Delay(0, 500, mSec) ' Log with delay incase multiple messages are generated
@@ -651,12 +646,7 @@ Sub Initialization
   If DATA_STORAGE_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then
     Call ErrorLog("DATA_STORAGE_INTERVAL_S (" + DATA_STORAGE_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
   End If
-  If SENSOR_WARMUP_S = 0 Then
-    SensorProgramOn = True ' Warmup = 0, means always on, start powered up
-  End If
-  If SENSOR_WARMUP_S MOD SCAN_INTERVAL_S > 0 Then 
-    Call ErrorLog("SENSOR_WARMUP_S (" + SENSOR_WARMUP_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
-  End If
+  SensorProgramOn = True ' Warmup = 0, means always on, start powered up
   DataloggerOSVersion = Right(Status.OSVersion, 5) ' Get the OS version and convert to a string, only needed at startup.  5 characters works for OS > 10.01
   Message += "System initialization complete."
   Call AddDate
