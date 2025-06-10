@@ -402,20 +402,6 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
     ReadPause = False
     ReadFast = False
   End If
-  If ReadNow Then ' If ReadNow is on here then it is set manually, not by program control
-    If SensorPowerStatus = False Then
-      Call WritePort(SENSOR_POWER_PORT, True)
-      SensorPowerStatus = True
-      ' The duration of the delay depends on the instrument.  Some power up quickly (ultrasonic <1s, Display <2s), some take a long time (EXO takes 30s before responding to SDI12)
-      Message = "Sensor always on, delay for 2s only"
-      Delay(0, 2, Sec) ' Display needs 2s.  This will throw out subsequent time instructions, but manual readings don't happen often
-    End If
-    StoreData = True
-    If SENSOR_WARMUP_S > 0 Then 
-      SensorProgramOff = True ' Turn off power at the end of the manual reading
-    End If
-  End If
-  
   If TimeIntoInterval(0,MEASUREMENT_INTERVAL_S,Sec) Then ReadNow = True
   If TimeIntoInterval(0,MEASUREMENT_INTERVAL_S,Sec) Then SensorProgramOn = True ' always on
   If NOT(SensorHoldPowerOff) AND (SensorHoldPowerOn OR SensorProgramOn OR ReadFast) Then ' Turn on if instructed by either the user or the program.  Turning off is after the measurement
@@ -430,7 +416,7 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
     ReadNow = false
   End If
 
-  If StoreData Then ' store exactly at the interval
+  If StoreData Then ' store at interval
     ' StoreData does not store data with RS485 sondes, must take measurements first, and measurements must be valid or CallTable is skipped (see above)
     Call LoadData ' Load the array for addresses of variables to use
     For i = 1 To PARAMETERS_TO_SEND
