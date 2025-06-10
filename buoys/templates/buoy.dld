@@ -6,7 +6,7 @@ Public AccessPointName As String = "so01.VZWSTATIC" ' Cell APN
 Const PARAMETERS_TO_SEND = 11 ' message width for cloud
 Const HYDROSPHERE_HOST As String = "stormcentral.waterlog.com"
 Const HYDROSPHERE_PORT As Long = 32212
-Const HYDROSPHERE_MAX_RETRIES As Long = 5 ' Number of retries for Hydrosphere connection attempts
+Const HYDROSPHERE_MAX_RETRIES As Long = 5 ' Hydrosphere connection attempts
 Const HYDROSPHERE_BUFFER_SIZE As Long = 96 ' Readings stored while waiting for comms.  96 is required for 15min data, for 12 hours - if daily updates are used
 Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s, i.e. 5s
 
@@ -255,7 +255,6 @@ Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor R
 Public ReadPause As Boolean = False: Units ReadPause = True = Pause New Sensor Readings
 Public ReadStatusSensors As Boolean = False
 Public StoreData As Boolean = False: Units StoreData = True = Save Data Record  ' Allows program control (time and event based) as well as user control
-Public ForceStoreData As Boolean = False
 Public SensorHoldPowerOn As Boolean = False: Units SensorHoldPowerOn = True = Keep Sensor On
 Public SensorHoldPowerOff As Boolean = False: Units SensorHoldPowerOff = True = Keep Sensor Off
 Public SensorKeepRS485On As Boolean = False                   ' Set true if power is to be kept on between readings.  May be useful to see the full boot-up message from the sonde.  No, it stops this working at all.  Only get a couple of bytes, 00 FF
@@ -346,7 +345,7 @@ EndSub
 
 Public HydrosphereID_EditInProgram As String = HYDROSPHERE_ID ' The ID in the form of abcde-abcde-abcde-abcde, defined in main program
 Public HydrosphereData As String *(22+PARAMETERS_TO_SEND*10) ' The string representing one full record to send to Hydrosphere
-Public HydrosphereDataBuffer(HYDROSPHERE_BUFFER_SIZE) As String *(22+PARAMETERS_TO_SEND*10) ' A small buffer of records to send to Hydrosphere
+Public HydrosphereDataBuffer(HYDROSPHERE_BUFFER_SIZE) As String *(22+PARAMETERS_TO_SEND*10)
 Public HydrosphereNames As String *(PARAMETERS_TO_SEND*26)' The combined descriptions into a single string
 Dim HydrosphereBufferNextPointer As Long = 1
 
@@ -455,12 +454,8 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
       HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CR
       HydrosphereBufferNextPointer += 1
     End If
-    SendToHydrosphere = True ' If new data has been saved, then next time through, send it to Hydrosphere
+    SendToHydrosphere = True ' If new data saved, then next time through, send it to Hydrosphere
     StoreData = False ' Only do this one time
-  End If
-  If ForceStoreData Then
-    CallTable SondeValues ' This can force data storage for processes like FTP that won't do a transfer
-    ForceStoreData = False
   End If
   If NOT(SensorHoldPowerOn) AND (SensorHoldPowerOff OR SensorProgramOff) Then
     If SensorPowerStatus Then ' Only turn off if currently on
@@ -665,7 +660,9 @@ EndSub
 
 
 Sub SystemCheck
-  If TimeIntoInterval(0,SLOW_MEASUREMENT_INTERVAL_S,sec) Then ReadStatusSensors = True
+  If TimeIntoInterval(0,SLOW_MEASUREMENT_INTERVAL_S,sec) Then
+    ReadStatusSensors = True
+  End If
   PanelTemp(InternalTemperature,FILTER_FREQUENCY) ' Measure each time as this is a surrogate indicator for analog errors - when it has noise in the data
   Battery(BatteryVoltage) ' Measure using the CR300 battery voltage hardware
   If ReadStatusSensors Then
