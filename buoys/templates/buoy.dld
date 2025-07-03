@@ -390,83 +390,6 @@ Sub Hydrosphere
   End If
 EndSub
 
-Sub SensorMeasurements ' Time commands at the top, so slow commands don't interfere
-
-  If TimeIntoInterval(0, MEASUREMENT_INTERVAL_S, Sec) Then 
-    ReadNow = True
-    SensorProgramOn = True ' always on
-  End If
-  If (SensorProgramOn) Then
-    ' Turn on if instructed by either the user or the program. Turning off is after the measurement
-    If NOT (SensorPowerStatus) Then ' Only turn it on if it is not already
-      Call WritePort(SENSOR_POWER_PORT, True)
-      SensorPowerStatus = True
-    End If
-    SensorProgramOn = false ' Only do this once
-  End If
-  If (ReadNow) Then
-    Call MeasureWaterQuality
-    ReadNow = false
-  End If
-
-  If TimeIntoInterval(0, DATA_STORAGE_INTERVAL_S, Sec) Then ' store at interval
-    ' does not store data with RS485 sondes, must take measurements first, and measurements must be valid or CallTable is skipped (see above)
-    ParameterToSend(1) = @ExternalTemp
-    ParameterToSend(2) = @SpConductivity_us
-    ParameterToSend(3) = @Pressure_abs
-    ParameterToSend(4) = @Chlorophyll_ugL
-    ParameterToSend(5) = @Chlorophyll_RFU
-    ParameterToSend(6) = @BGA_PE_ugL
-    ParameterToSend(7) = @BGA_PE_RFU
-    ParameterToSend(8) = @BatteryVoltage
-    ParameterToSend(9) = @InternalHumidity
-    ParameterToSend(10) = @Salinity
-    ParameterToSend(11) = @Latitude
-    ParameterToSend(12) = @Longitude
-    ' ParameterToSend(5) = @ODO
-    ' ParameterToSend(6) = @ODO_Sat
-    ' ParameterToSend(7) = @pH
-    ' ParameterToSend(8) = @pH_mV
-    For i = 1 To PARAMETERS_TO_SEND
-      HydrosphereDescription(i) = !(ParameterToSend(i)) ' name of memory location is the canonical vendor name
-      AddressToRead = (ParameterToSend(i)) ' Cannot read the value directly
-      HydrosphereValues(i) = !AddressToRead
-    Next i
-    RealTime(rTime)
-    HydrosphereData = "D=" + FormatFloat(Month,"%02.0f") + "/" + FormatFloat(DayOfMonth,"%02.0f") + "/" + FormatFloat((Year MOD 100),"%02.0f") + "," + FormatFloat(Hour,"%02.0f") + ":" + FormatFloat(Minute,"%02.0f") + ":" + FormatFloat(Second,"%02.0f") + ","
-    HydrosphereNames = "SN="
-    For i = 1 To PARAMETERS_TO_SEND
-      HydrosphereNames += HydrosphereDescription(i)
-      HydrosphereData += HydrosphereValues(i)
-      If i < PARAMETERS_TO_SEND Then 
-        HydrosphereData += ","
-        HydrosphereNames += ","
-      End If
-    Next i
-    If HydrosphereBufferNextPointer <= HYDROSPHERE_BUFFER_SIZE Then
-      HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CR
-      HydrosphereBufferNextPointer += 1
-    End If
-    SendToHydrosphere = True ' If new data saved, then next time through, send it to Hydrosphere
-  End If
-  If (SensorProgramOff) Then
-    If SensorPowerStatus Then ' Only turn off if currently on
-      Call WritePort(SENSOR_POWER_PORT, False)
-      SensorPowerStatus = False
-    End If
-    SensorProgramOff = False ' Only do this once
-  End If
-  If SensorKeepRS485On AND NOT(SensorKeepRS485OnLast) Then
-    Message = "Turning on RS485 adapter based on SensorKeepRS485On setting"
-    Call WritePort(Vx1, True)
-  End If
-  If NOT(SensorKeepRS485On) AND SensorKeepRS485OnLast Then
-    Message = "Turning off RS485 adapter based on SensorKeepRS485On setting"
-    Call WritePort(Vx1, False)
-  End If
-  SensorKeepRS485OnLast = SensorKeepRS485On
-EndSub
-
 
 Const GPS_PARAMETERS As Long = 9 ' 1=Time(UTC),2=Date,3=Lat(ddmm),4=Lat(.mmmmmm),5=Long(ddmm),6=Long(.mmmmmm),7=Alt,8=Fix,9=#Sat
 Dim GPSReadings(GPS_PARAMETERS) As Float
@@ -653,6 +576,84 @@ Sub Initialization
   DataloggerOSVersion = Right(Status.OSVersion, 5) ' Get the OS version and convert to a string, only needed at startup.  5 characters works for OS > 10.01
   Message += "System initialization complete."
   Call AddDate
+EndSub
+
+
+Sub SensorMeasurements ' Time commands at the top, so slow commands don't interfere
+
+  If TimeIntoInterval(0, MEASUREMENT_INTERVAL_S, Sec) Then 
+    ReadNow = True
+    SensorProgramOn = True ' always on
+  End If
+  If (SensorProgramOn) Then
+    ' Turn on if instructed by either the user or the program. Turning off is after the measurement
+    If NOT (SensorPowerStatus) Then ' Only turn it on if it is not already
+      Call WritePort(SENSOR_POWER_PORT, True)
+      SensorPowerStatus = True
+    End If
+    SensorProgramOn = false ' Only do this once
+  End If
+  If (ReadNow) Then
+    Call MeasureWaterQuality
+    ReadNow = false
+  End If
+
+  If TimeIntoInterval(0, DATA_STORAGE_INTERVAL_S, Sec) Then ' store at interval
+    ' does not store data with RS485 sondes, must take measurements first, and measurements must be valid or CallTable is skipped (see above)
+    ParameterToSend(1) = @ExternalTemp
+    ParameterToSend(2) = @SpConductivity_us
+    ParameterToSend(3) = @Pressure_abs
+    ParameterToSend(4) = @Chlorophyll_ugL
+    ParameterToSend(5) = @Chlorophyll_RFU
+    ParameterToSend(6) = @BGA_PE_ugL
+    ParameterToSend(7) = @BGA_PE_RFU
+    ParameterToSend(8) = @BatteryVoltage
+    ParameterToSend(9) = @InternalHumidity
+    ParameterToSend(10) = @Salinity
+    ParameterToSend(11) = @Latitude
+    ParameterToSend(12) = @Longitude
+    ' ParameterToSend(5) = @ODO
+    ' ParameterToSend(6) = @ODO_Sat
+    ' ParameterToSend(7) = @pH
+    ' ParameterToSend(8) = @pH_mV
+    For i = 1 To PARAMETERS_TO_SEND
+      HydrosphereDescription(i) = !(ParameterToSend(i)) ' name of memory location is the canonical vendor name
+      AddressToRead = (ParameterToSend(i)) ' Cannot read the value directly
+      HydrosphereValues(i) = !AddressToRead
+    Next i
+    RealTime(rTime)
+    HydrosphereData = "D=" + FormatFloat(Month,"%02.0f") + "/" + FormatFloat(DayOfMonth,"%02.0f") + "/" + FormatFloat((Year MOD 100),"%02.0f") + "," + FormatFloat(Hour,"%02.0f") + ":" + FormatFloat(Minute,"%02.0f") + ":" + FormatFloat(Second,"%02.0f") + ","
+    HydrosphereNames = "SN="
+    For i = 1 To PARAMETERS_TO_SEND
+      HydrosphereNames += HydrosphereDescription(i)
+      HydrosphereData += HydrosphereValues(i)
+      If i < PARAMETERS_TO_SEND Then 
+        HydrosphereData += ","
+        HydrosphereNames += ","
+      End If
+    Next i
+    If HydrosphereBufferNextPointer <= HYDROSPHERE_BUFFER_SIZE Then
+      HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CR
+      HydrosphereBufferNextPointer += 1
+    End If
+    SendToHydrosphere = True ' If new data saved, then next time through, send it to Hydrosphere
+  End If
+  If (SensorProgramOff) Then
+    If SensorPowerStatus Then ' Only turn off if currently on
+      Call WritePort(SENSOR_POWER_PORT, False)
+      SensorPowerStatus = False
+    End If
+    SensorProgramOff = False ' Only do this once
+  End If
+  If SensorKeepRS485On AND NOT(SensorKeepRS485OnLast) Then
+    Message = "Turning on RS485 adapter based on SensorKeepRS485On setting"
+    Call WritePort(Vx1, True)
+  End If
+  If NOT(SensorKeepRS485On) AND SensorKeepRS485OnLast Then
+    Message = "Turning off RS485 adapter based on SensorKeepRS485On setting"
+    Call WritePort(Vx1, False)
+  End If
+  SensorKeepRS485OnLast = SensorKeepRS485On
 EndSub
 
 
