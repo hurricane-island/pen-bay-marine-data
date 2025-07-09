@@ -3,7 +3,7 @@ Const HYDROSPHERE_ID = "$CLIENT_ID" ' Hydrosphere site.
 Const PAKBUS_ADDRESS As Long = $PAKBUS_ADDRESS ' network address
 Const TCP_CLIENT As String = "(drema.konectgds.com,9200)" ' Pakbus Router
 Public AccessPointName As String = "so01.VZWSTATIC" ' Cell APN
-Const PARAMETERS_TO_SEND = 12 ' message width for cloud
+Const PARAMETERS_TO_SEND = 14 ' message width for cloud
 Const HYDROSPHERE_HOST As String = "stormcentral.waterlog.com"
 Const HYDROSPHERE_PORT As Long = 32212
 Const HYDROSPHERE_MAX_RETRIES As Long = 5 ' Hydrosphere connection attempts
@@ -610,10 +610,11 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
     ParameterToSend(8) = @BatteryVoltage
     ParameterToSend(9) = @InternalHumidity
     ParameterToSend(10) = @Salinity
-    ParameterToSend(11) = @Latitude
-    ParameterToSend(12) = @Longitude
-    ' ParameterToSend(5) = @ODO
-    ' ParameterToSend(6) = @ODO_Sat
+    ParameterToSend(11) = @ODO
+    ParameterToSend(12) = @ODO_Sat
+    ParameterToSend(13) = @Latitude
+    ParameterToSend(14) = @Longitude
+
     ' ParameterToSend(7) = @pH
     ' ParameterToSend(8) = @pH_mV
     For i = 1 To PARAMETERS_TO_SEND
