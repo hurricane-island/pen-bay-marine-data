@@ -22,7 +22,7 @@ def template(name: str, address: str, client: str, template: str):
         'CLIENT_ID': client,
     }.items():
         slug = "$" + var
-        filedata: str = filedata.replace(slug, value)
+        filedata = filedata.replace(slug, value)
 
     encoded_data = filedata.encode('utf-8')
     hash = hashlib.md5()
