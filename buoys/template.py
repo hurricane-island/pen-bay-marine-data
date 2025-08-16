@@ -30,6 +30,7 @@ def template(name: str, address: str, client: str, template: str):
     checksum = hash.hexdigest()
     prefix = name.lower()
     firmware_path = f"{path}/firmware/{prefix}.{checksum}.dld"
+    Path(firmware_path).parent.mkdir(parents=True, exist_ok=True)
     with open(firmware_path, 'w', encoding='utf-8') as file:
         file.write(filedata)
 
