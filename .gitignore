@@ -66,3 +66,5 @@ buoys/firmware/*
 .pixi
 *.egg-info
 weather/weewx.conf
+*/__pycache__/
+*.pyc
