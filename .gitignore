@@ -49,18 +49,7 @@ po/*~
 rsconnect/
 
 .DS_Store
-.env*
-yarn.lock
-yarn-error.log
-node_modules/
-
-# Compiler output form CRBasic
-logger-programs/*.tdf 
-
-logger-programs/*
-!logger-programs/template/
-buoys/firmware/*
-*.tdf
+.envrc
 
 # pixi environments
 .pixi
