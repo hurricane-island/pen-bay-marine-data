@@ -6,6 +6,7 @@ platforms = ["osx-arm64"]
 version = "0.1.0"
 
 [tasks]
+pbmd = "python cli.py"
 
 [dependencies]
 python = ">=3.13.3,<3.14"

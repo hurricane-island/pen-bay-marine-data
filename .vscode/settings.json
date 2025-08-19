@@ -1,6 +1,7 @@
 {
     "makefile.configureOnOpen": false,
     "cSpell.words": [
+        "PAKBUS",
         "resampler",
         "twinx",
         "xlabel",
