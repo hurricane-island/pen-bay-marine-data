@@ -1,3 +1,11 @@
 {
-    "makefile.configureOnOpen": false
+    "makefile.configureOnOpen": false,
+    "cSpell.words": [
+        "resampler",
+        "twinx",
+        "xlabel",
+        "xlim",
+        "ylabel",
+        "ylim"
+    ]
 }
