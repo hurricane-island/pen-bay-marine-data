@@ -16,6 +16,8 @@ black = ">=25.1.0,<26"
 bidict = ">=0.23.1,<0.24"
 matplotlib = ">=3.10.5,<4"
 numpy = ">=2.3.2,<3"
+pip = ">=25.1.1,<26"
+ioos_qc = ">=2.2.0,<3"
 
 [pypi-dependencies]
 "influxdb3-python" = "~=0.12.0"
