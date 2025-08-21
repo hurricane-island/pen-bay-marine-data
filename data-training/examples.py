@@ -15,8 +15,9 @@ from matplotlib import pyplot as plt
 from matplotlib.dates import WeekdayLocator, DateFormatter
 
 FIGURES = Path(__file__).parent / "figures"
-DATA_DIR = Path(__file__).parent / "data"
-EXAMPLE = DATA_DIR / "buoy.csv"
+DATA_DIR = Path(__file__).parents[1] / "buoys" / "data"
+# DATA_DIR = Path(__file__).parent / "data"
+EXAMPLE = Path(__file__).parent / "data" / "buoy.csv"
 
 
 def iso_time_format(time: str) -> str:
