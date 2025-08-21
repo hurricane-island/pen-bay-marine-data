@@ -16,7 +16,6 @@ from matplotlib.dates import WeekdayLocator, DateFormatter
 
 FIGURES = Path(__file__).parent / "figures"
 DATA_DIR = Path(__file__).parents[1] / "buoys" / "data"
-# DATA_DIR = Path(__file__).parent / "data"
 EXAMPLE = Path(__file__).parent / "data" / "buoy.csv"
 
 
