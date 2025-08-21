@@ -1,12 +1,18 @@
 {
     "makefile.configureOnOpen": false,
     "cSpell.words": [
+        "autofmt",
+        "mdates",
+        "medianprops",
         "PAKBUS",
         "resampler",
         "skiprows",
         "twinx",
+        "xaxis",
+        "xdate",
         "xlabel",
         "xlim",
+        "xticks",
         "ylabel",
         "ylim"
     ]

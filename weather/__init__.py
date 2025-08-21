@@ -3,11 +3,11 @@ Weather Station Tools CLI:
 
 This module provides a command-line interface for using weather station data, including:
 
-- Concatenated CSV files from a single station
-- Show summary statistics for a station
-- Get information about the Influx database
-- Backfill Influx database from CSV files
-    - Convert CSV names to WeeWx/InfluxDB names
+- `export`:Concatenate CSV files from a single station
+- `describe`: Show summary statistics for a station
+- `db`: Get information about the Influx database
+- TBD: Backfill Influx database from CSV files
+- Convert CSV names to WeeWx/InfluxDB names
 
 Limitations:
 
@@ -125,6 +125,7 @@ class WeatherLinkArchive:
     """
     A WeatherLink archive exported file
     """
+
     # pylint: disable=too-many-arguments, too-many-locals, too-many-positional-arguments
     def __init__(
         self,
@@ -184,23 +185,15 @@ class WeatherLinkArchive:
         return f"Archive(name={self.name})"
 
 
-def influx_client(bucket: str = "test") -> InfluxDBClient3:
-    """
-    Database context manager.
-    """
-    token = getenv("INFLUX_API_TOKEN", "")
-    host = getenv("INFLUX_SERVER_URL", "")
-    client = InfluxDBClient3(host=host, database=bucket, token=token)
-    return client
-
-
 def get_influx_data(
-    measurement: str, time: str = TIME, bucket: str = "weather"
+    measurement: str, time: str = TIME, database: str = "weather"
 ) -> DataFrame:
     """
     Get data from InfluxDB and format as a DataFrame.
     """
-    client = influx_client(bucket=bucket)
+    token = getenv("INFLUX_API_TOKEN", "")
+    host = getenv("INFLUX_SERVER_URL", "")
+    client = InfluxDBClient3(host=host, database=database, token=token)
     df: DataFrame = client.query(
         f"SELECT * FROM {measurement} WHERE binding IN ('archive') ORDER BY {time}",
         mode="pandas",
@@ -214,24 +207,41 @@ def resample_series(
     """
     Resample a time series to a specified frequency.
     """
-    # daily = series.resample(freq)
-    # series_max = daily.max()
-    # daily = series.groupby(Grouper(freq='D')).boxplot()
-    # series_min = daily.min()
-    # print(daily)
-    # plt.boxplot(daily)
-    # plt.boxplot(series_max.index, series_max,label=f"{series.name} {freq.lower()} max", color=color)
-    # series_mean = daily.mean()
-    # plt.bar(series_mean.index, series_mean, label=f"{series.name} {freq.lower()} mean", color=color, linestyle="--")
+    daily = series.resample(freq)
+    series_max = daily.max()
+    plt.plot(
+        series_max.index,
+        series_max,
+        label=f"{series.name} {freq.lower()} max",
+        color=color,
+    )
+    series_mean = daily.mean()
+    plt.plot(
+        series_mean.index,
+        series_mean,
+        label=f"{series.name} {freq.lower()} mean",
+        color=color,
+        linestyle="--",
+    )
 
 
-def plot_comparison(influx: Series, local: Series, series: str):
+@weather.command(name="plot")
+@click.argument("station")
+@click.argument("series")
+@click.option("--measurement", default="observations", help="The InfluxDB measurement (table) name.")
+def plot_comparison(station: str, measurement: str, series: str):
     """
     Plot a comparison of local and InfluxDB data for a specific series.
     """
+    remote = get_influx_data(measurement)[series]
+    local = WeatherLinkArchive(station).df[series]
+    values = set(NAME_LOOKUP.values())
+    values.discard(None)
+    if series not in values:
+        raise ValueError(f"Series '{series}' is not a valid column: {values}.")
     plt.figure(figsize=(12, 6))
-    resample_series(influx, color="red")
-    # resample_series(local, color="black")
+    resample_series(local, color="black")
+    resample_series(remote, color="red")
     plt.title(f"Comparison of {series}")
     plt.xlabel("Time")
     plt.ylabel("Value")
@@ -241,7 +251,7 @@ def plot_comparison(influx: Series, local: Series, series: str):
 
 
 @weather.command()
-@click.option("--name", default="dev", help="The station name.")
+@click.argument("name")
 def describe(name: str):
     """
     Parse and normalize weather station data for display
@@ -255,7 +265,7 @@ def describe(name: str):
 
 
 @weather.command()
-@click.option("--name", default="dev", help="The station name.")
+@click.argument("name")
 def export(name: str):
     """
     Export normalized weather station data to CSV.
@@ -269,14 +279,13 @@ def export(name: str):
 @click.option(
     "--measurement", default="observations", help="The Influx measurement (table)."
 )
-def database(measurement: str):
+def influx(measurement: str):
     """
     Show information about the data already stored in Influx database.
     """
     df = get_influx_data(measurement)
     print(df.describe(include="all"))
     print(df.dtypes)
-
 
 
 @weather.command()
@@ -287,19 +296,20 @@ def database(measurement: str):
     default="observations",
     help="The InfluxDB measurement (table) name.",
 )
+# pylint: disable=too-many-locals
 def boxplot(station: str, series: str, measurement: str):
     """
     Display concatenated data, aggregated by day. Boxplots don't use date axis the
     same way as line and scatter plots, so we have to calculate positions and offsets
     manually.
     """
-    influx = get_influx_data(measurement)
+    db = get_influx_data(measurement)
     local = WeatherLinkArchive(station).df
     values = set(NAME_LOOKUP.values())
     values.discard(None)
     if series not in values:
         raise ValueError(f"Series '{series}' is not a valid column: {values}.")
-    df = concat([local[series], influx[series]], axis=0)
+    df = concat([local[series], db[series]], axis=0)
     fig = plt.figure(figsize=(12, 6))
     ax = fig.subplots()
     grouper = Grouper(freq="D")
@@ -341,7 +351,7 @@ def compare(station: str, series: str, measurement: str):
     """
     Compare local and database data before merging or backfilling.
     """
-    influx = get_influx_data(measurement)
+    db = get_influx_data(measurement)
     local = WeatherLinkArchive(station).df
     values = set(NAME_LOOKUP.values())
     values.discard(None)
@@ -349,11 +359,11 @@ def compare(station: str, series: str, measurement: str):
         raise ValueError(f"Series '{series}' is not a valid column: {values}.")
     print(f"\nColumn: {series}")
     try:
-        series_a = influx[series]
+        series_a = db[series]
         series_a.name = "influx"
         series_b = local[series]
         series_b.name = "local"
         df = concat([series_a, series_b], axis=1)
         print(df.describe(include="all"))
-    except Exception as e:
+    except (KeyError, ValueError) as e:
         print(f"Error processing column {series}: {e}")
