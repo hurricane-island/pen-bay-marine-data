@@ -22,13 +22,10 @@ Questions:
 
 from pathlib import Path
 import click
-from pandas import read_csv, to_datetime, DataFrame, Series, set_option, concat, Grouper
+from pandas import read_csv, to_datetime, DataFrame, Series, concat, Grouper
 from influxdb_client_3 import InfluxDBClient3
 from os import getenv
-from weewx.drivers.vantage import _archive_map
-from bidict import frozenbidict
 from matplotlib import pyplot as plt, dates as mdates
-from numpy import array
 from datetime import datetime
 
 DATA_DIR = Path(__file__).parent / "data"
