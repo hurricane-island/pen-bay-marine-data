@@ -229,7 +229,7 @@ def resample_series(
 @click.argument("station")
 @click.argument("series")
 @click.option("--measurement", default="observations", help="The InfluxDB measurement (table) name.")
-def plot_comparison(station: str, measurement: str, series: str):
+def plot_comparison(station: str, series: str, measurement: str):
     """
     Plot a comparison of local and InfluxDB data for a specific series.
     """
