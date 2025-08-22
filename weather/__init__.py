@@ -178,7 +178,7 @@ class WeatherLinkArchive:
         series = Series(time_string, name=TIME)
         timestamps = to_datetime(series, format="%m/%d/%y %I:%M %p")
         df.set_index(timestamps, inplace=True)
-        df.drop(columns=[date, time])
+        df = df.drop(columns=[date, time])
         self.df = df
 
     def __repr__(self):
