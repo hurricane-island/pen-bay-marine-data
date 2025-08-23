@@ -6,19 +6,19 @@ platforms = ["osx-arm64"]
 version = "0.1.0"
 
 [tasks]
-pbmd = "python cli.py"
+penbay = "python cli.py"
 
 [dependencies]
-python = ">=3.13.3,<3.14"
+python = "==3.13"
+typing_extensions = "*"
 pandas = ">=2.2.3,<3"
 click = ">=8.2.1,<9"
 black = ">=25.1.0,<26"
-bidict = ">=0.23.1,<0.24"
 matplotlib = ">=3.10.5,<4"
 numpy = ">=2.3.2,<3"
 pip = ">=25.2,<26"
 ioos_qc = ">=2.2.1,<3"
 
 [pypi-dependencies]
-"influxdb3-python" = "~=0.12.0"
+"influxdb3-python" = "~=0.15.0"
 weewx = ">=5.1.0, <6"

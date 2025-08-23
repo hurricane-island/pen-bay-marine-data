@@ -3,11 +3,11 @@ Weather Station Tools CLI:
 
 This module provides a command-line interface for using weather station data, including:
 
-- Concatenated CSV files from a single station
-- Show summary statistics for a station
-- Get information about the Influx database
-- Backfill Influx database from CSV files
-    - Convert CSV names to WeeWx/InfluxDB names
+- `export`:Concatenate CSV files from a single station
+- `describe`: Show summary statistics for a station
+- `db`: Get information about the Influx database
+- TBD: Backfill Influx database from CSV files
+- Convert CSV names to WeeWx/InfluxDB names
 
 Limitations:
 
@@ -22,13 +22,10 @@ Questions:
 
 from pathlib import Path
 import click
-from pandas import read_csv, to_datetime, DataFrame, Series, set_option, concat, Grouper
+from pandas import read_csv, to_datetime, DataFrame, Series, concat, Grouper
 from influxdb_client_3 import InfluxDBClient3
 from os import getenv
-from weewx.drivers.vantage import _archive_map
-from bidict import frozenbidict
 from matplotlib import pyplot as plt, dates as mdates
-from numpy import array
 from datetime import datetime
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -119,90 +116,147 @@ NAME_LOOKUP = {
 @click.group()
 def weather():
     """
-    Weather station data tools.
+    Weather data tools.
     """
 
 
-def normalize_headers(filename: str, skiprows=2, delimiter="\t") -> str:
+# pylint: disable=too-few-public-methods
+class WeatherLinkArchive:
     """
-    Normalize headers from a multiple header line file. Rename them if they
-    have a known mapping, but otherwise leave them as is.
+    A WeatherLink archive exported file
     """
-    rows: list[list[str]] = []
-    with open(filename, "r", encoding="utf-8") as file:
-        for _ in range(skiprows):
-            rows.append(file.readline().split(delimiter))
-    headers = []
-    for items in zip(*rows):
-        header = ""
-        for each in items:
-            header += str(each).strip() + " "
-        header = header.strip()
-        if header in NAME_LOOKUP and NAME_LOOKUP[header] is not None:
-            header = NAME_LOOKUP[header]
-        headers.append(header)
-    return headers
 
+    # pylint: disable=too-many-arguments, too-many-locals, too-many-positional-arguments
+    def __init__(
+        self,
+        # Source name
+        name: str,
+        # Number of rows that contain column info to concatenate
+        skiprows: int = 2,
+        # Delimiter used in the sourcefile
+        delimiter: str = "\t",
+        # Interpret as NaN
+        na_value: str = "---",
+        # Name of date column
+        date: str = "Date",
+        # Name of time column
+        time: str = "Time",
+    ):
+        """
+        Read and normalize weather station data. This handles
+        parsing a Davis WeatherLink export. This format contains
+        two lines of headers, is tab-delimited, and has separate
+        columns for data and time that need to be combined.
 
-def normalize_time_index(
-    df: DataFrame, date: str = "Date", time: str = "Time"
-) -> DataFrame:
-    """
-    Create a datetime index from the non-standard Date and Time columns.
-    Works on data exported by Weather Link software.
-    """
-    # create a string that can be parsed as a datetime by pandas
-    time_string = df[date] + " " + df[time].str.upper() + "M"
-    series = Series(time_string, name=TIME)
-    timestamps = to_datetime(series, format="%m/%d/%y %I:%M %p")
-    return df.set_index(timestamps).drop(columns=[date, time])
+        Normalize headers from a multiple header line file. Rename them if they
+        have a known mapping, but otherwise leave them as is.
+        """
+        self.name = name
+        filename = DATA_DIR / f"{name}.txt"
+        rows: list[list[str]] = []
+        with open(filename, "r", encoding="utf-8") as file:
+            for _ in range(skiprows):
+                rows.append(file.readline().split(delimiter))
+        names = []
+        for items in zip(*rows):
+            header = ""
+            for each in items:
+                header += str(each).strip() + " "
+            header = header.strip()
+            if header in NAME_LOOKUP and NAME_LOOKUP[header] is not None:
+                header = NAME_LOOKUP[header]
+            names.append(header)
+        df = read_csv(
+            filename,
+            delimiter=delimiter,
+            skiprows=skiprows,
+            names=names,
+            na_values=[na_value],
+        )
+        # create a string that can be parsed as a datetime by pandas
+        time_string = df[date] + " " + df[time].str.upper() + "M"
+        series = Series(time_string, name=TIME)
+        timestamps = to_datetime(series, format="%m/%d/%y %I:%M %p")
+        df.set_index(timestamps, inplace=True)
+        df = df.drop(columns=[date, time])
+        self.df = df
 
-
-def read_station_data(name: str, skiprows: int = 2, delimiter: str = "\t") -> DataFrame:
-    """
-    Read and normalize weather station data. This handles
-    parsing a Davis Weather Link export. This format contains
-    two lines of headers, is tab-delimited, and has separate
-    columns for data and time that need to be combined.
-    """
-    filename = DATA_DIR / f"{name}.txt"
-    names = normalize_headers(filename, skiprows=skiprows, delimiter=delimiter)
-    df = read_csv(
-        filename, delimiter=delimiter, skiprows=skiprows, names=names, na_values=["---"]
-    )
-    return normalize_time_index(df)
-
-
-def influx_client(bucket: str = "test") -> InfluxDBClient3:
-    """
-    Database context manager.
-    """
-    token = getenv("INFLUX_API_TOKEN", "")
-    host = getenv("INFLUX_SERVER_URL", "")
-    client = InfluxDBClient3(host=host, database=bucket, token=token)
-    return client
+    def __repr__(self):
+        return f"Archive(name={self.name})"
 
 
 def get_influx_data(
-    measurement: str, time: str = TIME, bucket: str = "weather"
+    measurement: str, time: str = TIME, database: str = "weather"
 ) -> DataFrame:
     """
     Get data from InfluxDB and format as a DataFrame.
     """
-    client = influx_client(bucket=bucket)
+    token = getenv("INFLUX_API_TOKEN", "")
+    host = getenv("INFLUX_SERVER_URL", "")
+    client = InfluxDBClient3(host=host, database=database, token=token)
     df: DataFrame = client.query(
-        f"SELECT * FROM {measurement} WHERE binding IN ('archive') ORDER BY {time}", mode="pandas"
+        f"SELECT * FROM {measurement} WHERE binding IN ('archive') ORDER BY {time}",
+        mode="pandas",
     )
     return df.set_index(time)
 
 
+def resample_series(
+    series: Series, freq: str = "1D", color: str = "black"
+) -> DataFrame:
+    """
+    Resample a time series to a specified frequency.
+    """
+    daily = series.resample(freq)
+    series_max = daily.max()
+    plt.plot(
+        series_max.index,
+        series_max,
+        label=f"{series.name} {freq.lower()} max",
+        color=color,
+    )
+    series_mean = daily.mean()
+    plt.plot(
+        series_mean.index,
+        series_mean,
+        label=f"{series.name} {freq.lower()} mean",
+        color=color,
+        linestyle="--",
+    )
+
+
+@weather.command(name="plot")
+@click.argument("station")
+@click.argument("series")
+@click.option("--measurement", default="observations", help="The InfluxDB measurement (table) name.")
+def plot_comparison(station: str, series: str, measurement: str):
+    """
+    Plot a comparison of local and InfluxDB data for a specific series.
+    """
+    remote = get_influx_data(measurement)[series]
+    local = WeatherLinkArchive(station).df[series]
+    values = set(NAME_LOOKUP.values())
+    values.discard(None)
+    if series not in values:
+        raise ValueError(f"Series '{series}' is not a valid column: {values}.")
+    plt.figure(figsize=(12, 6))
+    resample_series(local, color="black")
+    resample_series(remote, color="red")
+    plt.title(f"Comparison of {series}")
+    plt.xlabel("Time")
+    plt.ylabel("Value")
+    plt.legend()
+    plt.savefig(f"{FIGURES_DIR}/comparison_{series}.png")
+    plt.close()
+
+
 @weather.command()
-@click.option("--name", default="dev", help="The station name.")
+@click.argument("name")
 def describe(name: str):
     """
     Parse and normalize weather station data for display
     """
-    df = read_station_data(name)
+    df = WeatherLinkArchive(name).df
     values = NAME_LOOKUP.values()
     ind = df.columns.intersection(values)
     compatible = df[ind]
@@ -211,12 +265,12 @@ def describe(name: str):
 
 
 @weather.command()
-@click.option("--name", default="dev", help="The station name.")
+@click.argument("name")
 def export(name: str):
     """
     Export normalized weather station data to CSV.
     """
-    df = read_station_data(name)
+    df = WeatherLinkArchive(name).df
     filename = DATA_DIR / f"{name}.csv"
     df.to_csv(filename)
 
@@ -225,7 +279,7 @@ def export(name: str):
 @click.option(
     "--measurement", default="observations", help="The Influx measurement (table)."
 )
-def database(measurement: str):
+def influx(measurement: str):
     """
     Show information about the data already stored in Influx database.
     """
@@ -233,59 +287,36 @@ def database(measurement: str):
     print(df.describe(include="all"))
     print(df.dtypes)
 
-def resample_series(series: Series, freq: str = "1D", color: str = "black") -> DataFrame:
-    """
-    Resample a time series to a specified frequency.
-    """
-    # daily = series.resample(freq)
-    # series_max = daily.max()
-    # daily = series.groupby(Grouper(freq='D')).boxplot()
-    # series_min = daily.min()
-    # print(daily)
-    # plt.boxplot(daily)
-    # plt.boxplot(series_max.index, series_max,label=f"{series.name} {freq.lower()} max", color=color)
-    # series_mean = daily.mean()
-    # plt.bar(series_mean.index, series_mean, label=f"{series.name} {freq.lower()} mean", color=color, linestyle="--")
-
-
-def plot_comparison(influx: Series, local: Series, series: str):
-    """
-    Plot a comparison of local and InfluxDB data for a specific series.
-    """
-    plt.figure(figsize=(12, 6))
-    resample_series(influx, color="red")
-    # resample_series(local, color="black")
-    plt.title(f"Comparison of {series}")
-    plt.xlabel("Time")
-    plt.ylabel("Value")
-    plt.legend()
-    plt.savefig(f"{FIGURES_DIR}/comparison_{series}.png")
-    plt.close()
 
 @weather.command()
 @click.argument("station")
 @click.argument("series")
-@click.option("--measurement", default="observations", help="The InfluxDB measurement (table) name.")
+@click.option(
+    "--measurement",
+    default="observations",
+    help="The InfluxDB measurement (table) name.",
+)
+# pylint: disable=too-many-locals
 def boxplot(station: str, series: str, measurement: str):
     """
     Display concatenated data, aggregated by day. Boxplots don't use date axis the
     same way as line and scatter plots, so we have to calculate positions and offsets
     manually.
     """
-    influx = get_influx_data(measurement)
-    local = read_station_data(station)
+    db = get_influx_data(measurement)
+    local = WeatherLinkArchive(station).df
     values = set(NAME_LOOKUP.values())
     values.discard(None)
     if series not in values:
         raise ValueError(f"Series '{series}' is not a valid column: {values}.")
-    df = concat([local[series], influx[series]], axis=0)
+    df = concat([local[series], db[series]], axis=0)
     fig = plt.figure(figsize=(12, 6))
     ax = fig.subplots()
-    grouper = Grouper(freq='D')
+    grouper = Grouper(freq="D")
     gb = df.groupby(grouper, sort=True)
     groups = gb.groups.keys()
     indices = gb.groups.values()
-    epoch = datetime(1970,1,1)
+    epoch = datetime(1970, 1, 1)
     pos = [(group - epoch).days for group in groups]
     bins = []
     previous = 0
@@ -293,48 +324,46 @@ def boxplot(station: str, series: str, measurement: str):
         bins.append(df[previous:each])
         previous = each
     plt.boxplot(
-        bins,
-        notch=False,
-        widths=0.6,
-        positions=pos,
-        medianprops={"color": "black"}
+        bins, notch=False, widths=0.6, positions=pos, medianprops={"color": "black"}
     )
     plt.title(f"Daily {series}")
     plt.xlabel("date")
     plt.xticks(rotation=45)
-    ax.set_xlim( [ pos[0] - 0.5, pos[-1] + 0.5 ] )
-    ax.set_ylim( [ 0, None ] )
+    ax.set_xlim([pos[0] - 0.5, pos[-1] + 0.5])
+    ax.set_ylim([0, None])
     ax.xaxis.set_major_locator(mdates.WeekdayLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d')) # Customize format
-    fig.autofmt_xdate() # Automatically formats and rotates date labels
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))  # Customize format
+    fig.autofmt_xdate()  # Automatically formats and rotates date labels
     plt.ylabel(series)
     plt.savefig(f"{FIGURES_DIR}/aggregation_{series}.png")
     plt.close()
-    
+
 
 @weather.command()
 @click.argument("station")
 @click.argument("series")
-@click.option("--measurement", default="observations", help="The InfluxDB measurement (table) name.")
-# @click.option("--plot/--no-plot", default=False, help="Display a plot")
+@click.option(
+    "--measurement",
+    default="observations",
+    help="The InfluxDB measurement (table) name.",
+)
 def compare(station: str, series: str, measurement: str):
     """
     Compare local and database data before merging or backfilling.
     """
-    influx = get_influx_data(measurement)
-    local = read_station_data(station)
+    db = get_influx_data(measurement)
+    local = WeatherLinkArchive(station).df
     values = set(NAME_LOOKUP.values())
     values.discard(None)
     if series not in values:
         raise ValueError(f"Series '{series}' is not a valid column: {values}.")
     print(f"\nColumn: {series}")
     try:
-        series_a = influx[series]
+        series_a = db[series]
         series_a.name = "influx"
         series_b = local[series]
         series_b.name = "local"
         df = concat([series_a, series_b], axis=1)
         print(df.describe(include="all"))
-    except Exception as e:
+    except (KeyError, ValueError) as e:
         print(f"Error processing column {series}: {e}")
-
