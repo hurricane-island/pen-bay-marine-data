@@ -7,5 +7,5 @@ deploy:
 .PHONY: deploy
 
 develop:
-	@ balena deploy weather-dev --build --nocache
+	@ balena deploy weather-dev --build --nocache --multi-dockerignore
 .PHONY: develop
