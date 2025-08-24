@@ -21,32 +21,111 @@ Questions:
 
 """
 
-from os import getenv
-from datetime import datetime
 from pathlib import Path
 from enum import Enum
 import click
-from pandas import read_csv, to_datetime, DataFrame, Series, concat, Grouper
+from pandas import read_csv, to_datetime, DataFrame, Series, concat
 from influxdb_client_3 import InfluxDBClient3
-from matplotlib import pyplot as plt, dates as mdates
-from matplotlib.axes import Axes
-from balena import Balena
 from ioos_qc.config import Config
 from ioos_qc.streams import PandasStream
 from ioos_qc.stores import PandasStore
+from lib import (
+    plot_options,
+    influx_options,
+    boxplot,
+    plot_tail,
+    fahrenheit_to_kelvin,
+    cardinal_direction_to_degrees,
+)
 
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
 TIME = "time"
-KNOTS_TO_METERS_PER_SECOND = 0.514444
-INCHES_OF_MERCURY_TO_PASCAL = 3386.389
-MILES_PER_HOUR_TO_METERS_PER_SECOND = 0.44704
+KNOTS_TO_SPEED = 0.514444
+INCHES_OF_MERCURY_TO_PRESSURE = 3386.389
+MILES_PER_HOUR_TO_SPEED = 0.44704
+PERCENT_TO_FRACTION = 0.01
+INCHES_TO_MILLIMETERS = 25.4
+INCHES_PER_HOUR_TO_KILOGRAMS_PER_SQUARE_METER_PER_SECOND = INCHES_TO_MILLIMETERS / 3600
+
+
+class ClickCommands(Enum):
+    """
+    Valid click command names. Does not factor in
+    Click groups. Used to ensure consistent command
+    and label usage across CLI.
+    """
+
+    # plotting commands
+    TAIL = "tail"
+    DAILY = "daily"
+    # others...
+    DESCRIBE = "describe"
+    STATS = "stats"
+    BACKFILL = "backfill"
+    DEPLOY = "deploy"
+    QUALITY = "quality"
+    EXPORT = "export"
+
+
+# pylint: disable=too-few-public-methods
+class Source:
+    """
+    Abstraction for converting from a data source
+    to standard format.
+    """
+
+    name: str
+    transform: callable
+
+    def __init__(self, name: str, transform: callable):
+        self.name = name
+        self.transform = transform
+
+
+# pylint: disable=too-few-public-methods
+class ObservedProperty:
+    """
+    Abstraction for a single observed property, mapping
+    multiple sources into a single Schema based on CF Metadata
+    standards.
+    """
+
+    name: str
+    units: str
+    weewx: Source
+    weather_link: Source
+
+    def __init__(self, name: str, unit: str, weewx: Source, weather_link: Source):
+        self.name = name
+        self.unit = unit
+        self.weewx = weewx
+        self.weather_link = weather_link
+
+
+class StandardUnits(Enum):
+    """
+    CF Metadata Standard Units. These are all of the Davis Vantage Pro2
+    observed properties that have Climate and Forecast (CF) metadata standard
+    units.
+    """
+
+    TEMPERATURE = "deg K"
+    PRESSURE = "Pa"
+    SPEED = "m/s"
+    DIRECTION = "degrees"
+    ENERGY = "W/m^2"
+    FLUX = "kg/m^2/s"
+    AMOUNT = "kg/m^2"
 
 
 class StandardNames(Enum):
     """
-    CF Metadata Standard Names
+    CF Metadata Standard Names. These are all of the Davis Vantage Pro2
+    observed properties that have Climate and Forecast (CF) metadata standard
+    names. Not all of these are available on all platforms, but it is
+    a starting point from what we currently have in the field.
     """
 
     AIR_TEMPERATURE = "air_temperature"
@@ -66,91 +145,134 @@ class StandardNames(Enum):
     WATER_EVAPOTRANSPIRATION_FLUX = "water_evapotranspiration_flux"
 
 
-CF_STANDARD_NAME_TO_UNITS = {
-    StandardNames.AIR_TEMPERATURE.value: "deg K",
-    StandardNames.RELATIVE_HUMIDITY.value: None,
-    StandardNames.WIND_SPEED.value: "m / s",
-    StandardNames.WIND_FROM_DIRECTION.value: "degrees",
-    StandardNames.AIR_PRESSURE.value: "Pa",
-    StandardNames.WIND_SPEED_OF_GUST.value: "m / s",
-    StandardNames.WIND_GUST_FROM_DIRECTION.value: "degrees",
-    StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value: "deg K",
-    StandardNames.SOLAR_IRRADIANCE.value: "W / m^2",
-    StandardNames.ULTRAVIOLET_INDEX.value: None,
-    StandardNames.RAINFALL_AMOUNT.value: "kg / m^2",
-    StandardNames.RAINFALL_RATE.value: "kg / m^2 / s",
-    StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value: "deg K",
-    StandardNames.DEW_POINT_TEMPERATURE.value: "deg K",
-    StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value: "kg / m^2 / s",
+# Standard units for display, not used in determining value conversions
+CF_STANDARDS = {
+    StandardNames.AIR_TEMPERATURE: ObservedProperty(
+        name=StandardNames.AIR_TEMPERATURE.value,
+        unit=StandardUnits.TEMPERATURE.value,
+        weather_link=Source(name="Temp Out", transform=fahrenheit_to_kelvin),
+        weewx=Source(name="outTemp", transform=fahrenheit_to_kelvin),
+    ),
+    StandardNames.RELATIVE_HUMIDITY: ObservedProperty(
+        name=StandardNames.RELATIVE_HUMIDITY.value,
+        unit=None,
+        weather_link=Source(
+            name="Out Hum", transform=lambda x: x * PERCENT_TO_FRACTION
+        ),
+        weewx=Source(name="outHumidity", transform=lambda x: x * PERCENT_TO_FRACTION),
+    ),
+    StandardNames.WIND_SPEED: ObservedProperty(
+        name=StandardNames.WIND_SPEED.value,
+        unit=StandardUnits.SPEED.value,
+        weather_link=Source(
+            name="Wind Speed",
+            transform=lambda x: x * MILES_PER_HOUR_TO_SPEED,
+        ),
+        weewx=Source(name="windSpeed", transform=lambda x: x * KNOTS_TO_SPEED),
+    ),
+    StandardNames.WIND_FROM_DIRECTION: ObservedProperty(
+        name=StandardNames.WIND_FROM_DIRECTION.value,
+        unit=StandardUnits.DIRECTION.value,
+        weather_link=Source(name="Wind Dir", transform=lambda x: x),
+        weewx=Source(name="windDir", transform=cardinal_direction_to_degrees),
+    ),
+    StandardNames.AIR_PRESSURE: ObservedProperty(
+        name=StandardNames.AIR_PRESSURE.value,
+        unit=StandardUnits.PRESSURE.value,
+        weather_link=Source(
+            name="Bar", transform=lambda x: x * INCHES_OF_MERCURY_TO_PRESSURE
+        ),
+        weewx=Source(
+            name="barometer", transform=lambda x: x * INCHES_OF_MERCURY_TO_PRESSURE
+        ),
+    ),
+    StandardNames.WIND_SPEED_OF_GUST: ObservedProperty(
+        name=StandardNames.WIND_SPEED_OF_GUST.value,
+        unit=StandardUnits.SPEED.value,
+        weather_link=Source(
+            name="Hi Speed", transform=lambda x: x * MILES_PER_HOUR_TO_SPEED
+        ),
+        weewx=Source(name="windGust", transform=lambda x: x * KNOTS_TO_SPEED),
+    ),
+    StandardNames.WIND_GUST_FROM_DIRECTION: ObservedProperty(
+        name=StandardNames.WIND_GUST_FROM_DIRECTION.value,
+        unit=StandardUnits.DIRECTION.value,
+        weather_link=Source(name="Hi Dir", transform=lambda x: x),
+        weewx=Source(name="windGustDir", transform=cardinal_direction_to_degrees),
+    ),
+    StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE: ObservedProperty(
+        name=StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value,
+        unit=StandardUnits.TEMPERATURE.value,
+        weather_link=Source(name="Wind Chill", transform=fahrenheit_to_kelvin),
+        weewx=Source(name="windchill", transform=fahrenheit_to_kelvin),
+    ),
+    StandardNames.SOLAR_IRRADIANCE: ObservedProperty(
+        name=StandardNames.SOLAR_IRRADIANCE.value,
+        unit=StandardUnits.ENERGY.value,
+        weather_link=Source(name="Solar Rad.", transform=lambda x: x),
+        weewx=Source(name="radiation", transform=lambda x: x),
+    ),
+    StandardNames.ULTRAVIOLET_INDEX: ObservedProperty(
+        name=StandardNames.ULTRAVIOLET_INDEX.value,
+        unit=None,
+        weather_link=Source(name="UV Index", transform=lambda x: x),
+        weewx=Source(name="UV", transform=lambda x: x),
+    ),
+    StandardNames.RAINFALL_AMOUNT: ObservedProperty(
+        name=StandardNames.RAINFALL_AMOUNT.value,
+        unit=StandardUnits.AMOUNT.value,
+        weather_link=Source(name="Rain", transform=lambda x: x * INCHES_TO_MILLIMETERS),
+        weewx=Source(name="rain", transform=lambda x: x * INCHES_TO_MILLIMETERS),
+    ),
+    StandardNames.RAINFALL_RATE: ObservedProperty(
+        name=StandardNames.RAINFALL_RATE.value,
+        unit=StandardUnits.FLUX.value,
+        weather_link=Source(
+            name="Rain Rate",
+            transform=lambda x: x
+            * INCHES_PER_HOUR_TO_KILOGRAMS_PER_SQUARE_METER_PER_SECOND,
+        ),
+        weewx=Source(
+            name="rainRate",
+            transform=lambda x: x
+            * INCHES_PER_HOUR_TO_KILOGRAMS_PER_SQUARE_METER_PER_SECOND,
+        ),
+    ),
+    StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE: ObservedProperty(
+        name=StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value,
+        unit=StandardUnits.TEMPERATURE.value,
+        weather_link=Source(name="Heat Index", transform=fahrenheit_to_kelvin),
+        weewx=Source(name="heatindex", transform=fahrenheit_to_kelvin),
+    ),
+    StandardNames.DEW_POINT_TEMPERATURE: ObservedProperty(
+        name=StandardNames.DEW_POINT_TEMPERATURE.value,
+        unit=StandardUnits.TEMPERATURE.value,
+        weather_link=Source(name="Dew Pt.", transform=fahrenheit_to_kelvin),
+        weewx=Source(name="dewpoint", transform=fahrenheit_to_kelvin),
+    ),
+    StandardNames.WATER_EVAPOTRANSPIRATION_FLUX: ObservedProperty(
+        name=StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value,
+        unit=StandardUnits.FLUX.value,
+        weewx=Source(
+            name="ET",
+            transform=lambda x: x
+            * INCHES_PER_HOUR_TO_KILOGRAMS_PER_SQUARE_METER_PER_SECOND,
+        ),
+        weather_link=Source(
+            name="ET",
+            transform=lambda x: x
+            * INCHES_PER_HOUR_TO_KILOGRAMS_PER_SQUARE_METER_PER_SECOND,
+        ),
+    ),
 }
-
-# Weather Link to WeeWx mapping, the keys
-# are reordered into logical groupings
-# and are not in column-order
-CF_STANDARD_NAME_TO_DAVIS_WEEWX = {
-    StandardNames.AIR_TEMPERATURE.value: ["Temp Out", "outTemp"],  # float64, F -> K
-    StandardNames.RELATIVE_HUMIDITY.value: ["Out Hum", "outHumidity"],  # float64, %
-    StandardNames.WIND_SPEED.value: [
-        "Wind Speed",
-        "windSpeed",
-    ],  # UNIT MISMATCH, knots -> miles per hour -> m/s
-    StandardNames.WIND_FROM_DIRECTION.value: [
-        "Wind Dir",
-        "windDir",
-    ],  # DATA TYPE MISMATCH & SOME DATA MISSING FROM DB, cardinal -> degrees
-    StandardNames.AIR_PRESSURE.value: ["Bar", "barometer"],  # float64, Hg -> Pa
-    StandardNames.WIND_SPEED_OF_GUST.value: [
-        "Hi Speed",
-        "windGust",
-    ],  # UNIT MISMATCH, knots -> miles per hour -> m/s
-    StandardNames.WIND_GUST_FROM_DIRECTION.value: [
-        "Hi Dir",
-        "windGustDir",
-    ],  # DATA TYPE AND OFFSET(?) MISMATCH
-    StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value: [
-        "Wind Chill",
-        "windchill",
-    ],  # float64
-    StandardNames.SOLAR_IRRADIANCE.value: ["Solar Rad.", "radiation"],  # float64
-    StandardNames.ULTRAVIOLET_INDEX.value: ["UV Index", "UV"],  # float64
-    StandardNames.RAINFALL_AMOUNT.value: ["Rain", "rain"],  # float64
-    StandardNames.RAINFALL_RATE.value: ["Rain Rate", "rainRate"],  # float64
-    StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value: [
-        "Heat Index",
-        "heatindex",
-    ],  # float64
-    StandardNames.DEW_POINT_TEMPERATURE.value: ["Dew Pt.", "dewpoint"],  # float64
-    StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value: ["ET", "ET"],  # float64
-}
-
-
-class ClickCommands(Enum):
-    """
-    Valid click command names
-    """
-
-    EXPORT = "export"
-    COMPARE = "compare"
-    TAIL = "tail"
-    DAILY = "daily"
-    DESCRIBE = "describe"
-    INFLUX = "influx"
-    STATS = "stats"
-    BACKFILL = "backfill"
-    DEPLOY = "deploy"
-    QUALITY = "quality"
-
-
-class ImageFormat(Enum):
-    """
-    Valid image file formats for writing figures
-    """
-
-    PNG = "png"
 
 
 class StationName(Enum):
-    """Valid weather station names"""
+    """
+    Valid station names. For now just includes weather
+    stations, but these could be used to refer to all
+    sensing platforms and systems at a single location.
+    """
 
     APPRENTICESHOP = "apprenticeshop"
     DEV = "dev"
@@ -170,52 +292,35 @@ def plot():
     """
 
 
+@click.group(name="db")
+def database():
+    """
+    Commands that interact with the weather database.
+    """
+
+
+@click.group(name="file")
+def file():
+    """
+    Commands that interact with the weather file system.
+    """
+
+
 # Subcommands assignment
 weather.add_command(plot)
+weather.add_command(database)
+weather.add_command(file)
 
 
 def source_options(function):
     """
-    Attach common options to source commands:
-    - host
-    - token
-    - measurement
-    - station
-    - series
+    Choose weather station and observation series.
     """
-    function = click.option(
-        "--token",
-        envvar="INFLUX_API_TOKEN",
-        help="The InfluxDB API token.",
-    )(function)
-    function = click.option(
-        "--measurement",
-        default="observations",
-        help="The InfluxDB measurement (table) name.",
-    )(function)
-    function = click.option(
-        "--host",
-        envvar="INFLUX_SERVER_URL",
-        help="The InfluxDB server URL.",
-    )(function)
     function = click.argument(
         "series", type=click.Choice(StandardNames, case_sensitive=False)
     )(function)
     function = click.argument(
         "station", type=click.Choice(StationName, case_sensitive=False)
-    )(function)
-    return function
-
-
-def plot_options(function):
-    """
-    Attach common options to plotting commands.
-    """
-    function = click.option(
-        "--format",
-        type=click.Choice(ImageFormat, case_sensitive=False),
-        default=ImageFormat.PNG,
-        help="The output format.",
     )(function)
     return function
 
@@ -254,13 +359,16 @@ class WeatherLinkArchive:
         self.name = name
         filename = DATA_DIR / f"{name}.txt"
         rows: list[list[str]] = []
-        with open(filename, "r", encoding="utf-8") as file:
+        with open(filename, "r", encoding="utf-8") as fid:
             for _ in range(skiprows):
-                rows.append(file.readline().split(delimiter))
+                rows.append(fid.readline().split(delimiter))
         names = []
-        lookup = {
-            value[0]: key for key, value in CF_STANDARD_NAME_TO_DAVIS_WEEWX.items()
-        }
+        lookup = {}
+        transforms = {}
+        for key, value in CF_STANDARDS.items():
+            lookup[value.weather_link.name] = key.value
+            transforms[key.value] = value.weather_link.transform
+
         for items in zip(*rows):
             header = ""
             for each in items:
@@ -281,88 +389,15 @@ class WeatherLinkArchive:
         series = Series(time_string, name=TIME)
         timestamps = to_datetime(series, format="%m/%d/%y %I:%M %p")
         df.set_index(timestamps, inplace=True)
-        df = df.drop(columns=[date, time])
-        self.df = df
-        self.unit_correction()
-
-    def __repr__(self):
-        return f"Archive(name={self.name})"
-
-    def unit_correction(self):
-        """
-        Exported speed is in knots, but standard is m / s.
-        Exported direction is cardinal, but standard is in degrees.
-        """
-        self.df[StandardNames.WIND_SPEED.value] = (
-            self.df[StandardNames.WIND_SPEED.value] * KNOTS_TO_METERS_PER_SECOND
-        )
-        self.df[StandardNames.WIND_SPEED_OF_GUST.value] = (
-            self.df[StandardNames.WIND_SPEED_OF_GUST.value] * KNOTS_TO_METERS_PER_SECOND
-        )
-        wind = {
-            "N": 0,
-            "NNE": 22.5,
-            "NE": 45,
-            "ENE": 67.5,
-            "E": 90,
-            "ESE": 112.5,
-            "SE": 135,
-            "SSE": 157.5,
-            "S": 180,
-            "SSW": 202.5,
-            "SW": 225,
-            "WSW": 247.5,
-            "W": 270,
-            "WNW": 292.5,
-            "NW": 315,
-            "NNW": 337.5,
-        }
-        self.df[StandardNames.WIND_FROM_DIRECTION.value] = self.df[
-            StandardNames.WIND_FROM_DIRECTION.value
-        ].map(wind)
-        self.df[StandardNames.WIND_GUST_FROM_DIRECTION.value] = self.df[
-            StandardNames.WIND_GUST_FROM_DIRECTION.value
-        ].map(wind)
-        self.df[StandardNames.AIR_TEMPERATURE.value] = (
-            (self.df[StandardNames.AIR_TEMPERATURE.value] + 459.67) * 5 / 9
-        )
-        self.df[StandardNames.DEW_POINT_TEMPERATURE.value] = (
-            (self.df[StandardNames.DEW_POINT_TEMPERATURE.value] + 459.67) * 5 / 9
-        )
-        self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] = (
-            (self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] + 459.67)
-            * 5
-            / 9
-        )
-        self.df[StandardNames.AIR_PRESSURE.value] = (
-            self.df[StandardNames.AIR_PRESSURE.value] * INCHES_OF_MERCURY_TO_PASCAL
-        )
-        self.df[StandardNames.RELATIVE_HUMIDITY.value] = (
-            self.df[StandardNames.RELATIVE_HUMIDITY.value] * 0.01
-        )
-        # density and length units cancel out
-        self.df[StandardNames.RAINFALL_AMOUNT.value] = (
-            self.df[StandardNames.RAINFALL_AMOUNT.value] * 25.4
-        )
-        self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] = (
-            self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] * 25.4 / 3600
-        )
-        self.df[StandardNames.RAINFALL_RATE.value] = (
-            self.df[StandardNames.RAINFALL_RATE.value] * 25.4 / 3600
-        )
-        self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] = (
-            (self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] + 459.67)
-            * 5
-            / 9
-        )
-        # none for irradiance, UV
+        df.drop(columns=[date, time], inplace=True)
+        self.df = df.transform(transforms)
 
 
 class WeeWxInfluxArchive:
     """
     WeeWx archive data from InfluxDB.
     """
-
+    # pylint: disable=redefined-outer-name
     def __init__(
         self,
         measurement: str,
@@ -375,318 +410,147 @@ class WeeWxInfluxArchive:
         Get data from InfluxDB and format as a DataFrame.
         """
         client = InfluxDBClient3(host=host, database=database, token=token)
-        self.df: DataFrame = client.query(
+        df: DataFrame = client.query(
             f"SELECT * FROM {measurement} WHERE binding IN ('archive') ORDER BY {time}",
             mode="pandas",
         )
-        columns = {
-            value[1]: key for key, value in CF_STANDARD_NAME_TO_DAVIS_WEEWX.items()
-        }
-        self.df.rename(columns=columns, inplace=True)
-        self.df.set_index(time, inplace=True)
-        self.unit_correction()
-
-    def unit_correction(self):
-        """
-        Convert to Climate and Forecast standard units.
-        """
-        self.df[StandardNames.WIND_SPEED.value] = (
-            self.df[StandardNames.WIND_SPEED.value]
-            * MILES_PER_HOUR_TO_METERS_PER_SECOND
-        )
-        self.df[StandardNames.WIND_SPEED_OF_GUST.value] = (
-            self.df[StandardNames.WIND_SPEED_OF_GUST.value]
-            * MILES_PER_HOUR_TO_METERS_PER_SECOND
-        )
-        self.df[StandardNames.AIR_TEMPERATURE.value] = (
-            (self.df[StandardNames.AIR_TEMPERATURE.value] + 459.67) * 5 / 9
-        )
-        self.df[StandardNames.DEW_POINT_TEMPERATURE.value] = (
-            (self.df[StandardNames.DEW_POINT_TEMPERATURE.value] + 459.67) * 5 / 9
-        )
-        self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] = (
-            (self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] + 459.67)
-            * 5
-            / 9
-        )
-        self.df[StandardNames.AIR_PRESSURE.value] = (
-            self.df[StandardNames.AIR_PRESSURE.value] * INCHES_OF_MERCURY_TO_PASCAL
-        )
-        self.df[StandardNames.RELATIVE_HUMIDITY.value] = (
-            self.df[StandardNames.RELATIVE_HUMIDITY.value] * 0.01
-        )
-        # density and length units cancel out
-        self.df[StandardNames.RAINFALL_AMOUNT.value] = (
-            self.df[StandardNames.RAINFALL_AMOUNT.value] * 25.4
-        )
-        self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] = (
-            self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] * 25.4 / 3600
-        )
-        self.df[StandardNames.RAINFALL_RATE.value] = (
-            self.df[StandardNames.RAINFALL_RATE.value] * 25.4 / 3600
-        )
-        self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] = (
-            (self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] + 459.67)
-            * 5
-            / 9
-        )
-        # none for irradiance, UV
+        # Invert the dictionary, keeping the second value as key
+        columns = {}
+        transforms = {}
+        for key, value in CF_STANDARDS.items():
+            columns[value.weewx.name] = key.value
+            transforms[key.value] = value.weewx.transform
+        df.rename(columns=columns, inplace=True)
+        df.set_index(time, inplace=True)
+        self.df = df.transform(transforms)
 
 
-@plot.command(name=ClickCommands.COMPARE.value)
+@weather.command(name=ClickCommands.DESCRIBE.value)
 @source_options
-@plot_options
-# pylint: disable=redefined-builtin
-def plot_comparison(
-    station: StationName,
+@influx_options
+def weather_describe_series(
+    station: StandardNames,
     series: StandardNames,
     host: str,
     measurement: str,
     token: str,
-    format: ImageFormat,
 ):
     """
-    Plot a comparison of local and InfluxDB data for a specific series.
+    Compare local and database data before merging or backfilling.
     """
-    remote = WeeWxInfluxArchive(measurement, token, host).df[series.value]
+    db = WeeWxInfluxArchive(measurement, token, host).df[series.value]
     local = WeatherLinkArchive(station.value).df[series.value]
-    start: datetime = local.index.min()
-    end: datetime = remote.index.max()
-    filename = f"{FIGURES_DIR}/{ClickCommands.COMPARE.value}/{station.value}/{series.value}.{format.value}"
-    Path(filename).parent.mkdir(parents=True, exist_ok=True)
-    fig = plt.figure(figsize=(12, 6))
-    freq = "1D"
-    daily = local.resample(freq)
-    series_max = daily.max()
-    color = "black"
-    ax = fig.subplots()
-    ax.plot(
-        series_max.index,
-        series_max,
-        label=f"{local.name} {freq.lower()} max",
-        color=color,
-    )
-    series_mean = daily.mean()
-    plt.plot(
-        series_mean.index,
-        series_mean,
-        label=f"{local.name} {freq.lower()} mean",
-        color=color,
-        linestyle="--",
-    )
-    daily = remote.resample(freq)
-    series_max = daily.max()
-    color = "red"
-    plt.plot(
-        series_max.index,
-        series_max,
-        label=f"{remote.name} {freq.lower()} max",
-        color=color,
-    )
-    series_mean = daily.mean()
-    plt.plot(
-        series_mean.index,
-        series_mean,
-        label=f"{remote.name} {freq.lower()} mean",
-        color=color,
-        linestyle="--",
-    )
-    layout(ax, start, end, ClickCommands.COMPARE, station, series.value, (start, end))
-    fig.tight_layout()
-    fig.savefig(filename)
+    db.name = "influx"
+    local.name = "local"
+    df = concat([db, local], axis=1)
+    print(df.describe())
 
 
 @plot.command(name=ClickCommands.TAIL.value)
 @source_options
+@influx_options
 @plot_options
 @click.option(
-    "--last",
-    default="7D",
-    help="The time range to include in the plot (e.g., 7D, 14D).",
+    "--days",
+    default=60,
+    help="The time range to include in the plot (e.g., 7, 14).",
 )
-# pylint: disable=redefined-builtin
-def plot_tail(
+@click.option(
+    "--resample",
+    default="1h",
+    help="How to resample the data (e.g., 1d, 1h).",
+)
+def weather_plot_tail(
     station: StationName,
     series: StandardNames,
     host: str,
     measurement: str,
     token: str,
-    format: ImageFormat,
-    last: str,
+    **kwargs,
 ):
     """
     Plot a comparison of local and InfluxDB data for a specific series.
+
+    Keyword arguments are passed through to the rendering function
     """
     remote = WeeWxInfluxArchive(measurement, token, host).df[series.value]
     local = WeatherLinkArchive(station.value).df[series.value]
-    filename = f"{FIGURES_DIR}/{ClickCommands.TAIL.value}/{station.value}/{series.value}.{format.value}"
-    Path(filename).parent.mkdir(parents=True, exist_ok=True)
-    fig = plt.figure(figsize=(12, 6))
-    ax = fig.subplots()
-    tail = local.last(last)
-    ax.plot(tail.index, tail, color="black", label="local")
-    tail = remote.last(last)
-    ax.plot(tail.index, tail, color="red", linestyle="--", label="database")
-    start: datetime = local.index.min()
-    end: datetime = remote.index.max()
-    layout(
-        ax,
-        start,
-        end,
-        ClickCommands.TAIL,
-        station,
-        series.value,
-        (tail.index[0], tail.index[-1]),
-    )
-    fig.tight_layout()
-    fig.savefig(filename)
-
-
-@weather.command(name=ClickCommands.DESCRIBE.value)
-@click.argument("name")
-def describe(name: str):
-    """
-    Parse and normalize weather station data for display
-    """
-    df = WeatherLinkArchive(name).df
-    values = CF_STANDARD_NAME_TO_DAVIS_WEEWX.keys()
-    ind = df.columns.intersection(values)
-    compatible = df[ind]
-    print(compatible.describe(include="all"))
-    print(compatible.dtypes)
-
-
-@weather.command(name=ClickCommands.EXPORT.value)
-@click.argument("name")
-def export(name: str):
-    """
-    Export normalized weather station data to CSV.
-    """
-    df = WeatherLinkArchive(name).df
-    filename = DATA_DIR / f"{name}.csv"
-    df.to_csv(filename)
-
-
-@weather.command(name=ClickCommands.INFLUX.value)
-@source_options
-def influx(_: StationName, __: StandardNames, host: str, measurement: str, token: str):
-    """
-    Show information about the data already stored in Influx database.
-    """
-    df = WeeWxInfluxArchive(measurement, token, host).df
-    print(df.describe(include="all"))
-    print(df.dtypes)
-
-
-def layout(
-    ax: Axes,
-    start: datetime,
-    end: datetime,
-    command: ClickCommands,
-    station: StationName,
-    series: str,
-    xlim: tuple[float, float],
-):
-    """
-    Apply standard formatting layout to plots.
-    """
-    display_name = series.replace("_", " ").title()
-    if start.year == end.year:
-        year_range = f"{start.year}"
-    else:
-        year_range = f"{start.year}-{end.year}"
-    plt.title(f"{command.value} {station.value} {display_name} {year_range}".title())
-    plt.xlabel("Date")
-    plt.xticks(rotation=45)
-    ax.set_xlim(xlim)
-    ax.set_ylim([None, None])
-    major_locator = (
-        mdates.DateLocator if (end - start).days < 14 else mdates.WeekdayLocator
-    )
-    ax.xaxis.set_major_locator(major_locator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # Customize format
-    units = CF_STANDARD_NAME_TO_UNITS.get(series, None)
-    if units is not None:
-        plt.ylabel(f"{display_name} ({units})")
-    else:
-        plt.ylabel(display_name)
-    plt.legend()
+    prefix = f"{FIGURES_DIR}/{ClickCommands.TAIL.value}"
+    unit = CF_STANDARDS.get(series).unit
+    plot_tail(local, remote, station.value, series.value, prefix, units=unit, **kwargs)
 
 
 @plot.command(name=ClickCommands.DAILY.value)
 @source_options
+@influx_options
 @plot_options
 # pylint: disable=too-many-locals,redefined-builtin
-def plot_daily(
+def weather_plot_daily(
     station: StationName,
     series: Enum,
     host: str,
     measurement: str,
     token: str,
-    format: ImageFormat,
+    **kwargs,
 ):
     """
-    Display concatenated data, aggregated by day.
-
-    Box plots don't use date axis the same way as line and scatter plots,
-    so we have to calculate positions and offsets manually.
+    Display a single `DataStream` aggregated by day.
     """
-    db = WeeWxInfluxArchive(measurement, token, host).df
-    local = WeatherLinkArchive(station.value).df
-    start: datetime = local.index.min()
-    end: datetime = db.index.max()
-    key: str = series.value
-    filename = f"{FIGURES_DIR}/{ClickCommands.DAILY.value}/{station.value}/{key}.{format.value}"
-    Path(filename).parent.mkdir(parents=True, exist_ok=True)
-    df = concat([local[key], db[key]], axis=0)
-    fig = plt.figure(figsize=(12, 6))
-    ax = fig.subplots()
-    grouper = Grouper(freq="D")
-    gb = df.groupby(grouper, sort=True)
-    groups = gb.groups.keys()
-    indices = gb.groups.values()
-    epoch = datetime(1970, 1, 1)
-    pos = [(group - epoch).days for group in groups]
-    bins = []
-    previous = 0
-    for each in indices:
-        bins.append(df[previous:each])
-        previous = each
-    plt.boxplot(
-        bins, notch=False, widths=0.8, positions=pos, medianprops={"color": "black"}
-    )
-    layout(
-        ax, start, end, ClickCommands.DAILY, station, key, (pos[0] - 0.5, pos[-1] + 0.5)
-    )
-    fig.tight_layout()
-    fig.savefig(filename)
-    plt.close()
+    remote = WeeWxInfluxArchive(measurement, token, host).df[series.value]
+    local = WeatherLinkArchive(station.value).df[series.value]
+    df = concat([local, remote], axis=0)
+    mask = ~df.index.duplicated(keep="first")
+    unique = df[mask].sort_index()
+    units = CF_STANDARDS.get(series).unit
+    prefix = f"{FIGURES_DIR}/{ClickCommands.DAILY.value}"
+    boxplot(unique, station.value, series.value, prefix, units, **kwargs)
 
 
-@weather.command(name=ClickCommands.STATS.value)
-@source_options
-def stats(station: str, series: str, host: str, measurement: str, token: str):
+@file.command(name=ClickCommands.DESCRIBE.value)
+@click.argument(
+    "station", type=click.Choice(StationName, case_sensitive=False)
+)
+def weather_file_describe(station: StationName):
     """
-    Compare local and database data before merging or backfilling.
+    Parse and normalize weather station data for display
     """
-    db = WeeWxInfluxArchive(measurement, token, host).df
-    local = WeatherLinkArchive(station).df
-    print(f"\nColumn: {series}")
-    try:
-        series_a = db[series]
-        series_a.name = "influx"
-        series_b = local[series]
-        series_b.name = "local"
-        df = concat([series_a, series_b], axis=1)
-        print(df.describe(include="all"))
-    except (KeyError, ValueError) as e:
-        print(f"Error processing column {series}: {e}")
+    df = WeatherLinkArchive(station.value).df
+    values = [each.value for each in CF_STANDARDS]
+    ind = df.columns.intersection(values)
+    compatible = df[ind]
+    print(compatible.describe())
 
 
-@weather.command(name=ClickCommands.BACKFILL.value)
-@source_options
-def backfill(
-    station: StationName, series: StandardNames, host: str, measurement: str, token: str
+@file.command(name=ClickCommands.EXPORT.value)
+@click.argument(
+    "station", type=click.Choice(StationName, case_sensitive=False)
+)
+def weather_file_export(station: StationName):
+    """
+    Export normalized weather station data to CSV.
+    """
+    df = WeatherLinkArchive(station.value).df
+    filename = DATA_DIR / f"{station.value}.csv"
+    df.to_csv(filename)
+
+
+@database.command(name=ClickCommands.DESCRIBE.value)
+@influx_options
+def weather_db_describe(host: str, measurement: str, token: str):
+    """
+    Show information about the data already stored in Influx database.
+    """
+    df = WeeWxInfluxArchive(measurement, token, host).df
+    print(df.describe())
+
+
+@database.command(name=ClickCommands.BACKFILL.value)
+@click.argument(
+    "station", type=click.Choice(StationName, case_sensitive=False)
+)
+@influx_options
+def weather_db_backfill(
+    station: StationName, host: str, measurement: str, token: str
 ):
     """
     Backfill missing data from local to database.
@@ -717,14 +581,19 @@ def backfill(
 
 
 @weather.command(name=ClickCommands.QUALITY.value)
-def quality():
+@click.argument(
+    "station", type=click.Choice(StationName, case_sensitive=False)
+)
+def weather_quality(station: StationName):
     """
     Assess the quality of the weather data.
     """
-    config = Config("""
+    test_type = "qartod"
+    config = Config(
+        f"""
     streams:
         air_temperature:
-            qartod:
+            {test_type}:
                 gross_range_test:
                     suspect_span: [-10, 50]
                     fail_span: [-40, 200]
@@ -733,26 +602,29 @@ def quality():
                     fail_threshold: 10.0
                     method: "average"
         wind_speed:
-            qartod:
+            {test_type}:
                 gross_range_test:
                     suspect_span: [0, 50]
                     fail_span: [0, 100]
-    """)
-    local = WeatherLinkArchive("apprenticeshop").df.reset_index()
+    """
+    )
+    local = WeatherLinkArchive(station.value).df.reset_index()
     flags = PandasStream(local).run(config)
     store = PandasStore(flags)
     result = store.save()
     result.set_index("time", inplace=True)
     frames: dict[str, list[str]] = {}
     for test in result.columns:
-        _series, name = test.split("_qartod_")
+        _series, name = test.split(f"_{test_type}_")
         if _series not in frames:
             frames[_series] = []
         frames[_series].append(name)
 
     by_observed_property = []
     for series, tests in frames.items():
-        columns = {f"{series}_qartod_{test}": test.replace("_test", "") for test in tests}
+        columns = {
+            f"{series}_{test_type}_{test}": test.replace("_test", "") for test in tests
+        }
         df = result[columns.keys()].rename(columns=columns)
         for col in df.columns:
             df[col] = df[col].astype("Int64")
@@ -760,14 +632,4 @@ def quality():
         df["observed_property"] = series
         by_observed_property.append(df)
     stacked = concat(by_observed_property, axis=0)
-    print(stacked.head(20))
-
-
-@weather.command(name=ClickCommands.DEPLOY.value)
-def deploy():
-    """
-    Deploy the weather application using balena
-    """
-    balena = Balena()
-    api_key = getenv("BALENA_API_KEY", "")
-    balena.auth.login_with_token(api_key)
+    print(stacked.describe())
