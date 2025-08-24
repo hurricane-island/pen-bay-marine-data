@@ -107,18 +107,42 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/xz-gpl-tools-5.8.1-h9a6d368_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/xz-tools-5.8.1-h39f12f2_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-h6491c7d_2.conda
+      - pypi: https://files.pythonhosted.org/packages/02/ff/1175b0b7371e46244032d43a56862d0af455823b5280a50c63d99cc50f18/automat-25.4.16-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/e7/6b/23dd73ccde2fd8bd361f86797c1368a126a5ac2df80e11414389bc136309/balena_sdk-15.1.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/38/fc/bce832fd4fd99766c04d1ee0eead6b0ec6486fb100ae5e74c1d91292b982/certifi-2025.1.31-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/8b/f1/672d303ddf17c24fc83afd712316fda78dc6fce1cd53011b839483e1ecc8/cffi-1.17.1-cp313-cp313-macosx_11_0_arm64.whl
+      - pypi: https://files.pythonhosted.org/packages/65/ca/2135ac97709b400c7654b4b764daf5c5567c2da45a30cdd20f9eefe2d658/charset_normalizer-3.4.3-cp313-cp313-macosx_10_13_universal2.whl
       - pypi: https://files.pythonhosted.org/packages/a6/c4/0679472c60052c27efa612b4cd3ddd2a23e885dcdc73461781d2c802d39e/configobj-5.0.9-py2.py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b8/40/c199d095151addf69efdb4b9ca3a4f20f70e20508d6222bffb9b76f58573/constantly-23.10.4-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/8c/29/2793d178d0eda1ca4a09a7c4e09a5185e75738cc6d526433e8663b460ea6/cryptography-45.0.6-cp311-abi3-macosx_10_9_universal2.whl
       - pypi: https://files.pythonhosted.org/packages/fb/55/244134dd6ac3889a66d70d42b89d2760e29ab0d662600a4772469bd830a1/CT3-3.4.0-cp313-cp313-macosx_11_0_arm64.whl
+      - pypi: https://files.pythonhosted.org/packages/6e/c6/ac0b6c1e2d138f1002bcf799d330bd6d85084fece321e662a14223794041/Deprecated-1.2.18-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f3/4e/57f8332d315159ecb7c00326719a29a04e60c9e62eeb6451250bd5ce9b36/ephem-4.2-cp313-cp313-macosx_11_0_arm64.whl
+      - pypi: https://files.pythonhosted.org/packages/6e/aa/8caf6a0a3e62863cbb9dab27135660acba46903b703e224f14f447e57934/hyperlink-21.0.0-py2.py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/0d/38/221e5b2ae676a3938c2c1919131410c342b6efc2baffeda395dd66eeca8f/incremental-24.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5f/3f/6333820b49a7b59cc5dc8e88fb560245fc8b5903912f12a3fc8490f638aa/influxdb3_python-0.15.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/14/bf/3e7803b9142514cccf9f4f41f40d8f2efcf5341c266edb0f44c719d6d0e7/pine_client-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2b/8d/275c58d4b00781bd36579501a259eacc5c6dfb369be4ddeb672ceb551d2d/pyarrow-19.0.1-cp313-cp313-macosx_12_0_arm64.whl
+      - pypi: https://files.pythonhosted.org/packages/c8/f1/d6a797abb14f6283c0ddff96bbdd46937f64122b8c925cab503dd37f8214/pyasn1-0.6.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/47/8d/d529b5d697919ba8c11ad626e835d4039be708a35b0d22de83a269a6682c/pyasn1_modules-0.4.2-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/13/a3/a812df4e2dd5696d1f351d58b8fe16a405b234ad2886a0dab9183fb78109/pycparser-2.22-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/61/ad/689f02752eeec26aed679477e80e632ef1b682313be70793d798c1d5fc8f/PyJWT-2.10.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0c/94/e4181a1f6286f545507528c78016e00065ea913276888db2262507693ce5/PyMySQL-1.1.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/80/28/2659c02301b9500751f8d42f9a6632e1508aa5120de5e43042b8b30f8d5d/pyopenssl-25.1.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/07/bc/587a445451b253b285629263eb51c2d8e9bcea4fc97826266d186f96f558/pyserial-3.5-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/28/b8/27e6312e86408a44fe16bd28ee12dd98608b39f7e7e57884a24e8f29b573/pyusb-1.3.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/ab/38/ff60c8fc9e002d50d48822cc5095deb8ebbc5f91a6b8fdd9731c87a147c9/ratelimit-2.2.1.tar.gz
       - pypi: https://files.pythonhosted.org/packages/69/3f/2ed8c1b8fe3fc2ed816ba40554ef703aad8c51700e2606c139fcf9b7f791/reactivex-4.0.4-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1e/db/4254e3eabe8020b458f1a747140d32277ec7a271daf1d235b70dc0b4e6e3/requests-2.32.5-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/a6/24/4d91e05817e92e3a61c8a21e08fd0f390f5301f1c448b137c57c4bc6e543/semver-3.0.4-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/08/2c/ca6dd598b384bc1ce581e24aaae0f2bed4ccac57749d5c3befbb5e742081/service_identity-24.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/eb/66/ab7efd8941f0bc7b2bd555b0f0471bff77df4c88e0cc31120c82737fec77/twisted-25.5.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/6b/11/cc635220681e93a0183390e26485430ca2c7b5f9d33b15c74c2861cb8091/urllib3-2.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d7/06/a30bc2974b02a367e347125ba7ca89d7b2da8e295c0da5b407bc55c543d1/weewx-5.1.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/45/35/6a08de0f2c96dcdd7fe464d7420ddb9a7655a6561150e5fc4da9356aeaab/wrapt-1.17.3-cp313-cp313-macosx_11_0_arm64.whl
+      - pypi: https://files.pythonhosted.org/packages/49/65/78e7cebca6be07c8fc4032bfbb123e500d60efdf7b86727bb8a071992108/zope.interface-7.2-cp313-cp313-macosx_11_0_arm64.whl
 packages:
 - conda: https://conda.anaconda.org/conda-forge/noarch/attrs-25.3.0-pyh71513ae_0.conda
   sha256: 99c53ffbcb5dc58084faf18587b215f9ac8ced36bbfb55fa807c00967e419019
@@ -131,6 +155,31 @@ packages:
   - pkg:pypi/attrs?source=hash-mapping
   size: 57181
   timestamp: 1741918625732
+- pypi: https://files.pythonhosted.org/packages/02/ff/1175b0b7371e46244032d43a56862d0af455823b5280a50c63d99cc50f18/automat-25.4.16-py3-none-any.whl
+  name: automat
+  version: 25.4.16
+  sha256: 04e9bce696a8d5671ee698005af6e5a9fa15354140a87f4870744604dcdd3ba1
+  requires_dist:
+  - typing-extensions ; python_full_version < '3.10'
+  - graphviz>0.5.1 ; extra == 'visualize'
+  - twisted>=16.1.1 ; extra == 'visualize'
+  requires_python: '>=3.9'
+- pypi: https://files.pythonhosted.org/packages/e7/6b/23dd73ccde2fd8bd361f86797c1368a126a5ac2df80e11414389bc136309/balena_sdk-15.1.4-py3-none-any.whl
+  name: balena-sdk
+  version: 15.1.4
+  sha256: 98aee033241082734aff0a7d7443b1ed26baec8b8edba224673a66dae3e0945b
+  requires_dist:
+  - pyjwt>=2.0.0
+  - twisted>=18.7.0
+  - deprecated>=1.2.13,<2.0.0
+  - pine-client
+  - pyopenssl>=18.0.0
+  - ratelimit>=2.2.1,<3.0.0
+  - requests>=2.19.1
+  - semver>=3.0.0,<4.0.0
+  - service-identity
+  - typing-extensions
+  requires_python: '>=3.8.1,<4.0.0'
 - conda: https://conda.anaconda.org/conda-forge/noarch/black-25.1.0-pyh866005b_0.conda
   sha256: c68f110cd491dc839a69e340930862e54c00fb02cede5f1831fcf8a253bd68d2
   md5: b9b0c42e7316aa6043bdfd49883955b8
@@ -228,6 +277,18 @@ packages:
   version: 2025.1.31
   sha256: ca78db4565a652026a4db2bcdf68f2fb589ea80d0be70e03929ed730746b84fe
   requires_python: '>=3.6'
+- pypi: https://files.pythonhosted.org/packages/8b/f1/672d303ddf17c24fc83afd712316fda78dc6fce1cd53011b839483e1ecc8/cffi-1.17.1-cp313-cp313-macosx_11_0_arm64.whl
+  name: cffi
+  version: 1.17.1
+  sha256: 0984a4925a435b1da406122d4d7968dd861c1385afe3b45ba82b750f229811e2
+  requires_dist:
+  - pycparser
+  requires_python: '>=3.8'
+- pypi: https://files.pythonhosted.org/packages/65/ca/2135ac97709b400c7654b4b764daf5c5567c2da45a30cdd20f9eefe2d658/charset_normalizer-3.4.3-cp313-cp313-macosx_10_13_universal2.whl
+  name: charset-normalizer
+  version: 3.4.3
+  sha256: 14c2a87c65b351109f6abfc424cab3927b3bdece6f706e4d12faaf3d52ee5efe
+  requires_python: '>=3.7'
 - conda: https://conda.anaconda.org/conda-forge/noarch/click-8.2.1-pyh707e725_0.conda
   sha256: 8aee789c82d8fdd997840c952a586db63c6890b00e88c4fb6e80a38edd5f51c0
   md5: 94b550b8d3a614dbd326af798c7dfb40
@@ -245,6 +306,11 @@ packages:
   version: 5.0.9
   sha256: 1ba10c5b6ee16229c79a05047aeda2b55eb4e80d7c7d8ecf17ec1ca600c79882
   requires_python: '>=3.7'
+- pypi: https://files.pythonhosted.org/packages/b8/40/c199d095151addf69efdb4b9ca3a4f20f70e20508d6222bffb9b76f58573/constantly-23.10.4-py3-none-any.whl
+  name: constantly
+  version: 23.10.4
+  sha256: 3fd9b4d1c3dc1ec9757f3c52aef7e53ad9323dbe39f51dfd4c43853b68dfa3f9
+  requires_python: '>=3.8'
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/contourpy-1.3.3-py313hc50a443_1.conda
   sha256: b444ecf07bdfaf05a875d517a598090bb2f574c33815b6248ececbc6b1e5a201
   md5: 84315902ea539576895726299478c0ec
@@ -261,6 +327,35 @@ packages:
   - pkg:pypi/contourpy?source=hash-mapping
   size: 258632
   timestamp: 1754064001338
+- pypi: https://files.pythonhosted.org/packages/8c/29/2793d178d0eda1ca4a09a7c4e09a5185e75738cc6d526433e8663b460ea6/cryptography-45.0.6-cp311-abi3-macosx_10_9_universal2.whl
+  name: cryptography
+  version: 45.0.6
+  sha256: 048e7ad9e08cf4c0ab07ff7f36cc3115924e22e2266e034450a890d9e312dd74
+  requires_dist:
+  - cffi>=1.14 ; platform_python_implementation != 'PyPy'
+  - bcrypt>=3.1.5 ; extra == 'ssh'
+  - nox>=2024.4.15 ; extra == 'nox'
+  - nox[uv]>=2024.3.2 ; python_full_version >= '3.8' and extra == 'nox'
+  - cryptography-vectors==45.0.6 ; extra == 'test'
+  - pytest>=7.4.0 ; extra == 'test'
+  - pytest-benchmark>=4.0 ; extra == 'test'
+  - pytest-cov>=2.10.1 ; extra == 'test'
+  - pytest-xdist>=3.5.0 ; extra == 'test'
+  - pretend>=0.7 ; extra == 'test'
+  - certifi>=2024 ; extra == 'test'
+  - pytest-randomly ; extra == 'test-randomorder'
+  - sphinx>=5.3.0 ; extra == 'docs'
+  - sphinx-rtd-theme>=3.0.0 ; python_full_version >= '3.8' and extra == 'docs'
+  - sphinx-inline-tabs ; python_full_version >= '3.8' and extra == 'docs'
+  - pyenchant>=3 ; extra == 'docstest'
+  - readme-renderer>=30.0 ; extra == 'docstest'
+  - sphinxcontrib-spelling>=7.3.1 ; extra == 'docstest'
+  - build>=1.0.0 ; extra == 'sdist'
+  - ruff>=0.3.6 ; extra == 'pep8test'
+  - mypy>=1.4 ; extra == 'pep8test'
+  - check-sdist ; python_full_version >= '3.8' and extra == 'pep8test'
+  - click>=8.0.1 ; extra == 'pep8test'
+  requires_python: '>=3.7,!=3.9.0,!=3.9.1'
 - pypi: https://files.pythonhosted.org/packages/fb/55/244134dd6ac3889a66d70d42b89d2760e29ab0d662600a4772469bd830a1/CT3-3.4.0-cp313-cp313-macosx_11_0_arm64.whl
   name: ct3
   version: 3.4.0
@@ -280,6 +375,18 @@ packages:
   - pkg:pypi/cycler?source=hash-mapping
   size: 13399
   timestamp: 1733332563512
+- pypi: https://files.pythonhosted.org/packages/6e/c6/ac0b6c1e2d138f1002bcf799d330bd6d85084fece321e662a14223794041/Deprecated-1.2.18-py2.py3-none-any.whl
+  name: deprecated
+  version: 1.2.18
+  sha256: bd5011788200372a32418f888e326a09ff80d0214bd961147cfed01b5c018eec
+  requires_dist:
+  - wrapt>=1.10,<2
+  - tox ; extra == 'dev'
+  - pytest ; extra == 'dev'
+  - pytest-cov ; extra == 'dev'
+  - bump2version<1 ; extra == 'dev'
+  - setuptools ; python_full_version >= '3.12' and extra == 'dev'
+  requires_python: '>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*'
 - pypi: https://files.pythonhosted.org/packages/f3/4e/57f8332d315159ecb7c00326719a29a04e60c9e62eeb6451250bd5ce9b36/ephem-4.2-cp313-cp313-macosx_11_0_arm64.whl
   name: ephem
   version: '4.2'
@@ -389,6 +496,33 @@ packages:
   purls: []
   size: 3483256
   timestamp: 1737516321575
+- pypi: https://files.pythonhosted.org/packages/6e/aa/8caf6a0a3e62863cbb9dab27135660acba46903b703e224f14f447e57934/hyperlink-21.0.0-py2.py3-none-any.whl
+  name: hyperlink
+  version: 21.0.0
+  sha256: e6b14c37ecb73e89c77d78cdb4c2cc8f3fb59a885c5b3f819ff4ed80f25af1b4
+  requires_dist:
+  - idna>=2.5
+  - typing ; python_full_version < '3.5'
+  requires_python: '>=2.6,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*'
+- pypi: https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl
+  name: idna
+  version: '3.10'
+  sha256: 946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3
+  requires_dist:
+  - ruff>=0.6.2 ; extra == 'all'
+  - mypy>=1.11.2 ; extra == 'all'
+  - pytest>=8.3.2 ; extra == 'all'
+  - flake8>=7.1.1 ; extra == 'all'
+  requires_python: '>=3.6'
+- pypi: https://files.pythonhosted.org/packages/0d/38/221e5b2ae676a3938c2c1919131410c342b6efc2baffeda395dd66eeca8f/incremental-24.7.2-py3-none-any.whl
+  name: incremental
+  version: 24.7.2
+  sha256: 8cb2c3431530bec48ad70513931a760f446ad6c25e8333ca5d95e24b0ed7b8fe
+  requires_dist:
+  - setuptools>=61.0
+  - tomli ; python_full_version < '3.11'
+  - click>=6.0 ; extra == 'scripts'
+  requires_python: '>=3.8'
 - pypi: https://files.pythonhosted.org/packages/5f/3f/6333820b49a7b59cc5dc8e88fb560245fc8b5903912f12a3fc8490f638aa/influxdb3_python-0.15.0-py3-none-any.whl
   name: influxdb3-python
   version: 0.15.0
@@ -1109,6 +1243,13 @@ packages:
   - pkg:pypi/pillow?source=hash-mapping
   size: 42120953
   timestamp: 1751482521154
+- pypi: https://files.pythonhosted.org/packages/14/bf/3e7803b9142514cccf9f4f41f40d8f2efcf5341c266edb0f44c719d6d0e7/pine_client-0.2.0-py3-none-any.whl
+  name: pine-client
+  version: 0.2.0
+  sha256: 267db5899ed2781bea74576fd1d2ee1bb16e9bca75a22227f07ec6cf5dba1541
+  requires_dist:
+  - typing-extensions>=4.5.0,<5.0.0
+  requires_python: '>=3.8.1,<4.0.0'
 - conda: https://conda.anaconda.org/conda-forge/noarch/pip-25.2-pyh145f28c_0.conda
   sha256: 20fe420bb29c7e655988fd0b654888e6d7755c1d380f82ca2f1bd2493b95d650
   md5: e7ab34d5a93e0819b62563c78635d937
@@ -1153,6 +1294,42 @@ packages:
   - pytz ; extra == 'test'
   - pandas ; extra == 'test'
   requires_python: '>=3.9'
+- pypi: https://files.pythonhosted.org/packages/c8/f1/d6a797abb14f6283c0ddff96bbdd46937f64122b8c925cab503dd37f8214/pyasn1-0.6.1-py3-none-any.whl
+  name: pyasn1
+  version: 0.6.1
+  sha256: 0d632f46f2ba09143da3a8afe9e33fb6f92fa2320ab7e886e2d0f7672af84629
+  requires_python: '>=3.8'
+- pypi: https://files.pythonhosted.org/packages/47/8d/d529b5d697919ba8c11ad626e835d4039be708a35b0d22de83a269a6682c/pyasn1_modules-0.4.2-py3-none-any.whl
+  name: pyasn1-modules
+  version: 0.4.2
+  sha256: 29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a
+  requires_dist:
+  - pyasn1>=0.6.1,<0.7.0
+  requires_python: '>=3.8'
+- pypi: https://files.pythonhosted.org/packages/13/a3/a812df4e2dd5696d1f351d58b8fe16a405b234ad2886a0dab9183fb78109/pycparser-2.22-py3-none-any.whl
+  name: pycparser
+  version: '2.22'
+  sha256: c3702b6d3dd8c7abc1afa565d7e63d53a1d0bd86cdc24edd75470f4de499cfcc
+  requires_python: '>=3.8'
+- pypi: https://files.pythonhosted.org/packages/61/ad/689f02752eeec26aed679477e80e632ef1b682313be70793d798c1d5fc8f/PyJWT-2.10.1-py3-none-any.whl
+  name: pyjwt
+  version: 2.10.1
+  sha256: dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb
+  requires_dist:
+  - cryptography>=3.4.0 ; extra == 'crypto'
+  - coverage[toml]==5.0.4 ; extra == 'dev'
+  - cryptography>=3.4.0 ; extra == 'dev'
+  - pre-commit ; extra == 'dev'
+  - pytest>=6.0.0,<7.0.0 ; extra == 'dev'
+  - sphinx ; extra == 'dev'
+  - sphinx-rtd-theme ; extra == 'dev'
+  - zope-interface ; extra == 'dev'
+  - sphinx ; extra == 'docs'
+  - sphinx-rtd-theme ; extra == 'docs'
+  - zope-interface ; extra == 'docs'
+  - coverage[toml]==5.0.4 ; extra == 'tests'
+  - pytest>=6.0.0,<7.0.0 ; extra == 'tests'
+  requires_python: '>=3.9'
 - pypi: https://files.pythonhosted.org/packages/0c/94/e4181a1f6286f545507528c78016e00065ea913276888db2262507693ce5/PyMySQL-1.1.1-py3-none-any.whl
   name: pymysql
   version: 1.1.1
@@ -1160,6 +1337,19 @@ packages:
   requires_dist:
   - pynacl>=1.4.0 ; extra == 'ed25519'
   - cryptography ; extra == 'rsa'
+  requires_python: '>=3.7'
+- pypi: https://files.pythonhosted.org/packages/80/28/2659c02301b9500751f8d42f9a6632e1508aa5120de5e43042b8b30f8d5d/pyopenssl-25.1.0-py3-none-any.whl
+  name: pyopenssl
+  version: 25.1.0
+  sha256: 2b11f239acc47ac2e5aca04fd7fa829800aeee22a2eb30d744572a157bd8a1ab
+  requires_dist:
+  - cryptography>=41.0.5,<46
+  - typing-extensions>=4.9 ; python_full_version >= '3.8' and python_full_version < '3.13'
+  - pytest-rerunfailures ; extra == 'test'
+  - pretend ; extra == 'test'
+  - pytest>=3.0.1 ; extra == 'test'
+  - sphinx!=5.2.0,!=5.2.0.post0,!=7.2.5 ; extra == 'docs'
+  - sphinx-rtd-theme ; extra == 'docs'
   requires_python: '>=3.7'
 - conda: https://conda.anaconda.org/conda-forge/noarch/pyparsing-3.2.3-pyhe01879c_2.conda
   sha256: afe32182b1090911b64ac0f29eb47e03a015d142833d8a917defd65d91c99b74
@@ -1262,6 +1452,10 @@ packages:
   purls: []
   size: 516376
   timestamp: 1720814307311
+- pypi: https://files.pythonhosted.org/packages/ab/38/ff60c8fc9e002d50d48822cc5095deb8ebbc5f91a6b8fdd9731c87a147c9/ratelimit-2.2.1.tar.gz
+  name: ratelimit
+  version: 2.2.1
+  sha256: af8a9b64b821529aca09ebaf6d8d279100d766f19e90b5059ac6a718ca6dee42
 - pypi: https://files.pythonhosted.org/packages/69/3f/2ed8c1b8fe3fc2ed816ba40554ef703aad8c51700e2606c139fcf9b7f791/reactivex-4.0.4-py3-none-any.whl
   name: reactivex
   version: 4.0.4
@@ -1294,6 +1488,18 @@ packages:
   - pkg:pypi/referencing?source=hash-mapping
   size: 51668
   timestamp: 1737836872415
+- pypi: https://files.pythonhosted.org/packages/1e/db/4254e3eabe8020b458f1a747140d32277ec7a271daf1d235b70dc0b4e6e3/requests-2.32.5-py3-none-any.whl
+  name: requests
+  version: 2.32.5
+  sha256: 2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6
+  requires_dist:
+  - charset-normalizer>=2,<4
+  - idna>=2.5,<4
+  - urllib3>=1.21.1,<3
+  - certifi>=2017.4.17
+  - pysocks>=1.5.6,!=1.5.7 ; extra == 'socks'
+  - chardet>=3.0.2,<6 ; extra == 'use-chardet-on-py3'
+  requires_python: '>=3.9'
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/rpds-py-0.27.0-py313h80e0809_0.conda
   sha256: d05d4eb509beb6a8061793a5710f4f9dffad98284bb0ace9a3f21b63102c78a6
   md5: d7b4225434fffea78af14273a12dbcee
@@ -1363,6 +1569,95 @@ packages:
   - pkg:pypi/scipy?source=hash-mapping
   size: 14095281
   timestamp: 1754970453860
+- pypi: https://files.pythonhosted.org/packages/a6/24/4d91e05817e92e3a61c8a21e08fd0f390f5301f1c448b137c57c4bc6e543/semver-3.0.4-py3-none-any.whl
+  name: semver
+  version: 3.0.4
+  sha256: 9c824d87ba7f7ab4a1890799cec8596f15c1241cb473404ea1cb0c55e4b04746
+  requires_python: '>=3.7'
+- pypi: https://files.pythonhosted.org/packages/08/2c/ca6dd598b384bc1ce581e24aaae0f2bed4ccac57749d5c3befbb5e742081/service_identity-24.2.0-py3-none-any.whl
+  name: service-identity
+  version: 24.2.0
+  sha256: 6b047fbd8a84fd0bb0d55ebce4031e400562b9196e1e0d3e0fe2b8a59f6d4a85
+  requires_dist:
+  - attrs>=19.1.0
+  - cryptography
+  - pyasn1
+  - pyasn1-modules
+  - coverage[toml]>=5.0.2 ; extra == 'dev'
+  - idna ; extra == 'dev'
+  - mypy ; extra == 'dev'
+  - pyopenssl ; extra == 'dev'
+  - pytest ; extra == 'dev'
+  - types-pyopenssl ; extra == 'dev'
+  - furo ; extra == 'docs'
+  - myst-parser ; extra == 'docs'
+  - pyopenssl ; extra == 'docs'
+  - sphinx ; extra == 'docs'
+  - sphinx-notfound-page ; extra == 'docs'
+  - idna ; extra == 'idna'
+  - idna ; extra == 'mypy'
+  - mypy ; extra == 'mypy'
+  - types-pyopenssl ; extra == 'mypy'
+  - coverage[toml]>=5.0.2 ; extra == 'tests'
+  - pytest ; extra == 'tests'
+  requires_python: '>=3.8'
+- pypi: https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl
+  name: setuptools
+  version: 80.9.0
+  sha256: 062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922
+  requires_dist:
+  - pytest>=6,!=8.1.* ; extra == 'test'
+  - virtualenv>=13.0.0 ; extra == 'test'
+  - wheel>=0.44.0 ; extra == 'test'
+  - pip>=19.1 ; extra == 'test'
+  - packaging>=24.2 ; extra == 'test'
+  - jaraco-envs>=2.2 ; extra == 'test'
+  - pytest-xdist>=3 ; extra == 'test'
+  - jaraco-path>=3.7.2 ; extra == 'test'
+  - build[virtualenv]>=1.0.3 ; extra == 'test'
+  - filelock>=3.4.0 ; extra == 'test'
+  - ini2toml[lite]>=0.14 ; extra == 'test'
+  - tomli-w>=1.0.0 ; extra == 'test'
+  - pytest-timeout ; extra == 'test'
+  - pytest-perf ; sys_platform != 'cygwin' and extra == 'test'
+  - jaraco-develop>=7.21 ; python_full_version >= '3.9' and sys_platform != 'cygwin' and extra == 'test'
+  - pytest-home>=0.5 ; extra == 'test'
+  - pytest-subprocess ; extra == 'test'
+  - pyproject-hooks!=1.1 ; extra == 'test'
+  - jaraco-test>=5.5 ; extra == 'test'
+  - sphinx>=3.5 ; extra == 'doc'
+  - jaraco-packaging>=9.3 ; extra == 'doc'
+  - rst-linker>=1.9 ; extra == 'doc'
+  - furo ; extra == 'doc'
+  - sphinx-lint ; extra == 'doc'
+  - jaraco-tidelift>=1.4 ; extra == 'doc'
+  - pygments-github-lexers==0.0.5 ; extra == 'doc'
+  - sphinx-favicon ; extra == 'doc'
+  - sphinx-inline-tabs ; extra == 'doc'
+  - sphinx-reredirects ; extra == 'doc'
+  - sphinxcontrib-towncrier ; extra == 'doc'
+  - sphinx-notfound-page>=1,<2 ; extra == 'doc'
+  - pyproject-hooks!=1.1 ; extra == 'doc'
+  - towncrier<24.7 ; extra == 'doc'
+  - packaging>=24.2 ; extra == 'core'
+  - more-itertools>=8.8 ; extra == 'core'
+  - jaraco-text>=3.7 ; extra == 'core'
+  - importlib-metadata>=6 ; python_full_version < '3.10' and extra == 'core'
+  - tomli>=2.0.1 ; python_full_version < '3.11' and extra == 'core'
+  - wheel>=0.43.0 ; extra == 'core'
+  - platformdirs>=4.2.2 ; extra == 'core'
+  - jaraco-functools>=4 ; extra == 'core'
+  - more-itertools ; extra == 'core'
+  - pytest-checkdocs>=2.4 ; extra == 'check'
+  - pytest-ruff>=0.2.1 ; sys_platform != 'cygwin' and extra == 'check'
+  - ruff>=0.8.0 ; sys_platform != 'cygwin' and extra == 'check'
+  - pytest-cov ; extra == 'cover'
+  - pytest-enabler>=2.2 ; extra == 'enabler'
+  - pytest-mypy ; extra == 'type'
+  - mypy==1.14.* ; extra == 'type'
+  - importlib-metadata>=7.0.2 ; python_full_version < '3.10' and extra == 'type'
+  - jaraco-develop>=7.21 ; sys_platform != 'cygwin' and extra == 'type'
+  requires_python: '>=3.9'
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/shapely-2.1.1-py313h76d6ede_0.conda
   sha256: 883427fb69804db47cc835cdd0e69dd1b7cdc23ca8d7f64dc9b9dcae4c17d835
   md5: b60bbe49ebe4706a66304c61c64597a0
@@ -1414,6 +1709,261 @@ packages:
   - pkg:pypi/tornado?source=hash-mapping
   size: 875854
   timestamp: 1754732465438
+- pypi: https://files.pythonhosted.org/packages/eb/66/ab7efd8941f0bc7b2bd555b0f0471bff77df4c88e0cc31120c82737fec77/twisted-25.5.0-py3-none-any.whl
+  name: twisted
+  version: 25.5.0
+  sha256: 8559f654d01a54a8c3efe66d533d43f383531ebf8d81d9f9ab4769d91ca15df7
+  requires_dist:
+  - attrs>=22.2.0
+  - automat>=24.8.0
+  - constantly>=15.1
+  - hyperlink>=17.1.1
+  - incremental>=24.7.0
+  - typing-extensions>=4.2.0
+  - zope-interface>=5
+  - appdirs>=1.4.0 ; extra == 'all-non-platform'
+  - bcrypt>=3.1.3 ; extra == 'all-non-platform'
+  - cryptography>=3.3 ; extra == 'all-non-platform'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'all-non-platform'
+  - h2>=3.2,<5.0 ; extra == 'all-non-platform'
+  - httpx[http2]>=0.27 ; extra == 'all-non-platform'
+  - hypothesis>=6.56 ; extra == 'all-non-platform'
+  - idna>=2.4 ; extra == 'all-non-platform'
+  - priority>=1.1.0,<2.0 ; extra == 'all-non-platform'
+  - pyhamcrest>=2 ; extra == 'all-non-platform'
+  - pyopenssl>=21.0.0 ; extra == 'all-non-platform'
+  - pyserial>=3.0 ; extra == 'all-non-platform'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'all-non-platform'
+  - service-identity>=18.1.0 ; extra == 'all-non-platform'
+  - wsproto ; extra == 'all-non-platform'
+  - appdirs>=1.4.0 ; extra == 'all-non-platform'
+  - bcrypt>=3.1.3 ; extra == 'all-non-platform'
+  - cryptography>=3.3 ; extra == 'all-non-platform'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'all-non-platform'
+  - h2>=3.2,<5.0 ; extra == 'all-non-platform'
+  - httpx[http2]>=0.27 ; extra == 'all-non-platform'
+  - hypothesis>=6.56 ; extra == 'all-non-platform'
+  - idna>=2.4 ; extra == 'all-non-platform'
+  - priority>=1.1.0,<2.0 ; extra == 'all-non-platform'
+  - pyhamcrest>=2 ; extra == 'all-non-platform'
+  - pyopenssl>=21.0.0 ; extra == 'all-non-platform'
+  - pyserial>=3.0 ; extra == 'all-non-platform'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'all-non-platform'
+  - service-identity>=18.1.0 ; extra == 'all-non-platform'
+  - wsproto ; extra == 'all-non-platform'
+  - appdirs>=1.4.0 ; extra == 'conch'
+  - bcrypt>=3.1.3 ; extra == 'conch'
+  - cryptography>=3.3 ; extra == 'conch'
+  - coverage~=7.5 ; extra == 'dev'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'dev'
+  - httpx[http2]>=0.27 ; extra == 'dev'
+  - hypothesis>=6.56 ; extra == 'dev'
+  - pydoctor~=24.11.1 ; extra == 'dev'
+  - pyflakes~=2.2 ; extra == 'dev'
+  - pyhamcrest>=2 ; extra == 'dev'
+  - python-subunit~=1.4 ; extra == 'dev'
+  - sphinx-rtd-theme~=1.3 ; extra == 'dev'
+  - sphinx>=6,<7 ; extra == 'dev'
+  - towncrier~=23.6 ; extra == 'dev'
+  - twistedchecker~=0.7 ; extra == 'dev'
+  - pydoctor~=24.11.1 ; extra == 'dev-release'
+  - sphinx-rtd-theme~=1.3 ; extra == 'dev-release'
+  - sphinx>=6,<7 ; extra == 'dev-release'
+  - towncrier~=23.6 ; extra == 'dev-release'
+  - pydoctor~=24.11.1 ; extra == 'dev-release'
+  - sphinx-rtd-theme~=1.3 ; extra == 'dev-release'
+  - sphinx>=6,<7 ; extra == 'dev-release'
+  - towncrier~=23.6 ; extra == 'dev-release'
+  - appdirs>=1.4.0 ; extra == 'gtk-platform'
+  - bcrypt>=3.1.3 ; extra == 'gtk-platform'
+  - cryptography>=3.3 ; extra == 'gtk-platform'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'gtk-platform'
+  - h2>=3.2,<5.0 ; extra == 'gtk-platform'
+  - httpx[http2]>=0.27 ; extra == 'gtk-platform'
+  - hypothesis>=6.56 ; extra == 'gtk-platform'
+  - idna>=2.4 ; extra == 'gtk-platform'
+  - priority>=1.1.0,<2.0 ; extra == 'gtk-platform'
+  - pygobject ; extra == 'gtk-platform'
+  - pyhamcrest>=2 ; extra == 'gtk-platform'
+  - pyopenssl>=21.0.0 ; extra == 'gtk-platform'
+  - pyserial>=3.0 ; extra == 'gtk-platform'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'gtk-platform'
+  - service-identity>=18.1.0 ; extra == 'gtk-platform'
+  - wsproto ; extra == 'gtk-platform'
+  - appdirs>=1.4.0 ; extra == 'gtk-platform'
+  - bcrypt>=3.1.3 ; extra == 'gtk-platform'
+  - cryptography>=3.3 ; extra == 'gtk-platform'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'gtk-platform'
+  - h2>=3.2,<5.0 ; extra == 'gtk-platform'
+  - httpx[http2]>=0.27 ; extra == 'gtk-platform'
+  - hypothesis>=6.56 ; extra == 'gtk-platform'
+  - idna>=2.4 ; extra == 'gtk-platform'
+  - priority>=1.1.0,<2.0 ; extra == 'gtk-platform'
+  - pygobject ; extra == 'gtk-platform'
+  - pyhamcrest>=2 ; extra == 'gtk-platform'
+  - pyopenssl>=21.0.0 ; extra == 'gtk-platform'
+  - pyserial>=3.0 ; extra == 'gtk-platform'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'gtk-platform'
+  - service-identity>=18.1.0 ; extra == 'gtk-platform'
+  - wsproto ; extra == 'gtk-platform'
+  - h2>=3.2,<5.0 ; extra == 'http2'
+  - priority>=1.1.0,<2.0 ; extra == 'http2'
+  - appdirs>=1.4.0 ; extra == 'macos-platform'
+  - bcrypt>=3.1.3 ; extra == 'macos-platform'
+  - cryptography>=3.3 ; extra == 'macos-platform'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'macos-platform'
+  - h2>=3.2,<5.0 ; extra == 'macos-platform'
+  - httpx[http2]>=0.27 ; extra == 'macos-platform'
+  - hypothesis>=6.56 ; extra == 'macos-platform'
+  - idna>=2.4 ; extra == 'macos-platform'
+  - priority>=1.1.0,<2.0 ; extra == 'macos-platform'
+  - pyhamcrest>=2 ; extra == 'macos-platform'
+  - pyobjc-core ; python_full_version >= '3.9' and extra == 'macos-platform'
+  - pyobjc-core<11 ; python_full_version < '3.9' and extra == 'macos-platform'
+  - pyobjc-framework-cfnetwork ; python_full_version >= '3.9' and extra == 'macos-platform'
+  - pyobjc-framework-cfnetwork<11 ; python_full_version < '3.9' and extra == 'macos-platform'
+  - pyobjc-framework-cocoa ; python_full_version >= '3.9' and extra == 'macos-platform'
+  - pyobjc-framework-cocoa<11 ; python_full_version < '3.9' and extra == 'macos-platform'
+  - pyopenssl>=21.0.0 ; extra == 'macos-platform'
+  - pyserial>=3.0 ; extra == 'macos-platform'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'macos-platform'
+  - service-identity>=18.1.0 ; extra == 'macos-platform'
+  - wsproto ; extra == 'macos-platform'
+  - appdirs>=1.4.0 ; extra == 'macos-platform'
+  - bcrypt>=3.1.3 ; extra == 'macos-platform'
+  - cryptography>=3.3 ; extra == 'macos-platform'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'macos-platform'
+  - h2>=3.2,<5.0 ; extra == 'macos-platform'
+  - httpx[http2]>=0.27 ; extra == 'macos-platform'
+  - hypothesis>=6.56 ; extra == 'macos-platform'
+  - idna>=2.4 ; extra == 'macos-platform'
+  - priority>=1.1.0,<2.0 ; extra == 'macos-platform'
+  - pyhamcrest>=2 ; extra == 'macos-platform'
+  - pyobjc-core ; python_full_version >= '3.9' and extra == 'macos-platform'
+  - pyobjc-core<11 ; python_full_version < '3.9' and extra == 'macos-platform'
+  - pyobjc-framework-cfnetwork ; python_full_version >= '3.9' and extra == 'macos-platform'
+  - pyobjc-framework-cfnetwork<11 ; python_full_version < '3.9' and extra == 'macos-platform'
+  - pyobjc-framework-cocoa ; python_full_version >= '3.9' and extra == 'macos-platform'
+  - pyobjc-framework-cocoa<11 ; python_full_version < '3.9' and extra == 'macos-platform'
+  - pyopenssl>=21.0.0 ; extra == 'macos-platform'
+  - pyserial>=3.0 ; extra == 'macos-platform'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'macos-platform'
+  - service-identity>=18.1.0 ; extra == 'macos-platform'
+  - wsproto ; extra == 'macos-platform'
+  - appdirs>=1.4.0 ; extra == 'mypy'
+  - bcrypt>=3.1.3 ; extra == 'mypy'
+  - coverage~=7.5 ; extra == 'mypy'
+  - cryptography>=3.3 ; extra == 'mypy'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'mypy'
+  - h2>=3.2,<5.0 ; extra == 'mypy'
+  - httpx[http2]>=0.27 ; extra == 'mypy'
+  - hypothesis>=6.56 ; extra == 'mypy'
+  - idna>=2.4 ; extra == 'mypy'
+  - mypy-zope==1.0.6 ; extra == 'mypy'
+  - mypy==1.10.1 ; extra == 'mypy'
+  - priority>=1.1.0,<2.0 ; extra == 'mypy'
+  - pydoctor~=24.11.1 ; extra == 'mypy'
+  - pyflakes~=2.2 ; extra == 'mypy'
+  - pyhamcrest>=2 ; extra == 'mypy'
+  - pyopenssl>=21.0.0 ; extra == 'mypy'
+  - pyserial>=3.0 ; extra == 'mypy'
+  - python-subunit~=1.4 ; extra == 'mypy'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'mypy'
+  - service-identity>=18.1.0 ; extra == 'mypy'
+  - sphinx-rtd-theme~=1.3 ; extra == 'mypy'
+  - sphinx>=6,<7 ; extra == 'mypy'
+  - towncrier~=23.6 ; extra == 'mypy'
+  - twistedchecker~=0.7 ; extra == 'mypy'
+  - types-pyopenssl ; extra == 'mypy'
+  - types-setuptools ; extra == 'mypy'
+  - wsproto ; extra == 'mypy'
+  - appdirs>=1.4.0 ; extra == 'osx-platform'
+  - bcrypt>=3.1.3 ; extra == 'osx-platform'
+  - cryptography>=3.3 ; extra == 'osx-platform'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'osx-platform'
+  - h2>=3.2,<5.0 ; extra == 'osx-platform'
+  - httpx[http2]>=0.27 ; extra == 'osx-platform'
+  - hypothesis>=6.56 ; extra == 'osx-platform'
+  - idna>=2.4 ; extra == 'osx-platform'
+  - priority>=1.1.0,<2.0 ; extra == 'osx-platform'
+  - pyhamcrest>=2 ; extra == 'osx-platform'
+  - pyobjc-core ; python_full_version >= '3.9' and extra == 'osx-platform'
+  - pyobjc-core<11 ; python_full_version < '3.9' and extra == 'osx-platform'
+  - pyobjc-framework-cfnetwork ; python_full_version >= '3.9' and extra == 'osx-platform'
+  - pyobjc-framework-cfnetwork<11 ; python_full_version < '3.9' and extra == 'osx-platform'
+  - pyobjc-framework-cocoa ; python_full_version >= '3.9' and extra == 'osx-platform'
+  - pyobjc-framework-cocoa<11 ; python_full_version < '3.9' and extra == 'osx-platform'
+  - pyopenssl>=21.0.0 ; extra == 'osx-platform'
+  - pyserial>=3.0 ; extra == 'osx-platform'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'osx-platform'
+  - service-identity>=18.1.0 ; extra == 'osx-platform'
+  - wsproto ; extra == 'osx-platform'
+  - appdirs>=1.4.0 ; extra == 'osx-platform'
+  - bcrypt>=3.1.3 ; extra == 'osx-platform'
+  - cryptography>=3.3 ; extra == 'osx-platform'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'osx-platform'
+  - h2>=3.2,<5.0 ; extra == 'osx-platform'
+  - httpx[http2]>=0.27 ; extra == 'osx-platform'
+  - hypothesis>=6.56 ; extra == 'osx-platform'
+  - idna>=2.4 ; extra == 'osx-platform'
+  - priority>=1.1.0,<2.0 ; extra == 'osx-platform'
+  - pyhamcrest>=2 ; extra == 'osx-platform'
+  - pyobjc-core ; python_full_version >= '3.9' and extra == 'osx-platform'
+  - pyobjc-core<11 ; python_full_version < '3.9' and extra == 'osx-platform'
+  - pyobjc-framework-cfnetwork ; python_full_version >= '3.9' and extra == 'osx-platform'
+  - pyobjc-framework-cfnetwork<11 ; python_full_version < '3.9' and extra == 'osx-platform'
+  - pyobjc-framework-cocoa ; python_full_version >= '3.9' and extra == 'osx-platform'
+  - pyobjc-framework-cocoa<11 ; python_full_version < '3.9' and extra == 'osx-platform'
+  - pyopenssl>=21.0.0 ; extra == 'osx-platform'
+  - pyserial>=3.0 ; extra == 'osx-platform'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'osx-platform'
+  - service-identity>=18.1.0 ; extra == 'osx-platform'
+  - wsproto ; extra == 'osx-platform'
+  - pyserial>=3.0 ; extra == 'serial'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'serial'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'test'
+  - httpx[http2]>=0.27 ; extra == 'test'
+  - hypothesis>=6.56 ; extra == 'test'
+  - pyhamcrest>=2 ; extra == 'test'
+  - idna>=2.4 ; extra == 'tls'
+  - pyopenssl>=21.0.0 ; extra == 'tls'
+  - service-identity>=18.1.0 ; extra == 'tls'
+  - wsproto ; extra == 'websocket'
+  - appdirs>=1.4.0 ; extra == 'windows-platform'
+  - bcrypt>=3.1.3 ; extra == 'windows-platform'
+  - cryptography>=3.3 ; extra == 'windows-platform'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'windows-platform'
+  - h2>=3.2,<5.0 ; extra == 'windows-platform'
+  - httpx[http2]>=0.27 ; extra == 'windows-platform'
+  - hypothesis>=6.56 ; extra == 'windows-platform'
+  - idna>=2.4 ; extra == 'windows-platform'
+  - priority>=1.1.0,<2.0 ; extra == 'windows-platform'
+  - pyhamcrest>=2 ; extra == 'windows-platform'
+  - pyopenssl>=21.0.0 ; extra == 'windows-platform'
+  - pyserial>=3.0 ; extra == 'windows-platform'
+  - pywin32!=226 ; extra == 'windows-platform'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'windows-platform'
+  - service-identity>=18.1.0 ; extra == 'windows-platform'
+  - twisted-iocpsupport>=1.0.2 ; extra == 'windows-platform'
+  - wsproto ; extra == 'windows-platform'
+  - appdirs>=1.4.0 ; extra == 'windows-platform'
+  - bcrypt>=3.1.3 ; extra == 'windows-platform'
+  - cryptography>=3.3 ; extra == 'windows-platform'
+  - cython-test-exception-raiser>=1.0.2,<2 ; extra == 'windows-platform'
+  - h2>=3.2,<5.0 ; extra == 'windows-platform'
+  - httpx[http2]>=0.27 ; extra == 'windows-platform'
+  - hypothesis>=6.56 ; extra == 'windows-platform'
+  - idna>=2.4 ; extra == 'windows-platform'
+  - priority>=1.1.0,<2.0 ; extra == 'windows-platform'
+  - pyhamcrest>=2 ; extra == 'windows-platform'
+  - pyopenssl>=21.0.0 ; extra == 'windows-platform'
+  - pyserial>=3.0 ; extra == 'windows-platform'
+  - pywin32!=226 ; extra == 'windows-platform'
+  - pywin32!=226 ; sys_platform == 'win32' and extra == 'windows-platform'
+  - service-identity>=18.1.0 ; extra == 'windows-platform'
+  - twisted-iocpsupport>=1.0.2 ; extra == 'windows-platform'
+  - wsproto ; extra == 'windows-platform'
+  requires_python: '>=3.8.0'
 - conda: https://conda.anaconda.org/conda-forge/noarch/typing_extensions-4.14.1-pyhe01879c_0.conda
   sha256: 4f52390e331ea8b9019b87effaebc4f80c6466d09f68453f52d5cdc2a3e1194f
   md5: e523f4f1e980ed7a4240d7e27e9ec81f
@@ -1458,6 +2008,11 @@ packages:
   - pyserial>=3.4,<4.0
   - pyusb>=1.0.2,<2.0.0
   requires_python: '>=3.6,<4.0'
+- pypi: https://files.pythonhosted.org/packages/45/35/6a08de0f2c96dcdd7fe464d7420ddb9a7655a6561150e5fc4da9356aeaab/wrapt-1.17.3-cp313-cp313-macosx_11_0_arm64.whl
+  name: wrapt
+  version: 1.17.3
+  sha256: 16ecf15d6af39246fe33e507105d67e4b81d8f8d2c6598ff7e3ca1b8a37213f7
+  requires_python: '>=3.8'
 - conda: https://conda.anaconda.org/conda-forge/noarch/xarray-2025.8.0-pyhd8ed1ab_0.conda
   sha256: 91c476aab9f878a243b4edb31a3cf6c7bb4e873ff537315f475769b890bbbb29
   md5: a7b1b2ffdbf18922945874ccbe1420aa
@@ -1550,6 +2105,22 @@ packages:
   purls: []
   size: 86425
   timestamp: 1749230316106
+- pypi: https://files.pythonhosted.org/packages/49/65/78e7cebca6be07c8fc4032bfbb123e500d60efdf7b86727bb8a071992108/zope.interface-7.2-cp313-cp313-macosx_11_0_arm64.whl
+  name: zope-interface
+  version: '7.2'
+  sha256: 15398c000c094b8855d7d74f4fdc9e73aa02d4d0d5c775acdef98cdb1119768d
+  requires_dist:
+  - setuptools
+  - sphinx ; extra == 'docs'
+  - repoze-sphinx-autointerface ; extra == 'docs'
+  - furo ; extra == 'docs'
+  - coverage[toml] ; extra == 'test'
+  - zope-event ; extra == 'test'
+  - zope-testing ; extra == 'test'
+  - coverage[toml] ; extra == 'testing'
+  - zope-event ; extra == 'testing'
+  - zope-testing ; extra == 'testing'
+  requires_python: '>=3.8'
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-h6491c7d_2.conda
   sha256: 0d02046f57f7a1a3feae3e9d1aa2113788311f3cf37a3244c71e61a93177ba67
   md5: e6f69c7bcccdefa417f056fa593b40f0
