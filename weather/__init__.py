@@ -1,4 +1,4 @@
-# pylint: disable=too-many-arguments,too-many-positional-arguments
+# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
 """
 Weather Station Tools CLI:
 
@@ -135,6 +135,7 @@ class ClickCommands(Enum):
     STATS = "stats"
     BACKFILL = "backfill"
     DEPLOY = "deploy"
+    QUALITY = "quality"
 
 
 class ImageFormat(Enum):
@@ -711,6 +712,12 @@ def backfill(
             data_frame_tag_columns=["station", "device", "source"],
         )
 
+@weather.command(name=ClickCommands.QUALITY.value)
+def quality():
+    """
+    Assess the quality of the weather data.
+    """
+    pass
 
 @weather.command(name=ClickCommands.DEPLOY.value)
 def deploy():
