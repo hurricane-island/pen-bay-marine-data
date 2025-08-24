@@ -397,6 +397,7 @@ class WeeWxInfluxArchive:
     """
     WeeWx archive data from InfluxDB.
     """
+
     # pylint: disable=redefined-outer-name
     def __init__(
         self,
@@ -507,9 +508,7 @@ def weather_plot_daily(
 
 
 @file.command(name=ClickCommands.DESCRIBE.value)
-@click.argument(
-    "station", type=click.Choice(StationName, case_sensitive=False)
-)
+@click.argument("station", type=click.Choice(StationName, case_sensitive=False))
 def weather_file_describe(station: StationName):
     """
     Parse and normalize weather station data for display
@@ -522,9 +521,7 @@ def weather_file_describe(station: StationName):
 
 
 @file.command(name=ClickCommands.EXPORT.value)
-@click.argument(
-    "station", type=click.Choice(StationName, case_sensitive=False)
-)
+@click.argument("station", type=click.Choice(StationName, case_sensitive=False))
 def weather_file_export(station: StationName):
     """
     Export normalized weather station data to CSV.
@@ -545,13 +542,9 @@ def weather_db_describe(host: str, measurement: str, token: str):
 
 
 @database.command(name=ClickCommands.BACKFILL.value)
-@click.argument(
-    "station", type=click.Choice(StationName, case_sensitive=False)
-)
+@click.argument("station", type=click.Choice(StationName, case_sensitive=False))
 @influx_options
-def weather_db_backfill(
-    station: StationName, host: str, measurement: str, token: str
-):
+def weather_db_backfill(station: StationName, host: str, measurement: str, token: str):
     """
     Backfill missing data from local to database.
     """
@@ -580,56 +573,50 @@ def weather_db_backfill(
         )
 
 
+def test_observed_property(
+    result: DataFrame, observed_property: str, tests: list[str]
+) -> DataFrame:
+    columns = {
+        f"{observed_property}_qartod_{test}": test.replace("_test", "")
+        for test in tests
+    }
+    df = result[columns.keys()].rename(columns=columns)
+    for col in df.columns:
+        df[col] = df[col].astype("Int64")
+    df["rollup"] = df.max(axis=1)
+    df["observed_property"] = observed_property
+    return df
+
+
 @weather.command(name=ClickCommands.QUALITY.value)
-@click.argument(
-    "station", type=click.Choice(StationName, case_sensitive=False)
-)
+@click.argument("station", type=click.Choice(StationName, case_sensitive=False))
 def weather_quality(station: StationName):
     """
     Assess the quality of the weather data.
     """
-    test_type = "qartod"
-    config = Config(
-        f"""
-    streams:
-        air_temperature:
-            {test_type}:
-                gross_range_test:
-                    suspect_span: [-10, 50]
-                    fail_span: [-40, 200]
-                spike_test:
-                    suspect_threshold: 5.0
-                    fail_threshold: 10.0
-                    method: "average"
-        wind_speed:
-            {test_type}:
-                gross_range_test:
-                    suspect_span: [0, 50]
-                    fail_span: [0, 100]
-    """
-    )
+    config = Config(f"{Path(__file__).parent}/qartod.yaml")
     local = WeatherLinkArchive(station.value).df.reset_index()
-    flags = PandasStream(local).run(config)
-    store = PandasStore(flags)
-    result = store.save()
-    result.set_index("time", inplace=True)
-    frames: dict[str, list[str]] = {}
-    for test in result.columns:
-        _series, name = test.split(f"_{test_type}_")
-        if _series not in frames:
-            frames[_series] = []
-        frames[_series].append(name)
 
-    by_observed_property = []
-    for series, tests in frames.items():
-        columns = {
-            f"{series}_{test_type}_{test}": test.replace("_test", "") for test in tests
-        }
-        df = result[columns.keys()].rename(columns=columns)
-        for col in df.columns:
-            df[col] = df[col].astype("Int64")
-        df["rollup"] = df.max(axis=1)
-        df["observed_property"] = series
-        by_observed_property.append(df)
-    stacked = concat(by_observed_property, axis=0)
+    def test_data_frame(df: DataFrame) -> DataFrame:
+        """
+        Apply any necessary processing to the DataFrame
+        """
+        flags = PandasStream(local).run(config)
+        store = PandasStore(flags)
+        result = store.save()
+        result.set_index("time", inplace=True)
+        frames: dict[str, list[str]] = {}
+        for test in result.columns:
+            _series, name = test.split("_qartod_")
+            if _series not in frames:
+                frames[_series] = []
+            frames[_series].append(name)
+
+        by_observed_property = []
+        for items in frames.items():
+            df = test_observed_property(result, *items)
+            by_observed_property.append(df)
+        return concat(by_observed_property, axis=0)
+
+    stacked = test_data_frame(local)
     print(stacked.describe())

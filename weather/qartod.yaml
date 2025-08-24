@@ -1,0 +1,15 @@
+streams:
+  air_temperature:
+    qartod:
+      gross_range_test:
+        suspect_span: [-10, 50]
+        fail_span: [-40, 200]
+      spike_test:
+        suspect_threshold: 5.0
+        fail_threshold: 10.0
+        method: "average"
+  wind_speed:
+    qartod:
+      gross_range_test:
+        suspect_span: [0, 50]
+        fail_span: [0, 100]
