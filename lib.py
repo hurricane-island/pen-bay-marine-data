@@ -9,7 +9,10 @@ from pathlib import Path
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.axes import Axes
 from click import Choice, option
-from pandas import DataFrame, Grouper, Series
+from pandas import DataFrame, Grouper, Series, concat
+from ioos_qc.config import Config
+from ioos_qc.streams import PandasStream
+from ioos_qc.stores import PandasStore
 
 
 class ImageFormat(Enum):
@@ -22,6 +25,21 @@ class ImageFormat(Enum):
     """
 
     PNG = "png"
+
+class StandardUnits(Enum):
+    """
+    CF Metadata Standard Units. These are all of the Davis Vantage Pro2
+    observed properties that have Climate and Forecast (CF) metadata standard
+    units.
+    """
+
+    TEMPERATURE = "deg K"
+    PRESSURE = "Pa"
+    SPEED = "m/s"
+    DIRECTION = "degrees"
+    ENERGY = "W/m^2"
+    FLUX = "kg/m^2/s"
+    AMOUNT = "kg/m^2"
 
 
 def influx_options(function):
@@ -66,6 +84,45 @@ def fahrenheit_to_kelvin(fahrenheit: float) -> float:
     Convert Fahrenheit to Kelvin.
     """
     return (fahrenheit - 32) * 5 / 9 + 273.15
+
+
+def test_observed_property(
+    result: DataFrame, observed_property: str, tests: list[str]
+) -> DataFrame:
+    """
+    Get quality assurance flags for observed property.
+    """
+    columns = {
+        f"{observed_property}_qartod_{test}": test.replace("_test", "")
+        for test in tests
+    }
+    df = result[columns.keys()].rename(columns=columns)
+    df["rollup"] = df.max(axis=1).astype("object")
+    for col in df.columns:
+        df[col] = df[col].astype("object")
+    df["observed_property"] = observed_property
+    return df
+
+
+def test_data_frame(df: DataFrame, config: Config) -> DataFrame:
+    """
+    Apply any necessary processing to the DataFrame
+    """
+    flags = PandasStream(df).run(config)
+    store = PandasStore(flags)
+    result = store.save().set_index("time")
+    frames: dict[str, list[str]] = {}
+    for test in result.columns:
+        _series, name = test.split("_qartod_")
+        if _series not in frames:
+            frames[_series] = []
+        frames[_series].append(name)
+
+    by_observed_property = []
+    for items in frames.items():
+        df = test_observed_property(result, *items)
+        by_observed_property.append(df)
+    return concat(by_observed_property, axis=0)
 
 
 def cardinal_direction_to_degrees(series: Series) -> Series:
@@ -181,6 +238,19 @@ def group_observations_by_time(
         years += f"-{groups[-1].year}"
     return bins, positions, years
 
+def describe_data_frame(df: DataFrame, config_path: str):
+    """
+    Display a summary of the DataFrame without an overwhelming amount of detail.
+    """
+    summary = df.describe().T.drop(columns=["25%", "50%", "75%", "std", "mean"])
+    print("\nSamples:\n")
+    print(summary)
+    config = Config(config_path)
+    qa = test_data_frame(df.reset_index(), config)
+    gb = qa.groupby("observed_property")
+    print("\nQuality Assurance Flags:\n")
+    group_summary = gb.describe().T
+    print(group_summary)
 
 def boxplot(
     df: DataFrame,

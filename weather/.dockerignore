@@ -3,3 +3,4 @@ cli.py
 data/
 __pycache__/
 figures/
+qartod.yaml

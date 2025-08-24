@@ -26,9 +26,6 @@ from enum import Enum
 import click
 from pandas import read_csv, to_datetime, DataFrame, Series, concat
 from influxdb_client_3 import InfluxDBClient3
-from ioos_qc.config import Config
-from ioos_qc.streams import PandasStream
-from ioos_qc.stores import PandasStore
 from lib import (
     plot_options,
     influx_options,
@@ -36,6 +33,8 @@ from lib import (
     plot_tail,
     fahrenheit_to_kelvin,
     cardinal_direction_to_degrees,
+    describe_data_frame,
+    StandardUnits
 )
 
 
@@ -60,12 +59,9 @@ class ClickCommands(Enum):
     # plotting commands
     TAIL = "tail"
     DAILY = "daily"
-    # others...
+    # db and file commands...
     DESCRIBE = "describe"
-    STATS = "stats"
     BACKFILL = "backfill"
-    DEPLOY = "deploy"
-    QUALITY = "quality"
     EXPORT = "export"
 
 
@@ -102,22 +98,6 @@ class ObservedProperty:
         self.unit = unit
         self.weewx = weewx
         self.weather_link = weather_link
-
-
-class StandardUnits(Enum):
-    """
-    CF Metadata Standard Units. These are all of the Davis Vantage Pro2
-    observed properties that have Climate and Forecast (CF) metadata standard
-    units.
-    """
-
-    TEMPERATURE = "deg K"
-    PRESSURE = "Pa"
-    SPEED = "m/s"
-    DIRECTION = "degrees"
-    ENERGY = "W/m^2"
-    FLUX = "kg/m^2/s"
-    AMOUNT = "kg/m^2"
 
 
 class StandardNames(Enum):
@@ -278,14 +258,14 @@ class StationName(Enum):
     DEV = "dev"
 
 
-@click.group()
+@click.group(name="weather")
 def weather():
     """
     Weather station commands.
     """
 
 
-@click.group()
+@click.group(name="plot")
 def plot():
     """
     Commands that generate plots using weather data.
@@ -374,9 +354,7 @@ class WeatherLinkArchive:
             for each in items:
                 header += str(each).strip() + " "
             header = header.strip()
-            if header in lookup:
-                header = lookup[header]
-            names.append(header)
+            names.append(lookup.get(header, header))
         df = read_csv(
             filename,
             delimiter=delimiter,
@@ -514,10 +492,7 @@ def weather_file_describe(station: StationName):
     Parse and normalize weather station data for display
     """
     df = WeatherLinkArchive(station.value).df
-    values = [each.value for each in CF_STANDARDS]
-    ind = df.columns.intersection(values)
-    compatible = df[ind]
-    print(compatible.describe())
+    describe_data_frame(df, f"{Path(__file__).parent}/qartod.yaml")
 
 
 @file.command(name=ClickCommands.EXPORT.value)
@@ -538,7 +513,7 @@ def weather_db_describe(host: str, measurement: str, token: str):
     Show information about the data already stored in Influx database.
     """
     df = WeeWxInfluxArchive(measurement, token, host).df
-    print(df.describe())
+    describe_data_frame(df, f"{Path(__file__).parent}/qartod.yaml")
 
 
 @database.command(name=ClickCommands.BACKFILL.value)
@@ -571,52 +546,3 @@ def weather_db_backfill(station: StationName, host: str, measurement: str, token
             data_frame_measurement_name="weather",
             data_frame_tag_columns=["station", "device", "source"],
         )
-
-
-def test_observed_property(
-    result: DataFrame, observed_property: str, tests: list[str]
-) -> DataFrame:
-    columns = {
-        f"{observed_property}_qartod_{test}": test.replace("_test", "")
-        for test in tests
-    }
-    df = result[columns.keys()].rename(columns=columns)
-    for col in df.columns:
-        df[col] = df[col].astype("Int64")
-    df["rollup"] = df.max(axis=1)
-    df["observed_property"] = observed_property
-    return df
-
-
-@weather.command(name=ClickCommands.QUALITY.value)
-@click.argument("station", type=click.Choice(StationName, case_sensitive=False))
-def weather_quality(station: StationName):
-    """
-    Assess the quality of the weather data.
-    """
-    config = Config(f"{Path(__file__).parent}/qartod.yaml")
-    local = WeatherLinkArchive(station.value).df.reset_index()
-
-    def test_data_frame(df: DataFrame) -> DataFrame:
-        """
-        Apply any necessary processing to the DataFrame
-        """
-        flags = PandasStream(local).run(config)
-        store = PandasStore(flags)
-        result = store.save()
-        result.set_index("time", inplace=True)
-        frames: dict[str, list[str]] = {}
-        for test in result.columns:
-            _series, name = test.split("_qartod_")
-            if _series not in frames:
-                frames[_series] = []
-            frames[_series].append(name)
-
-        by_observed_property = []
-        for items in frames.items():
-            df = test_observed_property(result, *items)
-            by_observed_property.append(df)
-        return concat(by_observed_property, axis=0)
-
-    stacked = test_data_frame(local)
-    print(stacked.describe())
