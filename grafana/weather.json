@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 0,
+  "id": 19,
   "links": [
     {
       "asDropdown": false,
@@ -43,8 +43,8 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 24,
+        "h": 11,
+        "w": 10,
         "x": 0,
         "y": 0
       },
@@ -69,12 +69,204 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 11
       },
       "id": 6,
       "panels": [],
       "title": "Rockland, Maine",
       "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "aeklwsr10bnk0f"
+      },
+      "description": "Weather station at The Apprenticeshop in Rockland Maine. Davis Vantage 2 Pro model.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "orange",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              },
+              {
+                "color": "#EAB839",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "outTemp"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "fahrenheit"
+              },
+              {
+                "id": "displayName",
+                "value": "Air Temperature"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "outHumidity"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "displayName",
+                "value": "Relative Humidity"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 0,
+        "y": 12
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "vertical",
+        "percentChangeColorMode": "same_as_value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": true,
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.2.0-16890666601.patch2",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "aeklwsr10bnk0f"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \"time\", \"outTemp\", \"outHumidity\" FROM \"observations\" WHERE \"time\" >= $__timeFrom AND \"time\" <= $__timeTo AND \"binding\" = 'archive' ORDER BY \"time\" ASC",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "time",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "outTemp",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "outHumidity",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "whereJsonTree": {
+              "children1": [
+                {
+                  "id": "aaabaaa8-89ab-4cde-b012-319691d091c6",
+                  "properties": {
+                    "field": "binding",
+                    "fieldSrc": "field",
+                    "operator": "equal",
+                    "value": [
+                      "archive"
+                    ],
+                    "valueError": [
+                      null
+                    ],
+                    "valueSrc": [
+                      "value"
+                    ],
+                    "valueType": [
+                      "text"
+                    ]
+                  },
+                  "type": "rule"
+                }
+              ],
+              "id": "bb9899a9-0123-4456-b89a-b19691b5296a",
+              "type": "group"
+            },
+            "whereString": "binding = 'archive'"
+          },
+          "table": "observations"
+        }
+      ],
+      "title": "Temperature & Humidity",
+      "transparent": true,
+      "type": "stat"
     },
     {
       "datasource": {
@@ -193,9 +385,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 9
+        "w": 13,
+        "x": 10,
+        "y": 12
       },
       "id": 2,
       "options": {
@@ -309,6 +501,247 @@
             "fixedColor": "text",
             "mode": "fixed"
           },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Air Pressure"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "pressurehg"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sensors"
+            },
+            "properties": [
+              {
+                "id": "decimals"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 0,
+        "y": 20
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "same_as_value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": true,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.2.0-16890666601.patch2",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "aeklwsr10bnk0f"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT \"time\", \"barometer\" FROM \"observations\" WHERE \"time\" >= $__timeFrom AND \"time\" <= $__timeTo AND \"binding\" = 'archive' ",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "time",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "barometer",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "whereJsonTree": {
+              "children1": [
+                {
+                  "id": "aaabaaa8-89ab-4cde-b012-319691d091c6",
+                  "properties": {
+                    "field": "binding",
+                    "fieldSrc": "field",
+                    "operator": "equal",
+                    "value": [
+                      "archive"
+                    ],
+                    "valueError": [
+                      null
+                    ],
+                    "valueSrc": [
+                      "value"
+                    ],
+                    "valueType": [
+                      "text"
+                    ]
+                  },
+                  "type": "rule"
+                }
+              ],
+              "id": "bb9899a9-0123-4456-b89a-b19691b5296a",
+              "type": "group"
+            },
+            "whereString": "binding = 'archive'"
+          },
+          "table": "observations"
+        },
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "aeklvyvoqycxsb"
+          },
+          "editorMode": "builder",
+          "format": "table",
+          "hide": false,
+          "rawSql": "SELECT \"time\", \"barometer\" FROM \"observations\" WHERE \"time\" >= $__timeFrom AND \"time\" <= $__timeTo ",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "time",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "barometer",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ]
+          },
+          "table": "observations"
+        }
+      ],
+      "title": "Air Pressure",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Air Pressure",
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "barometer 1",
+                "barometer 2"
+              ],
+              "reducer": "mean"
+            },
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Sensors",
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "Air Pressure"
+              ],
+              "reducer": "count"
+            },
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "time",
+                "Air Pressure",
+                "Sensors"
+              ]
+            }
+          }
+        }
+      ],
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "Weather station at The Apprenticeshop in Rockland Maine. Davis Vantage 2 Pro model.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "text",
+            "mode": "fixed"
+          },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -360,47 +793,15 @@
           },
           "unit": "pressurehg"
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": "A"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Pressure @ The Apprenticeshop"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": "B"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Pressure @ Journey's End Marina"
-              },
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "light-yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 17
+        "h": 8,
+        "w": 13,
+        "x": 10,
+        "y": 20
       },
-      "id": 3,
+      "id": 14,
       "options": {
         "legend": {
           "calcs": [],
@@ -531,8 +932,207 @@
         }
       ],
       "title": "Air Pressure",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Air Pressure",
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "barometer 1",
+                "barometer 2"
+              ],
+              "reducer": "mean"
+            },
+            "replaceFields": true
+          }
+        }
+      ],
       "transparent": true,
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "aeklwsr10bnk0f"
+      },
+      "description": "Weather station at The Apprenticeshop in Rockland Maine. Davis Vantage 2 Pro model.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "radiation"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Solar Irradiance"
+              },
+              {
+                "id": "unit",
+                "value": "Wm2"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "UV"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-purple",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Ultraviolet Index"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 0,
+        "y": 28
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "same_as_value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": true,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.2.0-16890666601.patch2",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "aeklwsr10bnk0f"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \"time\", \"UV\", \"radiation\" FROM \"observations\" WHERE \"time\" >= $__timeFrom AND \"time\" <= $__timeTo AND \"binding\" = 'archive' ORDER BY \"time\" ASC",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "time",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "UV",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "radiation",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "whereJsonTree": {
+              "children1": [
+                {
+                  "id": "aaabaaa8-89ab-4cde-b012-319691d091c6",
+                  "properties": {
+                    "field": "binding",
+                    "fieldSrc": "field",
+                    "operator": "equal",
+                    "value": [
+                      "archive"
+                    ],
+                    "valueError": [
+                      null
+                    ],
+                    "valueSrc": [
+                      "value"
+                    ],
+                    "valueType": [
+                      "text"
+                    ]
+                  },
+                  "type": "rule"
+                }
+              ],
+              "id": "bb9899a9-0123-4456-b89a-b19691b5296a",
+              "type": "group"
+            },
+            "whereString": "binding = 'archive'"
+          },
+          "table": "observations"
+        }
+      ],
+      "title": "Daylight",
+      "transparent": true,
+      "type": "stat"
     },
     {
       "datasource": {
@@ -647,10 +1247,10 @@
         ]
       },
       "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 24
+        "h": 8,
+        "w": 13,
+        "x": 10,
+        "y": 28
       },
       "id": 5,
       "options": {
@@ -764,6 +1364,176 @@
             "fixedColor": "text",
             "mode": "fixed"
           },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "#EAB839",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 30
+              }
+            ]
+          },
+          "unit": "velocitymph"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "windSpeed"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Wind Speed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "windGust"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Wind Gust Speed"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 0,
+        "y": 36
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "same_as_value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": true,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.2.0-16890666601.patch2",
+      "targets": [
+        {
+          "dataset": "iox",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "aeklwsr10bnk0f"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \"time\", \"windSpeed\", \"windGust\" FROM \"observations\" WHERE \"time\" >= $__timeFrom AND \"time\" <= $__timeTo AND \"binding\" = 'archive' ORDER BY \"time\" ASC",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "time",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "windSpeed",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [
+                  {
+                    "name": "windGust",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "whereJsonTree": {
+              "children1": [
+                {
+                  "id": "aaabaaa8-89ab-4cde-b012-319691d091c6",
+                  "properties": {
+                    "field": "binding",
+                    "fieldSrc": "field",
+                    "operator": "equal",
+                    "value": [
+                      "archive"
+                    ],
+                    "valueError": [
+                      null
+                    ],
+                    "valueSrc": [
+                      "value"
+                    ],
+                    "valueType": [
+                      "text"
+                    ]
+                  },
+                  "type": "rule"
+                }
+              ],
+              "id": "bb9899a9-0123-4456-b89a-b19691b5296a",
+              "type": "group"
+            },
+            "whereString": "binding = 'archive'"
+          },
+          "table": "observations"
+        }
+      ],
+      "title": "Wind",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "aeklwsr10bnk0f"
+      },
+      "description": "Weather station at The Apprenticeshop in Rockland Maine. Davis Vantage 2 Pro model.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "text",
+            "mode": "fixed"
+          },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -816,7 +1586,7 @@
               }
             ]
           },
-          "unit": "velocityknot"
+          "unit": "velocitymph"
         },
         "overrides": [
           {
@@ -846,10 +1616,10 @@
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 31
+        "h": 6,
+        "w": 13,
+        "x": 10,
+        "y": 36
       },
       "id": 4,
       "options": {
@@ -961,10 +1731,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 11,
+        "h": 10,
         "w": 9,
         "x": 0,
-        "y": 39
+        "y": 42
       },
       "id": 10,
       "options": {
@@ -1057,5 +1827,5 @@
   "timezone": "browser",
   "title": "Weather",
   "uid": "e6af92e5-7911-4f2b-8309-968c4a6c2fb8",
-  "version": 88
+  "version": 105
 }
