@@ -1,4 +1,4 @@
-# pylint: disable=too-many-arguments,too-many-positional-arguments
+# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
 """
 Weather Station Tools CLI:
 
@@ -31,6 +31,9 @@ from influxdb_client_3 import InfluxDBClient3
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.axes import Axes
 from balena import Balena
+from ioos_qc.config import Config
+from ioos_qc.streams import PandasStream
+from ioos_qc.stores import PandasStore
 
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -135,6 +138,7 @@ class ClickCommands(Enum):
     STATS = "stats"
     BACKFILL = "backfill"
     DEPLOY = "deploy"
+    QUALITY = "quality"
 
 
 class ImageFormat(Enum):
@@ -710,6 +714,53 @@ def backfill(
             data_frame_measurement_name="weather",
             data_frame_tag_columns=["station", "device", "source"],
         )
+
+
+@weather.command(name=ClickCommands.QUALITY.value)
+def quality():
+    """
+    Assess the quality of the weather data.
+    """
+    config = Config("""
+    streams:
+        air_temperature:
+            qartod:
+                gross_range_test:
+                    suspect_span: [-10, 50]
+                    fail_span: [-40, 200]
+                spike_test:
+                    suspect_threshold: 5.0
+                    fail_threshold: 10.0
+                    method: "average"
+        wind_speed:
+            qartod:
+                gross_range_test:
+                    suspect_span: [0, 50]
+                    fail_span: [0, 100]
+    """)
+    local = WeatherLinkArchive("apprenticeshop").df.reset_index()
+    flags = PandasStream(local).run(config)
+    store = PandasStore(flags)
+    result = store.save()
+    result.set_index("time", inplace=True)
+    frames: dict[str, list[str]] = {}
+    for test in result.columns:
+        _series, name = test.split("_qartod_")
+        if _series not in frames:
+            frames[_series] = []
+        frames[_series].append(name)
+
+    by_observed_property = []
+    for series, tests in frames.items():
+        columns = {f"{series}_qartod_{test}": test.replace("_test", "") for test in tests}
+        df = result[columns.keys()].rename(columns=columns)
+        for col in df.columns:
+            df[col] = df[col].astype("Int64")
+        df["rollup"] = df.max(axis=1)
+        df["observed_property"] = series
+        by_observed_property.append(df)
+    stacked = concat(by_observed_property, axis=0)
+    print(stacked.head(20))
 
 
 @weather.command(name=ClickCommands.DEPLOY.value)
