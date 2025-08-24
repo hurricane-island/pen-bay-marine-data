@@ -1,3 +1,4 @@
+# pylint: disable=too-many-arguments,too-many-positional-arguments
 """
 Weather Station Tools CLI:
 
@@ -164,6 +165,7 @@ def plot():
     Commands that generate plots using weather data.
     """
 
+
 # Subcommands assignment
 weather.add_command(plot)
 
@@ -287,8 +289,12 @@ class WeatherLinkArchive:
         Exported speed is in knots, but standard is m / s.
         Exported direction is cardinal, but standard is in degrees.
         """
-        self.df[StandardNames.WIND_SPEED.value] = self.df[StandardNames.WIND_SPEED.value] * KNOTS_TO_METERS_PER_SECOND
-        self.df[StandardNames.WIND_SPEED_OF_GUST.value] = self.df[StandardNames.WIND_SPEED_OF_GUST.value] * KNOTS_TO_METERS_PER_SECOND
+        self.df[StandardNames.WIND_SPEED.value] = (
+            self.df[StandardNames.WIND_SPEED.value] * KNOTS_TO_METERS_PER_SECOND
+        )
+        self.df[StandardNames.WIND_SPEED_OF_GUST.value] = (
+            self.df[StandardNames.WIND_SPEED_OF_GUST.value] * KNOTS_TO_METERS_PER_SECOND
+        )
         wind = {
             "N": 0,
             "NNE": 22.5,
@@ -307,18 +313,44 @@ class WeatherLinkArchive:
             "NW": 315,
             "NNW": 337.5,
         }
-        self.df[StandardNames.WIND_FROM_DIRECTION.value] = self.df[StandardNames.WIND_FROM_DIRECTION.value].map(wind)
-        self.df[StandardNames.WIND_GUST_FROM_DIRECTION.value] = self.df[StandardNames.WIND_GUST_FROM_DIRECTION.value].map(wind)
-        self.df[StandardNames.AIR_TEMPERATURE.value] = (self.df[StandardNames.AIR_TEMPERATURE.value] + 459.67) * 5 / 9
-        self.df[StandardNames.DEW_POINT_TEMPERATURE.value] = (self.df[StandardNames.DEW_POINT_TEMPERATURE.value] + 459.67) * 5 / 9
-        self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] = (self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] + 459.67) * 5 / 9
-        self.df[StandardNames.AIR_PRESSURE.value] = self.df[StandardNames.AIR_PRESSURE.value] * INCHES_OF_MERCURY_TO_PASCAL
-        self.df[StandardNames.RELATIVE_HUMIDITY.value] = self.df[StandardNames.RELATIVE_HUMIDITY.value] * 0.01
+        self.df[StandardNames.WIND_FROM_DIRECTION.value] = self.df[
+            StandardNames.WIND_FROM_DIRECTION.value
+        ].map(wind)
+        self.df[StandardNames.WIND_GUST_FROM_DIRECTION.value] = self.df[
+            StandardNames.WIND_GUST_FROM_DIRECTION.value
+        ].map(wind)
+        self.df[StandardNames.AIR_TEMPERATURE.value] = (
+            (self.df[StandardNames.AIR_TEMPERATURE.value] + 459.67) * 5 / 9
+        )
+        self.df[StandardNames.DEW_POINT_TEMPERATURE.value] = (
+            (self.df[StandardNames.DEW_POINT_TEMPERATURE.value] + 459.67) * 5 / 9
+        )
+        self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] = (
+            (self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] + 459.67)
+            * 5
+            / 9
+        )
+        self.df[StandardNames.AIR_PRESSURE.value] = (
+            self.df[StandardNames.AIR_PRESSURE.value] * INCHES_OF_MERCURY_TO_PASCAL
+        )
+        self.df[StandardNames.RELATIVE_HUMIDITY.value] = (
+            self.df[StandardNames.RELATIVE_HUMIDITY.value] * 0.01
+        )
         # density and length units cancel out
-        self.df[StandardNames.RAINFALL_AMOUNT.value] = self.df[StandardNames.RAINFALL_AMOUNT.value] * 25.4
-        self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] = self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] * 25.4 / 3600
-        self.df[StandardNames.RAINFALL_RATE.value] = self.df[StandardNames.RAINFALL_RATE.value] * 25.4 / 3600
-        self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] = (self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] + 459.67) * 5 / 9
+        self.df[StandardNames.RAINFALL_AMOUNT.value] = (
+            self.df[StandardNames.RAINFALL_AMOUNT.value] * 25.4
+        )
+        self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] = (
+            self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] * 25.4 / 3600
+        )
+        self.df[StandardNames.RAINFALL_RATE.value] = (
+            self.df[StandardNames.RAINFALL_RATE.value] * 25.4 / 3600
+        )
+        self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] = (
+            (self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] + 459.67)
+            * 5
+            / 9
+        )
         # none for irradiance, UV
 
 
@@ -327,7 +359,14 @@ class WeeWxInfluxArchive:
     WeeWx archive data from InfluxDB.
     """
 
-    def __init__(self, measurement: str, token: str, host: str, time: str = TIME, database: str = "weather"):
+    def __init__(
+        self,
+        measurement: str,
+        token: str,
+        host: str,
+        time: str = TIME,
+        database: str = "weather",
+    ):
         """
         Get data from InfluxDB and format as a DataFrame.
         """
@@ -347,18 +386,46 @@ class WeeWxInfluxArchive:
         """
         Convert to Climate and Forecast standard units.
         """
-        self.df[StandardNames.WIND_SPEED.value] = self.df[StandardNames.WIND_SPEED.value] * MILES_PER_HOUR_TO_METERS_PER_SECOND
-        self.df[StandardNames.WIND_SPEED_OF_GUST.value] = self.df[StandardNames.WIND_SPEED_OF_GUST.value] * MILES_PER_HOUR_TO_METERS_PER_SECOND
-        self.df[StandardNames.AIR_TEMPERATURE.value] = (self.df[StandardNames.AIR_TEMPERATURE.value] + 459.67) * 5 / 9
-        self.df[StandardNames.DEW_POINT_TEMPERATURE.value] = (self.df[StandardNames.DEW_POINT_TEMPERATURE.value] + 459.67) * 5 / 9
-        self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] = (self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] + 459.67) * 5 / 9
-        self.df[StandardNames.AIR_PRESSURE.value] = self.df[StandardNames.AIR_PRESSURE.value] * INCHES_OF_MERCURY_TO_PASCAL
-        self.df[StandardNames.RELATIVE_HUMIDITY.value] = self.df[StandardNames.RELATIVE_HUMIDITY.value] * 0.01
+        self.df[StandardNames.WIND_SPEED.value] = (
+            self.df[StandardNames.WIND_SPEED.value]
+            * MILES_PER_HOUR_TO_METERS_PER_SECOND
+        )
+        self.df[StandardNames.WIND_SPEED_OF_GUST.value] = (
+            self.df[StandardNames.WIND_SPEED_OF_GUST.value]
+            * MILES_PER_HOUR_TO_METERS_PER_SECOND
+        )
+        self.df[StandardNames.AIR_TEMPERATURE.value] = (
+            (self.df[StandardNames.AIR_TEMPERATURE.value] + 459.67) * 5 / 9
+        )
+        self.df[StandardNames.DEW_POINT_TEMPERATURE.value] = (
+            (self.df[StandardNames.DEW_POINT_TEMPERATURE.value] + 459.67) * 5 / 9
+        )
+        self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] = (
+            (self.df[StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value] + 459.67)
+            * 5
+            / 9
+        )
+        self.df[StandardNames.AIR_PRESSURE.value] = (
+            self.df[StandardNames.AIR_PRESSURE.value] * INCHES_OF_MERCURY_TO_PASCAL
+        )
+        self.df[StandardNames.RELATIVE_HUMIDITY.value] = (
+            self.df[StandardNames.RELATIVE_HUMIDITY.value] * 0.01
+        )
         # density and length units cancel out
-        self.df[StandardNames.RAINFALL_AMOUNT.value] = self.df[StandardNames.RAINFALL_AMOUNT.value] * 25.4
-        self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] = self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] * 25.4 / 3600
-        self.df[StandardNames.RAINFALL_RATE.value] = self.df[StandardNames.RAINFALL_RATE.value] * 25.4 / 3600
-        self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] = (self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] + 459.67) * 5 / 9
+        self.df[StandardNames.RAINFALL_AMOUNT.value] = (
+            self.df[StandardNames.RAINFALL_AMOUNT.value] * 25.4
+        )
+        self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] = (
+            self.df[StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value] * 25.4 / 3600
+        )
+        self.df[StandardNames.RAINFALL_RATE.value] = (
+            self.df[StandardNames.RAINFALL_RATE.value] * 25.4 / 3600
+        )
+        self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] = (
+            (self.df[StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value] + 459.67)
+            * 5
+            / 9
+        )
         # none for irradiance, UV
 
 
@@ -367,7 +434,12 @@ class WeeWxInfluxArchive:
 @plot_options
 # pylint: disable=redefined-builtin
 def plot_comparison(
-    station: StationName, series: StandardNames, host: str, measurement: str, token: str, format: ImageFormat
+    station: StationName,
+    series: StandardNames,
+    host: str,
+    measurement: str,
+    token: str,
+    format: ImageFormat,
 ):
     """
     Plot a comparison of local and InfluxDB data for a specific series.
@@ -493,7 +565,7 @@ def export(name: str):
 
 @weather.command(name=ClickCommands.INFLUX.value)
 @source_options
-def influx(_: StationName, __: StandardNames,host: str, measurement: str, token: str):
+def influx(_: StationName, __: StandardNames, host: str, measurement: str, token: str):
     """
     Show information about the data already stored in Influx database.
     """
@@ -542,12 +614,17 @@ def layout(
 @plot_options
 # pylint: disable=too-many-locals,redefined-builtin
 def plot_daily(
-    station: StationName, series: Enum, host: str, measurement: str, token: str, format: ImageFormat
+    station: StationName,
+    series: Enum,
+    host: str,
+    measurement: str,
+    token: str,
+    format: ImageFormat,
 ):
     """
     Display concatenated data, aggregated by day.
 
-    Boxplots don't use date axis the same way as line and scatter plots,
+    Box plots don't use date axis the same way as line and scatter plots,
     so we have to calculate positions and offsets manually.
     """
     db = WeeWxInfluxArchive(measurement, token, host).df
@@ -604,7 +681,9 @@ def stats(station: str, series: str, host: str, measurement: str, token: str):
 
 @weather.command(name=ClickCommands.BACKFILL.value)
 @source_options
-def backfill(station: StationName, series: StandardNames, host: str, measurement: str, token : str):
+def backfill(
+    station: StationName, series: StandardNames, host: str, measurement: str, token: str
+):
     """
     Backfill missing data from local to database.
     """
@@ -613,18 +692,24 @@ def backfill(station: StationName, series: StandardNames, host: str, measurement
     selected = [each.value for each in StandardNames]
     filtered = local[selected]
     remote_filtered = remote[selected]
-    filtered['station'] = station.value
-    filtered['device'] = "davis-vantage"
-    filtered['source'] = "weather-link"
+    filtered["station"] = station.value
+    filtered["device"] = "davis-vantage"
+    filtered["source"] = "weather-link"
 
-    remote_filtered['station'] = station.value
-    remote_filtered['device'] = "davis-vantage"
-    remote_filtered['source'] = "weewx"
+    remote_filtered["station"] = station.value
+    remote_filtered["device"] = "davis-vantage"
+    remote_filtered["source"] = "weewx"
 
-    df = concat([filtered, remote_filtered]).drop_duplicates(keep="first", ignore_index=False)
+    df = concat([filtered, remote_filtered]).drop_duplicates(
+        keep="first", ignore_index=False
+    )
 
     with InfluxDBClient3(host=host, database="neracoos", token=token) as client:
-        client.write(df, data_frame_measurement_name="weather", data_frame_tag_columns=["station", "device", "source"])
+        client.write(
+            df,
+            data_frame_measurement_name="weather",
+            data_frame_tag_columns=["station", "device", "source"],
+        )
 
 
 @weather.command(name=ClickCommands.DEPLOY.value)
