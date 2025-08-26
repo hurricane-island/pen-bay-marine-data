@@ -6,7 +6,7 @@ from click import group
 from weather import weather
 from buoys import buoys
 
-@group()
+@group(name="cli")
 def cli():
     """
     Command Line Interface for weather and buoy data.
