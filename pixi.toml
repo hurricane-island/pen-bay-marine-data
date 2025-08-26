@@ -2,7 +2,7 @@
 authors = ["Keeney <nkeeney@hurricaneisland.net>", "Adele Jordan"]
 channels = ["conda-forge"]
 name = "pen-bay-marine-data"
-platforms = ["osx-arm64"]
+platforms = ["osx-arm64", "linux-64"]
 version = "0.1.0"
 
 [tasks]
@@ -23,3 +23,5 @@ ioos_qc = ">=2.2.1,<3"
 "influxdb3-python" = "~=0.15.0"
 weewx = ">=5.1.0, <6"
 balena-sdk = ">=15.1.4, <16"
+sphinx = ">=8.2.3, <9"
+sphinx-click = ">=6.0.0, <7"
