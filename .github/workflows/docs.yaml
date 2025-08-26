@@ -18,7 +18,7 @@ jobs:
           locked: false
       - name: Sphinx build
         run: |
-          pixi run sphinx-build -b html docs github-pages
+          pixi run sphinx-build -b html docs www
 
   deploy:
     # Add a dependency to the build job
@@ -40,3 +40,5 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4 # or specific "vX.X.X" version tag for this action
+        with:
+          artifact_name: www
