@@ -18,7 +18,7 @@ jobs:
           locked: false
       - name: Sphinx build
         run: |
-          pixi run sphinx-build -b html docs www
+          pixi run sphinx-build -b html docs github-pages
 
   deploy:
     # Add a dependency to the build job
