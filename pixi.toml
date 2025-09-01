@@ -7,6 +7,9 @@ version = "0.1.0"
 
 [tasks]
 penbay = "python cli.py"
+weather = "balena build --fleet weather"
+deploy = "balena deploy weather"
+develop = "balena deploy weather-dev --build --nocache --multi-dockerignore"
 
 [dependencies]
 python = "==3.13"

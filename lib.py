@@ -189,7 +189,7 @@ def plot_tail(
     if qartod is not None:
         config = Config(qartod)
         print(tail.columns)
-        qa = test_data_frame(tail.reset_index(), config, time_column='time')
+        qa = test_data_frame(tail.reset_index(), config, time_column=time_column)
         gb = qa.groupby("observed_property").get_group(observed_property)
         flagged = gb[gb["rollup"] != 1]
         print("Flagged:", len(flagged))
