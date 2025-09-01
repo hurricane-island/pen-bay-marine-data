@@ -2,14 +2,9 @@ streams:
   air_temperature:
     qartod:
       gross_range_test:
-        suspect_span: [-10, 50]
-        fail_span: [-40, 200]
+        suspect_span: [278, 288]
+        fail_span: [269, 310]  # Kelvin = -4 to 37 degC
       spike_test:
-        suspect_threshold: 5.0
-        fail_threshold: 10.0
+        suspect_threshold: 1.0
+        fail_threshold: 2.0
         method: "average"
-  wind_speed:
-    qartod:
-      gross_range_test:
-        suspect_span: [0, 5]
-        fail_span: [0, 10]
