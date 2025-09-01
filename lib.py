@@ -104,13 +104,13 @@ def test_observed_property(
     return df
 
 
-def test_data_frame(df: DataFrame, config: Config) -> DataFrame:
+def test_data_frame(df: DataFrame, config: Config, time_column: str) -> DataFrame:
     """
     Apply any necessary processing to the DataFrame
     """
     flags = PandasStream(df).run(config)
     store = PandasStore(flags)
-    result = store.save().set_index("time")
+    result = store.save().set_index(time_column)
     frames: dict[str, list[str]] = {}
     for test in result.columns:
         _series, name = test.split("_qartod_")
@@ -171,7 +171,9 @@ def plot_tail(
     image_format: ImageFormat = ImageFormat.PNG,
     days: int = 30,
     resample: str = "1h",
+    qartod: str = None,
     figsize: tuple[int, int] = (12, 6),
+    time_column: str = "time"
 ):
     """
     Plot the tail of a time series which has some values
@@ -183,6 +185,15 @@ def plot_tail(
     end: datetime = datetime.now()
     start: datetime = end - timedelta(days=days)
     fig, ax = plt.subplots(figsize=figsize)
+    tail = local.loc[local.index > start]
+    if qartod is not None:
+        config = Config(qartod)
+        print(tail.columns)
+        qa = test_data_frame(tail.reset_index(), config, time_column='time')
+        gb = qa.groupby("observed_property").get_group(observed_property)
+        flagged = gb[gb["rollup"] != 1]
+        print("Flagged:", len(flagged))
+
     plot_single_series(
         local.loc[local.index > start], ax, resample, label="file", color="black"
     )
@@ -204,7 +215,7 @@ def plot_tail(
     plt.xticks(rotation=45)
     ax.set_xlim(start, end)
     ax.set_ylim(None, None)
-    ax.xaxis.set_major_locator(mdates.DayLocator(interval=days // 8))
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=(days // 8) + 2))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # Customize format
     if units is not None:
         ax.set_ylabel(f"{display_name} ({units})")
@@ -246,7 +257,7 @@ def describe_data_frame(df: DataFrame, config_path: str):
     print("\nSamples:\n")
     print(summary)
     config = Config(config_path)
-    qa = test_data_frame(df.reset_index(), config)
+    qa = test_data_frame(df.reset_index(), config, time_column='time')
     gb = qa.groupby("observed_property")
     print("\nQuality Assurance Flags:\n")
     group_summary = gb.describe().T

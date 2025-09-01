@@ -11,5 +11,5 @@ streams:
   wind_speed:
     qartod:
       gross_range_test:
-        suspect_span: [0, 50]
-        fail_span: [0, 100]
+        suspect_span: [0, 5]
+        fail_span: [0, 10]

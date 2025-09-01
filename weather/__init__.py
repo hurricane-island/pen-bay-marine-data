@@ -146,9 +146,9 @@ CF_STANDARDS = {
         unit=StandardUnits.SPEED.value,
         weather_link=Source(
             name="Wind Speed",
-            transform=lambda x: x * MILES_PER_HOUR_TO_SPEED,
+            transform=lambda x: x * KNOTS_TO_SPEED,
         ),
-        weewx=Source(name="windSpeed", transform=lambda x: x * KNOTS_TO_SPEED),
+        weewx=Source(name="windSpeed", transform=lambda x: x * MILES_PER_HOUR_TO_SPEED),
     ),
     StandardNames.WIND_FROM_DIRECTION: ObservedProperty(
         name=StandardNames.WIND_FROM_DIRECTION.value,
@@ -170,9 +170,9 @@ CF_STANDARDS = {
         name=StandardNames.WIND_SPEED_OF_GUST.value,
         unit=StandardUnits.SPEED.value,
         weather_link=Source(
-            name="Hi Speed", transform=lambda x: x * MILES_PER_HOUR_TO_SPEED
+            name="Hi Speed", transform=lambda x: x * KNOTS_TO_SPEED
         ),
-        weewx=Source(name="windGust", transform=lambda x: x * KNOTS_TO_SPEED),
+        weewx=Source(name="windGust", transform=lambda x: x * MILES_PER_HOUR_TO_SPEED),
     ),
     StandardNames.WIND_GUST_FROM_DIRECTION: ObservedProperty(
         name=StandardNames.WIND_GUST_FROM_DIRECTION.value,
@@ -436,8 +436,13 @@ def weather_describe_series(
 )
 @click.option(
     "--resample",
-    default="1h",
+    default=None,
     help="How to resample the data (e.g., 1d, 1h).",
+)
+@click.option(
+    "--qartod",
+    default=None,
+    help="Path to the QARTOD configuration file.",
 )
 def weather_plot_tail(
     station: StationName,
