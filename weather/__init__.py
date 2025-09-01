@@ -48,6 +48,23 @@ PERCENT_TO_FRACTION = 0.01
 INCHES_TO_MILLIMETERS = 25.4
 INCHES_PER_HOUR_TO_KILOGRAMS_PER_SQUARE_METER_PER_SECOND = INCHES_TO_MILLIMETERS / 3600
 
+class Device(Enum):
+    """
+    Valid device names. Used to ensure consistent device
+    naming across CLI.
+    """
+    DAVIS_VANTAGE_PRO_2 = "davis-vantage-pro-2"
+    RIKA_900_09 = "rika-900-09"
+
+
+class Middleware(Enum):
+    """
+    Valid middleware names. Used to ensure consistent middleware
+    naming across CLI.
+    """
+    WEEWX = "weewx"
+    WEATHER_LINK = "weather-link"
+
 
 class ClickCommands(Enum):
     """
@@ -417,11 +434,11 @@ def weather_describe_series(
     """
     Compare local and database data before merging or backfilling.
     """
-    db = WeeWxInfluxArchive(measurement, token, host).df[series.value]
+    remote = WeeWxInfluxArchive(measurement, token, host).df[series.value]
     local = WeatherLinkArchive(station.value).df[series.value]
-    db.name = "influx"
+    remote.name = "influx"
     local.name = "local"
-    df = concat([db, local], axis=1)
+    df = concat([remote, local], axis=1)
     print(df.describe())
 
 
@@ -534,12 +551,12 @@ def weather_db_backfill(station: StationName, host: str, measurement: str, token
     filtered = local[selected]
     remote_filtered = remote[selected]
     filtered["station"] = station.value
-    filtered["device"] = "davis-vantage"
-    filtered["source"] = "weather-link"
+    filtered["device"] = Device.DAVIS_VANTAGE_PRO_2.value
+    filtered["source"] = Middleware.WEATHER_LINK.value
 
     remote_filtered["station"] = station.value
-    remote_filtered["device"] = "davis-vantage"
-    remote_filtered["source"] = "weewx"
+    remote_filtered["device"] = Device.DAVIS_VANTAGE_PRO_2.value
+    remote_filtered["source"] = Middleware.WEEWX.value
 
     df = concat([filtered, remote_filtered]).drop_duplicates(
         keep="first", ignore_index=False
