@@ -6,6 +6,7 @@ to processing Pandas DataFrames and plotting with Matplotlib.
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
+from typing import Optional
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.axes import Axes
 from click import Choice, option
@@ -33,13 +34,13 @@ class StandardUnits(Enum):
     units.
     """
 
-    TEMPERATURE = "deg K"
-    PRESSURE = "Pa"
-    SPEED = "m/s"
+    TEMPERATURE = "$ °K $"
+    PRESSURE = "$ Pa $"
+    SPEED = "$ m / s $"
     DIRECTION = "degrees"
-    ENERGY = "W/m^2"
-    FLUX = "kg/m^2/s"
-    AMOUNT = "kg/m^2"
+    ENERGY = "$ W / m^2 $"
+    FLUX = "$ kg / m^2 / s $"
+    AMOUNT = "$ kg / m^2 $"
 
 
 def influx_options(function):
@@ -150,16 +151,51 @@ def cardinal_direction_to_degrees(series: Series) -> Series:
     return series.map(wind)
 
 
-def plot_single_series(series: Series, ax: Axes, resample: str, label: str, **kwargs):
+def plot_single_series(series: Series, ax: Axes, resample: Optional[str], label: str, **kwargs):
     """
     Plot a single resampled time series.
     """
     observed_property: str = series.name
     observed_property = observed_property.replace("_", " ").title()
-    resampled = series.resample(resample)
-    series_mean = resampled.mean()
-    ax.plot(series_mean.index, series_mean, label=f"{label} {resample} mean", **kwargs)
+    if resample:
+        resampled = series.resample(resample)
+        series_to_plot = resampled.mean()
+        plot_label = f"{label} {resample} mean"
+    else:
+        series_to_plot = series
+        plot_label = label
 
+    ax.plot(series_to_plot.index, series_to_plot, label=plot_label, **kwargs)
+
+def plot_qartod_flags(ax: Axes, series: Series, observed_property: str, config: Config, time_column: str="time", zorder=3, label: bool=False):
+    """
+    Add scatter markers for flagged data points.
+    """
+    df = series.reset_index()
+    flags = PandasStream(df).run(config)
+    store = PandasStore(flags)
+    result = store.save().set_index(time_column)
+    frames: dict[str, list[str]] = {}
+    for test in result.columns:
+        _series, name = test.split("_qartod_")
+        if _series not in frames:
+            frames[_series] = []
+        frames[_series].append(name)
+
+    by_observed_property = []
+    for items in frames.items():
+        df = test_observed_property(result, *items)
+        by_observed_property.append(df)
+    qa = concat(by_observed_property, axis=0)
+    gb = qa.groupby("observed_property").get_group(observed_property)
+    suspect = series[gb["rollup"] == 3]
+    failed = series[gb["rollup"] == 4]
+    if len(suspect) > 0:
+        a = "suspect" if label else None
+        ax.scatter(suspect.index, suspect, label=a, color="orange", marker="x", zorder=zorder)
+    if len(failed) > 0:
+        b = "failed" if label else None
+        ax.scatter(failed.index, failed, label=b, color="red", marker="x", zorder=zorder)
 
 def plot_tail(
     local: Series,
@@ -172,7 +208,7 @@ def plot_tail(
     days: int = 30,
     resample: str = "1h",
     qartod: str = None,
-    figsize: tuple[int, int] = (12, 6),
+    figsize: tuple[int, int] = (7, 3),
     time_column: str = "time"
 ):
     """
@@ -185,26 +221,26 @@ def plot_tail(
     end: datetime = datetime.now()
     start: datetime = end - timedelta(days=days)
     fig, ax = plt.subplots(figsize=figsize)
-    tail = local.loc[local.index > start]
-    if qartod is not None:
-        config = Config(qartod)
-        print(tail.columns)
-        qa = test_data_frame(tail.reset_index(), config, time_column=time_column)
-        gb = qa.groupby("observed_property").get_group(observed_property)
-        flagged = gb[gb["rollup"] != 1]
-        print("Flagged:", len(flagged))
+    tail = remote.loc[remote.index > start]
+    local_tail = local.loc[local.index > start]
 
     plot_single_series(
-        local.loc[local.index > start], ax, resample, label="file", color="black"
+        local_tail, ax, resample, label="local", color="grey"
     )
     plot_single_series(
-        remote.loc[remote.index > start],
+        tail,
         ax,
         resample,
-        label="influx",
-        color="red",
-        linestyle="--",
+        label="remote",
+        color="black",
+        linestyle=":",
     )
+
+    if qartod is not None:
+        config = Config(qartod)
+        plot_qartod_flags(ax, tail, observed_property, config, time_column=time_column, label=True)
+        plot_qartod_flags(ax, local_tail, observed_property, config, time_column=time_column)
+
     display_name = observed_property.replace("_", " ").title()
     if start.year == end.year:
         year_range = f"{start.year}"
@@ -218,10 +254,8 @@ def plot_tail(
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=(days // 8) + 2))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # Customize format
     if units is not None:
-        ax.set_ylabel(f"{display_name} ({units})")
-    else:
-        ax.set_ylabel(display_name)
-    ax.legend()
+        ax.set_ylabel(f"{units}")
+    fig.legend(loc="outside upper right")
     fig.tight_layout()
     filename = f"{prefix}/{thing}/{observed_property}.{image_format.value}"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
