@@ -7,10 +7,9 @@ Const PARAMETERS_TO_SEND = 14 ' message width for cloud
 Const HYDROSPHERE_HOST As String = "stormcentral.waterlog.com"
 Const HYDROSPHERE_PORT As Long = 32212
 Const HYDROSPHERE_MAX_RETRIES As Long = 5 ' Hydrosphere connection attempts
-Const HYDROSPHERE_BUFFER_SIZE As Long = 96 ' Readings stored while waiting for comms.  96 is required for 15min data, for 12 hours - if daily updates are used
+Const BUFFER_SIZE As Long = 96 ' 96 is required for 15min data, for 12 hours - if daily updates are used
 Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s
 
-' Refer to section 13.3.2 "Hydrosphere Configuration" in the Ai1 manual for details on setting up the Hydrosphere parameters to suit this site
 Const CELLULAR As Long = 1
 Const SDI12 As Long = 1
 Const RS232 As Long = 2
@@ -24,13 +23,11 @@ Public Message As String * 256 = ""
 Public PortsStatus As String * 90
 Dim PortsON As Long = 0
 
-' Factory configuration constants
-Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval.
-Const MEASUREMENT_INTERVAL_S As Long = 3600 ' Sensor measurement interval
-Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 ' interval for less critical measurements, such as GPS
-Const DATA_STORAGE_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' Store data every measurement cycle
-Const LOW_BATTERY_SAVER_V = 12.83
-Const LOW_BATTERY_SHUTDOWN_V = 12.75' V  ' Battery protection thresholds.  SAVER: Slow meas/no night comms.  SHUTDOWN: Slowest meas/No comms
+Const DIAGNOSTIC_INTERVAL_S As Long = 5 ' Program scan Interval.
+Const REPORT_INTERVAL_S As Long = 900 ' seconds
+Const MEASUREMENT_INTERVAL_S As Long = 3600 ' seconds
+Const CLEANING_INTERVAL_S As Long = 1800 ' seconds
+Const LOW_BATTERY_SHUTDOWN_V = 12.75' V
 Const COMMS As Long = CELLULAR
 Const CELL_WINDOW_START As Long = 1440
 Const CELL_WINDOW_DURATION As Long = 10
@@ -52,8 +49,7 @@ Const SENSOR_POWER_PORT As Long = SW12V
 ' Available, C1. Recommended to keep for SDI12 in the future
 Const GPS_PORT As Long = ComC2_Rx ' C2. Serial Rx from GPS
 Const YSIPPORT As Long = ComRS232
-Public Ai1WipesSonde As Boolean = True
-PreserveOneVariable(Ai1WipesSonde)
+Public Ai1WipesSonde As Boolean = True ' is this needed by YSIP_CORE?
 
 Dim ParameterToSend(PARAMETERS_TO_SEND) As Long ' points to the address of each variable to send
 Public ExternalTemp As Float ' First reading from the sonde, use this instead of External_Temp
@@ -63,12 +59,7 @@ Include "CPU:YSIP_CORE_Enc.CR300"
 Dim Ai1OSVersion As Float = 0.75
 Dim DataloggerOSVersion As Float ' Used for holding CR300 OS version
 Const FILTER_FREQUENCY As Long = 4000 ' Set to 50 or 60 for situations with AC noise, otherwise 4000Hz provides quickest processing
-Const TIMER_STOP As Long = 1
-Const TIMER_RESET_AND_START As Long = 2
-Const TIMER_RESET_AND_STOP As Long = 3
-Const TIMER_READ As Long = 4
 Const ALLOW_SLEEP As Long = 1
-Const GPS_TIMER As Long = 11
 Const CR = CHR(13)
 Const hPa_TO_m As Float = 0.0101972
 Const CURRENT_PORT As Long = 5
@@ -141,13 +132,13 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
     WriteIO(&B00000010, StateMask)
   Case SE1
     If StateToWrite Then StateMask = &B00000100 Else StateMask = 0
-    Message = "Write to SE1 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrrorLog as it may be repeated
+    Message = "Write to SE1 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
   Case SE2
     If StateToWrite Then StateMask = &B00001000 Else StateMask = 0
-    Message = "Write to SE2 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrrorLog as it may be repeated
+    Message = "Write to SE2 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
   Case SE3 ' SE3 uses a different technique to drive regulators.  On is achieved by setting the port to high impedance (i.e. as an input).  Off is an output in the off state
     If StateToWrite Then StateMask = &B00010000 Else StateMask = 0
-    Message = "Write to SE3 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrrorLog as it may be repeated
+    Message = "Write to SE3 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
   Case SE4 ' SE4 uses same technique as SE3, high impedance / 0V setting, using regulator internal pull up resistor
     If StateToWrite Then StateMask = &B00100000 Else StateMask = 0
     If StateToWrite Then 
@@ -236,31 +227,15 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
 EndSub
 
 
-Dim CommsPowerOnStatus As Boolean = True  ' CommsPowerOnStatus returns the state of the internal cellular modem power when controlled by battery saver and shutdown settings, but does not indicate the state due to window duration and frequency.  IPNetPower overrides all other power control options
-Dim CellBillingDay = 1 ' Day of Month                         ' For data usage calculations, to know which day of month the billing cycle resets
-Public Control_____________ As Boolean = False                ' This groups all the program control flags into one section for ease of use
-Dim ReadGPSNow As Boolean = False: Units ReadGPSNow = True = Trigger a new GPS reading ' Set by setting ReadStatusSensors true
-Dim SendToHydrosphere As Boolean ' Set true to initiate data record and transfer.
+Dim LowPowerMode As Boolean = False  ' state of the internal cellular modem power controlled by the program
+Dim CellBillingDay = 1 ' For data usage calculations, to know which day of month the billing cycle resets
 
-Sub Communications
-  RealTime(rTime) ' Have If time statements at the top so none are missed from long scan times
-  Call Hydrosphere
-EndSub
-
-Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
-Public ReadStatusSensors As Boolean = False
-Public SensorKeepRS485On As Boolean = False                   ' Set true if power is to be kept on between readings.  May be useful to see the full boot-up message from the sonde.  No, it stops this working at all.  Only get a couple of bytes, 00 FF
-Dim SensorKeepRS485OnLast As Boolean = False                  ' Keep track of when this is first turned on, so you can power up the adapter
-Dim SensorProgramOn As Boolean = False
-Dim SensorProgramOff As Boolean = False ' Program controlled power operation 
-Public Measurements________ As Boolean = False
-Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON ' No longer need this public, have PortsStatus
+Public SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON ' No longer need this public, have PortsStatus
 Public GPSPowerStatus As Boolean: Units GPSPowerStatus = Returns True If GPS Is ON
 Const GPS_BAUD As Long = 9600
 Const GPS_BUFFER As Long = 512                                ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
 
 Public SondeReadFailed As Boolean = False
-Dim WQTemporaryRS485(YSISWATH) As Float                       ' A temporary array to be used to hold returned values prior to confirming as valid
 Alias SondeValuesSorted(45) = Sonde_Future1
 Alias SondeValuesSorted(46) = Sonde_Future2
 Alias SondeValuesSorted(47) = Sonde_Future3
@@ -278,115 +253,48 @@ Alias SondeValuesSorted(58) = Sonde_Future14
 Alias SondeValuesSorted(59) = Sonde_Future15
 Alias SondeValuesSorted(60) = Sonde_Future16
 
-Sub MeasureWaterQuality
-  Message = "Powering RS485 adapter for communications"
-  Call WritePort(Vx1, True) ' Turn on the RS485 adapter
-  Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
-  WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
-  If NOT sondefound Then findSonde(3)                         ' If the sonde hasn't been found, then attempt to find first
-  If Ai1WipesSonde Then ' When using Sample&Hold in the sonde, the sonde controls the wiping frequency, no need to duplicate here
-    Message = "Allowing time for sonde wiper."
-    startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
-    getWipeStatus()
-    For i = 40 To 1 Step -1
-      Delay(0, 1, Sec) ' Wait for sonde power
-      Message = "Allowing time for sonde wiper (" + i + "s remaining)"
-    Next i
-  End If
-  Message = "Reading sonde and updating available parameters. "
-  sondeCheck()
-  getSondeParams() ' Handle any sonde changes and update parameters
-  ReadAttempts = 0
-  Do
-    ReadAttempts += 1
-    Message = "Reading sonde values, attempt " + ReadAttempts
-    Sonde_External_Voltage = NaN
-    External_Temp = NaN
-    Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
-    getSondeValues() ' Populate available parameters
-    sortYSIPData()
-    ExternalTemp = External_Temp ' Map the temperature reading so that Hydrosphere and Satellite naming will work
-    SondeReadFailed = False
-    If (Sonde_External_Voltage = NaN) AND (WiperPosition = NAN) Then SondeReadFailed = True ' NAN's occur if there is no communications to sonde
-    If (Sonde_External_Voltage = 0)   AND (WiperPosition = 0)   Then SondeReadFailed = True ' 0's can occur if the sonde has failed to measure sensors yet, but ready to talk
-  Loop While (SondeReadFailed AND (ReadAttempts <= READ_ATTEMPTS_LIMIT)) ' Repeat if the read failed (any non-NaN value will mark success)
-  If SondeReadFailed Then ' Restore the previous values
-    SondeValuesSorted() = WQTemporaryRS485()
-    Message = "No valid Data ("
-    If Sonde_External_Voltage = NaN Then 
-      Message += "NAN returned"
-    ElseIf Sonde_External_Voltage = 0 Then Message += "Zero's returned"
-      Message += "Unspecified response"
-    End If
-    Message += "), restoring previous values. "
-    Call AddTime
-    Call AddDate
-    Errors = Message ' Message only, not logged
-  Else
-    Message = "Sonde read completed"
-    getSondeSN()
-    CallTable SondeValues ' Only store if successful
-  End If
-  CallTable YSISondeMeta
-  If SensorKeepRS485On Then
-    Message += ".  Keeping RS485 powered on (override by SensorKeepRS485On)" ' Set by program control for testing.  High power.
-  Else
-    Message += ".  Shutting down RS485 adapter"
-    Call WritePort(Vx1, False) ' sonde in lower power state
-  End If
-EndSub
 
-
-Public HydrosphereData As String *(22+PARAMETERS_TO_SEND*10) ' The string representing one full record to send to Hydrosphere
-Public HydrosphereDataBuffer(HYDROSPHERE_BUFFER_SIZE) As String *(22+PARAMETERS_TO_SEND*10)
-Public HydrosphereNames As String *(PARAMETERS_TO_SEND*26)' The combined descriptions into a single string
 Dim HydrosphereBufferNextPointer As Long = 1
-
-Dim HydrosphereDescription(PARAMETERS_TO_SEND) As String * 26 ' The string description of each parameter, up to 24 characters in length 
-Dim HydrosphereValues(PARAMETERS_TO_SEND) As Float        ' The actual values to send
-Dim HydrosphereSocket As Long
-Dim SerialOutResult As Long
-Dim HydrosphereRetries As Long
+Public HydrosphereData As String *(22+PARAMETERS_TO_SEND*10) ' one full record string
+Public HydrosphereDataBuffer(BUFFER_SIZE) As String *(22+PARAMETERS_TO_SEND*10)
+Public HydrosphereNames As String *(PARAMETERS_TO_SEND*26)' The combined descriptions into a single string
 
 Sub Hydrosphere
-  If (SendToHydrosphere) Then
-    HydrosphereRetries = 0 ' Send the buffer
-    Message = "Hydrosphere ("
-    Call AddTime
-    Message += "). "
-    If HydrosphereBufferNextPointer > 1 Then
-      Do While HydrosphereBufferNextPointer > 1 AND HydrosphereRetries < HYDROSPHERE_MAX_RETRIES
-        HydrosphereRetries += 1
-        HydrosphereSocket = TCPOpen(HYDROSPHERE_HOST,HYDROSPHERE_PORT,1000,HYDROSPHERE_TIMEOUT)
-        If HydrosphereSocket <> 0 Then
-          SerialFlush(HydrosphereSocket)
-          SerialOut(HydrosphereSocket,"SL(" + HYDROSPHERE_ID + ")" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
-          SerialOut(HydrosphereSocket, HydrosphereNames, "OK", 1, HYDROSPHERE_TIMEOUT)
-          SerialOutResult = SerialOut(HydrosphereSocket, HydrosphereDataBuffer(1), "OK", 1, HYDROSPHERE_TIMEOUT)
-          SerialOut(HydrosphereSocket, "DIS" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
-          TCPClose(HydrosphereSocket)
-        Else
-          Message += "No connection. "
-          SerialOutResult = 0 ' Make sure that the last OK is not still in the status
+  Dim Socket As Long
+  Dim SerialOutResult As Long
+  Dim TxAttempts As Long = 0
+  RealTime(rTime) ' Have If time statements at the top so none are missed from long scan times
+  Message = "Hydrosphere report."
+  If HydrosphereBufferNextPointer > 1 Then
+    Do While (HydrosphereBufferNextPointer > 1) AND (TxAttempts < HYDROSPHERE_MAX_RETRIES)
+      TxAttempts += 1
+      Socket = TCPOpen(HYDROSPHERE_HOST, HYDROSPHERE_PORT, 1000, HYDROSPHERE_TIMEOUT)
+      If Socket <> 0 Then
+        SerialFlush(Socket)
+        SerialOut(Socket,"SL(" + HYDROSPHERE_ID + ")" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
+        SerialOut(Socket, HydrosphereNames, "OK", 1, HYDROSPHERE_TIMEOUT)
+        SerialOutResult = SerialOut(Socket, HydrosphereDataBuffer(1), "OK", 1, HYDROSPHERE_TIMEOUT)
+        SerialOut(Socket, "DIS" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
+        TCPClose(Socket)
+      Else
+        Message = "No connection. "
+        SerialOutResult = 0 ' Make sure that the last OK is not still in the status
+      End If
+      If SerialOutResult = 2 Then ' If "OK" was sent
+        If HydrosphereBufferNextPointer > 2 Then ' still have values in the Buffer
+          For i = 1 To (HydrosphereBufferNextPointer - 2)
+            HydrosphereDataBuffer(i) = HydrosphereDataBuffer(i+1)
+          Next i
         End If
-        If SerialOutResult = 2 Then ' If "OK" was sent
-          If HydrosphereBufferNextPointer > 2 Then ' If we still have at least 2 data values in the Buffer (one of which was just sent), move the Buffer forward by one.
-            For i = 1 To (HydrosphereBufferNextPointer - 2)
-              HydrosphereDataBuffer(i) = HydrosphereDataBuffer(i+1)
-            Next i
-          End If
-          HydrosphereDataBuffer(HydrosphereBufferNextPointer-1) = "" ' Clear the details of the last Message from the Buffer (as they have been shifted forward by one now).
-          HydrosphereBufferNextPointer = HydrosphereBufferNextPointer - 1
-          Message += "Report " + HydrosphereBufferNextPointer + " sent. "
-        Else
-          Message += "No OK (" + SerialOutResult + "). "
-          If HydrosphereRetries = HYDROSPHERE_MAX_RETRIES Then Message += "Failed. " + HydrosphereRetries + "/" + HYDROSPHERE_MAX_RETRIES + " tries."
-        End If
-      Loop
-    Else
-      Message += "No data to send."
-    End If
-    SendToHydrosphere = False
+        HydrosphereDataBuffer(HydrosphereBufferNextPointer-1) = "" ' Clear the last message
+        HydrosphereBufferNextPointer = HydrosphereBufferNextPointer - 1
+        Message += "Report " + HydrosphereBufferNextPointer + " sent. "
+      Else
+        Message += "No OK (" + SerialOutResult + "). "
+      End If
+    Loop
+  Else
+    Message = "No data to send."
   End If
 EndSub
 
@@ -423,76 +331,7 @@ PreserveOneVariable(Latitude)
 PreserveOneVariable(Longitude) ' Save these values so a power cycle does not reset them and cause the icon to jump around
 Public GPSSatellitesRequired As Long = 4
 PreserveOneVariable(GPSSatellitesRequired) ' Specifies the required satellites for an accurate GPS fix.  Up to 7 or 8 is possible
-Const GPS_MAX_ON_TIME As Long = 180 ' turns off this many seconds
 
-Sub GPSOff
-  Call WritePort(Vx2, 0) ' Turn off the power to the GPS and other internal status sensors
-  Message = "GPS reading complete, turning off internal sensor power"
-  Timer(GPS_TIMER, Sec, TIMER_STOP)
-  GPSPowerStatus = False
-  ReadGPSNow = False ' And go back to waiting for the next request
-EndSub
-
-Sub ReadGPS
-  If ReadGPSNow Then
-    If NOT(GPSPowerStatus) Then                               ' If it wasn't previously on
-      Message = "Powering GPS for location tracking. "
-      Call WritePort(Vx2,True)                                ' Use WritePort first so it keeps track of the status of the port
-      ExciteV(Vx2,5000,0)                                     ' Then set it to 5V which is higher than the 3.3V default
-      GPSPowerStatus = True
-      Timer(GPS_TIMER, Sec, TIMER_RESET_AND_START)              ' Start the GPS timer
-    End If
-    If (Timer(GPS_TIMER, Sec, TIMER_READ) > GPS_MAX_ON_TIME) Then
-      Call GPSOff
-      Message = "GPS timer shutdown"
-    End If
-    SerialIn(RawGPSString, GPS_PORT, 50, 0, GPS_BUFFER)           ' Read in the serial data.  Termination is the time when characters stop being received (i.e. a break)
-    SerialFlush(GPS_PORT)                                     ' Clear out any data so a fresh reading is taken next cycle
-    GPSStart = InStr(1, RawGPSString, GPS_HEADER, 2)             ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
-    GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2)             ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
-    If (GPSStart>0) AND (GPSEnd>0) Then
-      GPSString = Mid(RawGPSString,GPSStart,GPSEnd-GPSStart)  ' Get the part between the start and the end
-      GPSLength = Len(GPSString)
-      Comma2 = 1
-      CommaCount = 0                                ' Now parse the information and convert to double precision data, starting at the start of the string
-      For InternalCounter = 1 To GPS_PARAMETERS
-        Comma1 = InStr(Comma2, GPSString, ",", 2)
-        Comma2 = InStr(Comma1+1, GPSString, ",", 2) ' Start searching at the position of the last comma
-        If Comma2 > 0 Then
-          GPSReadingsString(InternalCounter) = Mid(GPSString,Comma1+1,Comma2-Comma1-1) ' If it isn't above zero, the string was truncated for some reason
-          CommaCount+=1
-        End If
-      Next InternalCounter
-      For InternalCounter = 1 To GPS_PARAMETERS
-        GPSReadings(InternalCounter) = GPSReadingsString(InternalCounter) ' Convert from string to double
-      Next InternalCounter
-      If CommaCount >= 9 AND (GPSReadings(7) >= GPSSatellitesRequired) Then ' We have enough satellites so save the information
-        Latitude = Floor(GPS_Latitude_dddmm / 100.0) + (GPS_Latitude_dddmm MOD 100)/60
-        Longitude = Floor(GPS_Longitude_dddmm / 100.0) + (GPS_Longitude_dddmm MOD 100)/60
-        If GPSReadingsString(3) = "S" Then                    ' Add the sign to the latitude / longitude
-          GPSReadings(3) = -1
-          GPS_Latitude_dddmm = -GPS_Latitude_dddmm
-          Latitude = -Latitude
-        Else
-          GPSReadings(3) = 1
-        End If
-        If GPSReadingsString(5) = "W" Then
-          GPSReadings(5) = -1
-          GPS_Longitude_dddmm = -GPS_Longitude_dddmm
-          Longitude = -Longitude
-        Else
-          GPSReadings(5) = 1
-        End If
-        GPSFix = GPS_QualityIndicator
-        UTCTime = GPS_UTCtime
-        UTCDate = 0
-        GPSSatellitesInView = GPS_Satellites ' UTCDate isn't part of serial message
-        Message = "GPS location complete, using " + GPSReadings(7) + " satellites."
-        Call GPSOff
-      End If
-    End If
-  End If
-EndSub
 
 DataTable(Ai1, True, 3000) ' Records status information for remote diagnostics
   DataInterval(0, 1, Hr, 0)
@@ -506,9 +345,9 @@ DataTable(Ai1, True, 3000) ' Records status information for remote diagnostics
   Sample(1, DataloggerOSVersion, FP2)
   Sample(1, Ai1OSVersion, FP2)
   Sample(1,Status.ProgSignature,UINT2): FieldNames("ProgramSignature:0-65535)"): Units ProgramSignature = (0-65535) ' Store the program signature to know when a program has changed
-  Sample(1,ProgramCounter,Long)
-  Sample(1,Status.StartUpCode,FP2): FieldNames("StartUpCode:0=Ok,-1=Power Loss,-2=Watchdog"): Units StartUpCode = (0=Ok, -1=Power, -2=Watchdog)
-  Sample(1,Status.WatchdogErrors,FP2): FieldNames("WatchdogErrors:Watchdog Errors Since Compile"): Units WatchdogErrors = Errors Since Compile
+  Sample(1, ProgramCounter, Long)
+  Sample(1, Status.StartUpCode, FP2): FieldNames("StartUpCode:0=Ok,-1=Power Loss,-2=Watchdog"): Units StartUpCode = (0=Ok, -1=Power, -2=Watchdog)
+  Sample(1, Status.WatchdogErrors, FP2): FieldNames("WatchdogErrors:Watchdog Errors Since Compile"): Units WatchdogErrors = Errors Since Compile
   Sample(1,Status.SkippedScan,FP2): FieldNames("SkippedScans:Scans Skipped"): Units SkippedScans = Scans Skipped
   Sample(1,Status.MemoryFree, UINT2): FieldNames("MemoryFree:Bytes"): Units MemoryFree = Bytes
   Sample(1,Status.CellUsageToday,FP2): FieldNames("CellUsageToday:kB"): Units CellUsageToday = kB
@@ -526,14 +365,12 @@ EndTable
 Sub Initialization
   ValueToLoad = 0
   AddressToRead = 0 ' Stops a warning if not used
-  Call GPSOff ' First time starting up, turn the GPS off to put the power output port and regulator in a known state
+  Call WritePort(Vx2, 0) ' put the power output port and regulator in a known state
   SerialOpen(GPS_PORT, GPS_BAUD, 0, 0, GPS_BUFFER, ALLOW_SLEEP)
-  Message = "Initializing... "
+  Message = "Initializing. "
   RealTime(rTime)
   Call ErrorLog("Program restart") ' Record the program restart in the error log
   Delay(0, 500, mSec) ' Have a short delay incase multiple messages are generated
-  Control_____________ = false
-  Measurements________ = false
   i = 0  ' Just to stop a compile warning that it is unused
   SetSetting("PakBusTCPClients", TCP_CLIENT)
   SetSetting("PakBusAddress", PAKBUS_ADDRESS)
@@ -543,186 +380,215 @@ Sub Initialization
   SetSetting("CellPwrStartTime", CELL_WINDOW_START) ' When to power up the modem
   SetSetting("CellPwrDuration", CELL_WINDOW_DURATION) ' How long is each window
   SetSetting("CellPwrRepeat", CELL_WINDOW_FREQUENCY) ' When does the window repeat, i.e. hourly
-  SetSetting("CellBillingDay", CellBillingDay)                 ' When to roll over the monthly usage
-  SetSetting("CellKeepAlive", "www.google.com")                ' URL to ping to verify network connectivity.  If this fails, the datalogger will re-establish
-  SetSetting("CellKeepAliveTime", 30)                          ' How often to ping test the link
-  CommsPowerOnStatus = true
+  SetSetting("CellBillingDay", CellBillingDay) ' When to roll over the monthly usage
+  SetSetting("CellKeepAlive", "www.google.com") ' URL to ping to verify network connectivity.  If this fails, the logger will re-establish
+  SetSetting("CellKeepAliveTime", 30) ' How often to ping test the link
   IPNetPower(5, 1, 0) ' Make sure that it is turned on
   Call WritePort(Vx1, True)
   Call WritePort(SW12V, True)
-  For i = 25 To 1 Step -1
-    Delay(0, 1, Sec)
-    Message = "Powering sonde (" + i + "s remaining)" ' Wait for sonde to power up
-  Next i
+  Message = "Powering sonde (" + 25 + "s)"
+  Delay(0, 25, Sec)
   YSIPInit()
   findSonde(3)
   Message = "Sonde initialized. "
-  Call WritePort(Vx1, 0) ' Turn off RS485 adapter.  Don't check SensorKeepRS485On because this is during initialization
+  Call WritePort(Vx1, 0) ' Turn off RS485 adapter.
   If Status.LithiumBattery < 3.0 Then ' Check diagnostics are record to ErrorLog if a problem
     Call ErrorLog("Low (or no) Lithium Battery = " + Status.LithiumBattery)
-    Delay(0, 500, mSec) ' Log with delay incase multiple messages are generated
+    Delay(0, 500, mSec) ' Log with delay in case multiple messages are generated
   End If
   If Status.WatchdogErrors > 0 Then
     Call ErrorLog("Watchdog errors = " + Status.WatchdogErrors)
-    Delay(0, 500, mSec) ' Log with delay incase multiple messages are generated
+    Delay(0, 500, mSec) ' Log with delay in case multiple messages are generated
   End If
-  ' Check that all the measurement parameters are correct and evenly divisible (or measurements wont be taken correctly)
-  If MEASUREMENT_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("MEASUREMENT_INTERVAL_S (" + MEASUREMENT_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
-  If SLOW_MEASUREMENT_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("SLOW_MEASUREMENT_INTERVAL_S (" + SLOW_MEASUREMENT_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
-  If DATA_STORAGE_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then
-    Call ErrorLog("DATA_STORAGE_INTERVAL_S (" + DATA_STORAGE_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
-  End If
-  SensorProgramOn = True ' Warmup = 0, means always on, start powered up
   DataloggerOSVersion = Right(Status.OSVersion, 5) ' Get the OS version and convert to a string, only needed at startup.  5 characters works for OS > 10.01
   Message += "System initialization complete."
   Call AddDate
 EndSub
 
 
-Sub SensorMeasurements ' Time commands at the top, so slow commands don't interfere
-
-  If TimeIntoInterval(0, MEASUREMENT_INTERVAL_S, Sec) Then 
-    ReadNow = True
-    SensorProgramOn = True ' always on
-  End If
-  If (SensorProgramOn) Then
-    ' Turn on if instructed by either the user or the program. Turning off is after the measurement
-    If NOT (SensorPowerStatus) Then ' Only turn it on if it is not already
-      Call WritePort(SENSOR_POWER_PORT, True)
-      SensorPowerStatus = True
-    End If
-    SensorProgramOn = false ' Only do this once
-  End If
-  If (ReadNow) Then
-    Call MeasureWaterQuality
-    ReadNow = false
-  End If
-
-  If TimeIntoInterval(0, DATA_STORAGE_INTERVAL_S, Sec) Then ' store at interval
-    ' does not store data with RS485 sondes, must take measurements first, and measurements must be valid or CallTable is skipped (see above)
-    ParameterToSend(1) = @ExternalTemp
-    ParameterToSend(2) = @SpConductivity_us
-    ParameterToSend(3) = @Pressure_abs
-    ParameterToSend(4) = @Chlorophyll_ugL
-    ParameterToSend(5) = @Chlorophyll_RFU
-    ParameterToSend(6) = @BGA_PE_ugL
-    ParameterToSend(7) = @BGA_PE_RFU
-    ParameterToSend(8) = @BatteryVoltage
-    ParameterToSend(9) = @InternalHumidity
-    ParameterToSend(10) = @Salinity
-    ParameterToSend(11) = @ODO
-    ParameterToSend(12) = @ODO_Sat
-    ParameterToSend(13) = @Latitude
-    ParameterToSend(14) = @Longitude
-
-    ' ParameterToSend(7) = @pH
-    ' ParameterToSend(8) = @pH_mV
-    For i = 1 To PARAMETERS_TO_SEND
-      HydrosphereDescription(i) = !(ParameterToSend(i)) ' name of memory location is the canonical vendor name
-      AddressToRead = (ParameterToSend(i)) ' Cannot read the value directly
-      HydrosphereValues(i) = !AddressToRead
-    Next i
+Sub SensorMeasurements
+  Message = "Waking up sonde."
+  SensorPowerStatus = True ' Public flag for SystemCheck to gracefully handle power loss
+  Call WritePort(SENSOR_POWER_PORT, SensorPowerStatus) ' Turn on the power to the sensors
+  Call WritePort(Vx1, SensorPowerStatus) ' Turn on the RS485 adapter
+  Delay(0, 200, mSec) ' Allow sonde to wake up
+  If NOT sondefound Then findSonde(3) ' YSI library
+  Message = "Reading sonde. "
+  sondeCheck() ' YSI library
+  getSondeParams() ' YSI library
+  ReadAttempts = 0
+  Do
+    ReadAttempts += 1
+    Message = "Reading sonde values, attempt " + ReadAttempts
+    ' Prepare parameters to check with NaN so that a successful read is identified
+    Sonde_External_Voltage = NaN ' YSI library
+    External_Temp = NaN ' YSI library
+    Depth = NaN ' YSI library
     RealTime(rTime)
-    HydrosphereData = "D=" + FormatFloat(Month,"%02.0f") + "/" + FormatFloat(DayOfMonth,"%02.0f") + "/" + FormatFloat((Year MOD 100),"%02.0f") + "," + FormatFloat(Hour,"%02.0f") + ":" + FormatFloat(Minute,"%02.0f") + ":" + FormatFloat(Second,"%02.0f") + ","
-    HydrosphereNames = "SN="
-    For i = 1 To PARAMETERS_TO_SEND
-      HydrosphereNames += HydrosphereDescription(i)
-      HydrosphereData += HydrosphereValues(i)
-      If i < PARAMETERS_TO_SEND Then 
-        HydrosphereData += ","
-        HydrosphereNames += ","
-      End If
-    Next i
-    If HydrosphereBufferNextPointer <= HYDROSPHERE_BUFFER_SIZE Then
-      HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CR
-      HydrosphereBufferNextPointer += 1
+    getSondeValues() ' YSI library
+    sortYSIPData() ' YSI library
+    ExternalTemp = External_Temp ' Change naming
+    If Sonde_External_Voltage = NaN Then 
+      Message = "Sonde communication error. "
+    ElseIf Sonde_External_Voltage = 0 Then
+      Message = "Missing measurements error. "
+    Else
+      Message = "Sonde read complete."
+      getSondeSN() ' YSI library
+      CallTable SondeValues ' YSI library
+      ExitDo
     End If
-    SendToHydrosphere = True ' If new data saved, then next time through, send it to Hydrosphere
-  End If
-  If (SensorProgramOff) Then
-    If SensorPowerStatus Then ' Only turn off if currently on
-      Call WritePort(SENSOR_POWER_PORT, False)
-      SensorPowerStatus = False
+    Call AddTime
+    Call AddDate
+    Errors = Message
+  Loop Until (ReadAttempts >= READ_ATTEMPTS_LIMIT)
+
+  CallTable YSISondeMeta ' YSI library, must take measurements first
+
+  ParameterToSend(1) = @ExternalTemp
+  ParameterToSend(2) = @SpConductivity_us
+  ParameterToSend(3) = @Pressure_abs
+  ParameterToSend(4) = @Chlorophyll_ugL
+  ParameterToSend(5) = @Chlorophyll_RFU
+  ParameterToSend(6) = @BGA_PE_ugL
+  ParameterToSend(7) = @BGA_PE_RFU
+  ParameterToSend(8) = @BatteryVoltage
+  ParameterToSend(9) = @InternalHumidity
+  ParameterToSend(10) = @Salinity
+  ParameterToSend(11) = @ODO
+  ParameterToSend(12) = @ODO_Sat
+  ParameterToSend(13) = @Latitude
+  ParameterToSend(14) = @Longitude
+
+  HydrosphereData = "D=" + FormatFloat(Month,"%02.0f") + "/" + FormatFloat(DayOfMonth,"%02.0f") + "/" + FormatFloat((Year MOD 100),"%02.0f") + "," + FormatFloat(Hour,"%02.0f") + ":" + FormatFloat(Minute,"%02.0f") + ":" + FormatFloat(Second,"%02.0f") + ","
+  HydrosphereNames = "SN="
+  For i = 1 To PARAMETERS_TO_SEND
+    AddressToRead = (ParameterToSend(i)) ' Cannot read the value directly
+    HydrosphereData += !AddressToRead
+    HydrosphereNames += !(ParameterToSend(i)) ' name of memory location is the canonical vendor name
+    If i < PARAMETERS_TO_SEND Then 
+      HydrosphereData += ","
+      HydrosphereNames += ","
     End If
-    SensorProgramOff = False ' Only do this once
+  Next i
+
+  If HydrosphereBufferNextPointer <= BUFFER_SIZE Then
+    HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CR
+    HydrosphereBufferNextPointer += 1
   End If
-  If SensorKeepRS485On AND NOT(SensorKeepRS485OnLast) Then
-    Message = "Turning on RS485 adapter based on SensorKeepRS485On setting"
-    Call WritePort(Vx1, True)
-  End If
-  If NOT(SensorKeepRS485On) AND SensorKeepRS485OnLast Then
-    Message = "Turning off RS485 adapter based on SensorKeepRS485On setting"
-    Call WritePort(Vx1, False)
-  End If
-  SensorKeepRS485OnLast = SensorKeepRS485On
+  SensorPowerStatus = False ' Allows `SystemCheck` to shutdown the modem
+  Call WritePort(SENSOR_POWER_PORT, SensorPowerStatus)
+  Call WritePort(Vx1, SensorPowerStatus)
+EndSub
+
+
+Sub SensorCleaning
+  Message = "Cleaning sonde."
+  SensorPowerStatus = True ' Public flag for SystemCheck to gracefully handle power loss
+  Call WritePort(SENSOR_POWER_PORT, SensorPowerStatus) ' Turn on the power to the sensors
+  Call WritePort(Vx1, SensorPowerStatus) ' Turn on the RS485 adapter
+  Delay(0, 200, mSec) ' Allow sonde to wake up
+  If NOT sondefound Then findSonde(3) ' YSI library
+  Message = "Allowing " + 40 + " s for wiper."
+  startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
+  getWipeStatus() ' YSI library, updates `WiperPosition` variable?
+  Delay(0, 40, Sec) ' Wait for wiper
+  SensorPowerStatus = False ' Allows `SystemCheck` to shutdown the modem
+  Call WritePort(SENSOR_POWER_PORT, SensorPowerStatus)
+  Call WritePort(Vx1, SensorPowerStatus)
+  Message = "Sonde cleaning complete."
 EndSub
 
 
 Sub SystemCheck
-  If TimeIntoInterval(0, SLOW_MEASUREMENT_INTERVAL_S, sec) Then
-    ReadStatusSensors = True
-  End If
-  PanelTemp(InternalTemperature, FILTER_FREQUENCY) ' Measure each time as this is a surrogate indicator for analog errors - when it has noise in the data
+  PanelTemp(InternalTemperature, FILTER_FREQUENCY) ' indicator for analog errors - when it has noise in the data
   Battery(BatteryVoltage) ' Measure using the CR300 battery voltage hardware
-  If ReadStatusSensors Then
-    ReadGPSNow = True
-    Call WritePort(Vx2, True) ' Start with 3.3V for humidity. Must be 3V3 or the output will be above 2.5V for SE channel.  Have tested 5V sensor to read correctly at 3V3
-    VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000,FILTER_FREQUENCY, 1.0, 0)
-    InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*InternalTemperature)
-    If InternalHumidity > 100 Then InternalHumidity = 100
-    If InternalHumidity > 80 Then Message = "Change desiccant ASAP, condensation likely.  Ref: Ai1 manual section 22.":  Call AddTime: Errors = Message
-    ExciteV(Vx2,5000,0) ' Barometer uses 5V excitation
-    For i = 1 To PRESSURE_READINGS
-      VoltSe(PressureArray(i),1,mv2500,PRESSURE_PORT,True,2000,50,0.001,0) ' Measure the voltage of the barometric pressure sensor.  Sensor uses 5V excitation.  0.001 convert to volts
+  
+  Call WritePort(Vx2, True) ' Start with 3.3V for humidity. Must be 3V3 or the output will be above 2.5V for SE channel.  Have tested 5V sensor to read correctly at 3V3
+  VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000,FILTER_FREQUENCY, 1.0, 0)
+  InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*InternalTemperature)
+  If InternalHumidity > 100 Then InternalHumidity = 100
+  If InternalHumidity > 80 Then Message = "Change desiccant ASAP, condensation likely.  Ref: Ai1 manual section 22.":  Call AddTime: Errors = Message
+  ExciteV(Vx2, 5000, 0) ' Barometer uses 5V excitation
+  For i = 1 To PRESSURE_READINGS
+    VoltSe(PressureArray(i),1,mv2500,PRESSURE_PORT,True,2000,50,0.001,0) ' Measure the voltage of the barometric pressure sensor.  Sensor uses 5V excitation.  0.001 convert to volts
+  Next i
+  SortSpa(PressureArray(), PRESSURE_READINGS, PressureArray())
+  Pressure_Voltage = PressureArray(Ceiling(PRESSURE_READINGS/2))
+  If PressureFirstReading Then ' First time through the program fill the array with the initial value
+    For i = 1 To PRESSURE_TIME_AVERAGING
+      PressureTimeArray(i) = Pressure_Voltage
     Next i
-    SortSpa(PressureArray(), PRESSURE_READINGS, PressureArray())
-    Pressure_Voltage = PressureArray(Ceiling(PRESSURE_READINGS/2))
-    If PressureFirstReading Then ' First time through the program fill the array with the initial value
-      For i = 1 To PRESSURE_TIME_AVERAGING
-        PressureTimeArray(i) = Pressure_Voltage
-      Next i
-      PressureFirstReading = False ' Only do this first time through
-    Else
-      For i = 1 To PRESSURE_TIME_AVERAGING - 1
-        PressureTimeArray(i) = PressureTimeArray(i + 1)
-      Next i
-      PressureTimeArray(PRESSURE_TIME_AVERAGING) = Pressure_Voltage
-    End If
-    SortSpa(PressureTimeArraySorted(), PRESSURE_TIME_AVERAGING, PressureTimeArray())
-    Pressure_Voltage = PressureTimeArraySorted(Ceiling(PRESSURE_TIME_AVERAGING/2))
-    Pressure_hPa = (0.725*Pressure_Voltage-0.2625)*1000
-    Pressure_mH2O = (Pressure_hPa - 1013.25) * hPa_TO_m ' Offset relative to standard atmospheric pressure
-    Call WritePort(Vx2, True)
-    ExciteV(Vx2, 5000, 0) ' Step up to 5V for other internal sensors
-    VoltSe(Current_mV, 1, mv2500, CURRENT_PORT, True, 0, FILTER_FREQUENCY, 1, 0) ' Read the raw mV output. Settling time is from humidity sensor
-    Current_mA = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
-    ReadStatusSensors = False ' GPS turns off internal sensor power at the completion of its measurement
+    PressureFirstReading = False ' Only do this first time through
+  Else
+    For i = 1 To PRESSURE_TIME_AVERAGING - 1
+      PressureTimeArray(i) = PressureTimeArray(i + 1)
+    Next i
+    PressureTimeArray(PRESSURE_TIME_AVERAGING) = Pressure_Voltage
   End If
+  SortSpa(PressureTimeArraySorted(), PRESSURE_TIME_AVERAGING, PressureTimeArray())
+  Pressure_Voltage = PressureTimeArraySorted(Ceiling(PRESSURE_TIME_AVERAGING/2))
+  Pressure_hPa = (0.725*Pressure_Voltage-0.2625)*1000
+  Pressure_mH2O = (Pressure_hPa - 1013.25) * hPa_TO_m ' Offset relative to standard atmospheric pressure
+  Call WritePort(Vx2, True)
+  ExciteV(Vx2, 5000, 0) ' Step up to 5V for other internal sensors, including GPS
+  VoltSe(Current_mV, 1, mv2500, CURRENT_PORT, True, 0, FILTER_FREQUENCY, 1, 0) ' Read the raw mV output. Settling time is from humidity sensor
+  Current_mA = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
 
-  Call ReadGPS
+  SerialIn(RawGPSString, GPS_PORT, 50, 0, GPS_BUFFER)           ' Read in the serial data.  Termination is the time when characters stop being received (i.e. a break)
+  SerialFlush(GPS_PORT)                                     ' Clear out any data so a fresh reading is taken next cycle
+  GPSStart = InStr(1, RawGPSString, GPS_HEADER, 2)             ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
+  GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2)             ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
+  If (GPSStart>0) AND (GPSEnd>0) Then
+    GPSString = Mid(RawGPSString,GPSStart,GPSEnd-GPSStart)  ' Get the part between the start and the end
+    GPSLength = Len(GPSString)
+    Comma2 = 1
+    CommaCount = 0 ' Now parse the information and convert to double precision data, starting at the start of the string
+    For InternalCounter = 1 To GPS_PARAMETERS
+      Comma1 = InStr(Comma2, GPSString, ",", 2)
+      Comma2 = InStr(Comma1+1, GPSString, ",", 2) ' Start searching at the position of the last comma
+      If Comma2 > 0 Then
+        GPSReadingsString(InternalCounter) = Mid(GPSString,Comma1+1,Comma2-Comma1-1) ' If it isn't above zero, the string was truncated for some reason
+        CommaCount+=1
+      End If
+    Next InternalCounter
+    For InternalCounter = 1 To GPS_PARAMETERS
+      GPSReadings(InternalCounter) = GPSReadingsString(InternalCounter) ' Convert from string to double
+    Next InternalCounter
+    If CommaCount >= 9 AND (GPSReadings(7) >= GPSSatellitesRequired) Then ' We have enough satellites so save the information
+      Latitude = Floor(GPS_Latitude_dddmm / 100.0) + (GPS_Latitude_dddmm MOD 100)/60
+      Longitude = Floor(GPS_Longitude_dddmm / 100.0) + (GPS_Longitude_dddmm MOD 100)/60
+      If GPSReadingsString(3) = "S" Then                    ' Add the sign to the latitude / longitude
+        GPSReadings(3) = -1
+        GPS_Latitude_dddmm = -GPS_Latitude_dddmm
+        Latitude = -Latitude
+      Else
+        GPSReadings(3) = 1
+      End If
+      If GPSReadingsString(5) = "W" Then
+        GPSReadings(5) = -1
+        GPS_Longitude_dddmm = -GPS_Longitude_dddmm
+        Longitude = -Longitude
+      Else
+        GPSReadings(5) = 1
+      End If
+      GPSFix = GPS_QualityIndicator
+      UTCTime = GPS_UTCtime
+      UTCDate = 0
+      GPSSatellitesInView = GPS_Satellites ' UTCDate isn't part of serial message
+      Message = "GPS location complete, using " + GPSReadings(7) + " satellites."
+    End If
+  End If
+  Call WritePort(Vx2, 0)
 
   If BatteryVoltage < LOW_BATTERY_SHUTDOWN_V Then
-    If ReadNow Then ' If brownout when reading, display the error so it isn't lost
-      If(Left(Errors,17) <> Left("Low Battery Warning",17)) Then Call ErrorLog("Low Battery Warning, Brownout during measurement. " + BatteryVoltage + "V.  Note only" )
-    Else  ' if not during a measurement then turn off the modem as well
-      CommsPowerOnStatus = false
-      IPNetPower(5, 0, 0)
-      If(Left(Errors,17) <> Left("Low Battery Shutdown",17)) Then Call ErrorLog("Low Battery Shutdown, Modem off. " + BatteryVoltage + "V.  Ref: Ai1_manual section 9.2" ) ' Only store is this is a new message
+    If NOT (SensorPowerStatus) Then
+      LowPowerMode = true
+      IPNetPower(5, 0, 0) ' Modem off
     End If
-  Else
-    If (BatteryVoltage < LOW_BATTERY_SAVER_V) AND ((Hour < 6) OR (Hour > 18)) Then
-      If(Left(Errors,17) <> Left("Low Battery Saver",17)) Then Call ErrorLog("Low Battery Saver, Communications turned off overnight. " + BatteryVoltage + "V.  Ref: Ai1_manual section 9.2") ' Only store if this is a new message
-      CommsPowerOnStatus = false
-      IPNetPower(5, 0, 0)
-    Else  
-      If CommsPowerOnStatus = false Then
-        If ProgramCounter > LastProgramCounter + 10 Then ' Only cycle power if not recently done
-          Call ErrorLog("Battery power restored, resuming normal operation.  Ref: Ai1_manual section 9.2")
-          CommsPowerOnStatus = true
-          IPNetPower(5, 1, 0) ' Modem on
-        End If
-      End If
-    End If
+  ElseIf (LowPowerMode) AND (ProgramCounter > LastProgramCounter + 10) Then ' Only cycle power if not recently done
+    LowPowerMode = false
+    IPNetPower(5, 1, 0) ' Modem on
   End If
   CallTable Ai1
   ProgramCounter += 1 ' Increment the program counter
@@ -742,22 +608,33 @@ EndSub
 
 BeginProg
   Call Initialization
-  Scan (SCAN_INTERVAL_S, Sec, 0, 0)
-    ' Add any other custom sensor measurements here
+
+  ' Measure water quality
+  Scan(MEASUREMENT_INTERVAL_S, Sec, 0, 0)
     Call SensorMeasurements
-    ' Add any other communications or control instructions here
   NextScan
 
-  SlowSequence ' System background checks in a separate sequence so it does not slow down other functions
-    Scan (SCAN_INTERVAL_S, Sec, 0, 0)
+  ' Can have up to four slow sequences...
+
+  ' System check
+  SlowSequence
+    Scan(DIAGNOSTIC_INTERVAL_S, Sec, 0, 0)
       Call SystemCheck
     NextScan
   EndSequence
 
-  SlowSequence ' Communications management in a separate sequence so it does not slow down other functions
-    Scan (SCAN_INTERVAL_S, Sec, 0, 0)
-      ' Time specific instructions before communications subroutine
-      Call Communications
+  ' Communications
+  SlowSequence
+    Scan(REPORT_INTERVAL_S, Sec, 0, 0)
+      Call Hydrosphere
     NextScan
   EndSequence
+
+  ' Sensor cleaning
+  SlowSequence
+    Scan(CLEANING_INTERVAL_S, Sec, 0, 0)
+      Call SensorCleaning
+    NextScan
+  EndSequence
+
 EndProg
