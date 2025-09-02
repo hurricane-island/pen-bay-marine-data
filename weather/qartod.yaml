@@ -2,9 +2,75 @@ streams:
   air_temperature:
     qartod:
       gross_range_test:
-        suspect_span: [278, 288]
-        fail_span: [269, 310]  # Kelvin = -4 to 37 degC
-      spike_test:
-        suspect_threshold: 1.0
-        fail_threshold: 2.0
-        method: "average"
+        suspect_span: [273, 305]  # K
+        fail_span: [263, 315] 
+  relative_humidity:
+    qartod:
+      gross_range_test:
+        suspect_span: [20, 90]  # %
+        fail_span: [0, 100]
+  wind_speed:
+    qartod:
+      gross_range_test:
+        suspect_span: [0, 5]  # m/s
+        fail_span: [0, 10]  # m/s
+  wind_from_direction:
+    qartod:
+      gross_range_test:
+        suspect_span: [0, 360]  # degrees
+        fail_span: [0, 360]  # degrees
+  air_pressure:
+    qartod:
+      gross_range_test:
+        suspect_span: [950, 1050]  # Pa
+        fail_span: [900, 1100]
+  wind_speed_of_gust:
+    qartod:
+      gross_range_test:
+        suspect_span: [0, 10]  # m/s
+        fail_span: [0, 20]
+  wind_gust_from_direction:
+    qartod:
+      gross_range_test:
+        suspect_span: [0, 360]  # degrees
+        fail_span: [0, 360]
+  wind_chill_of_air_temperature:
+    qartod:
+      gross_range_test:
+        suspect_span: [273, 305] # K
+        fail_span: [263, 315]
+  solar_irradiance:
+    qartod:
+      gross_range_test:
+        suspect_span: [0, 900]  # W/m^2
+        fail_span: [0, 1000]
+  ultraviolet_index:
+    qartod:
+      gross_range_test:
+        suspect_span: [0, 8]  # 0-11
+        fail_span: [0, 12]
+  rainfall_amount:
+    qartod:
+      gross_range_test:
+        suspect_span: [0, 15]  # kg/m^2
+        fail_span: [0, 20]
+  rainfall_rate:
+    qartod:
+      gross_range_test:
+        suspect_span: [0, 100]  # mm/h
+        fail_span: [-5, 110]
+  heat_index_of_air_temperature:
+    qartod:
+      gross_range_test:
+        suspect_span: [273, 305]  # K
+        fail_span: [263, 315]
+  dew_point_temperature:
+    qartod:
+      gross_range_test:
+        suspect_span: [273, 305]  # K
+        fail_span: [263, 315]
+  water_evapotranspiration_flux:
+    qartod:
+      gross_range_test:
+        suspect_span: [0, 500]  # mm
+        fail_span: [0, 600]
