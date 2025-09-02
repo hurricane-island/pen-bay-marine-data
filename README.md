@@ -2,7 +2,7 @@
 
 ## Overview
 
-Code and data associated with the Pen Bay Marine Data project. This includes documentation and methods for both controlling the loggers, and accessing published data.
+Code and data associated with the [Pen Bay Marine Data project](https://www.hurricaneisland.net/research/pen-bay-marine-data). This includes documentation and methods for both controlling the loggers, and accessing published data.
 
 How-to and troubleshooting information is in the project Wiki. Non-public information is kept in the the Google Drive project folder.
 
