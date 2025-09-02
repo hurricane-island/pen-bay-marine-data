@@ -67,15 +67,12 @@ Const HUMIDITY_PORT As Long = 6
 Const READ_ATTEMPTS_LIMIT As Long = 4
 Public ReadAttempts As Long ' Times sensor read was attempted
 Dim ProgramCounter As Long: Units ProgramCounter = Cycles ' Program cycles since power up
-Dim LastProgramCounter As Long: Units LastProgramCounter = Cycles ' Error tracking
 Public BatteryVoltage As Float: Units BatteryVoltage = Volts
 Dim Vx1Voltage As Long
 Dim Vx2Voltage As Long ' Keep track of the excitation port voltage so that it can safely be turned off after status readings  
 Const PRESSURE_SUPPLY As Float = 5.0 ' All use 5V for maximum output
-Const PRESSURE_ZERO_OFFSET As Float = TRANSFER * PRESSURE_SUPPLY
 Const PRESSURE_FSR As Float = (1 - TRANSFER) * PRESSURE_SUPPLY
-Const PRESSURE_PARAMETERS As Long = 3
-Public Pressure(PRESSURE_PARAMETERS) As Float
+Public Pressure(3) As Float
 Alias Pressure(1) = Pressure_Voltage: Units Pressure_Voltage = Volts
 Alias Pressure(2) = Pressure_hPa: Units Pressure_hPa = hPa
 Alias Pressure(3) = Pressure_mH2O: Units Pressure_mH2O = mH2O
@@ -227,15 +224,12 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
 EndSub
 
 
-Dim LowPowerMode As Boolean = False  ' state of the internal cellular modem power controlled by the program
-Dim CellBillingDay = 1 ' For data usage calculations, to know which day of month the billing cycle resets
 
 Public SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON ' No longer need this public, have PortsStatus
 Public GPSPowerStatus As Boolean: Units GPSPowerStatus = Returns True If GPS Is ON
 Const GPS_BAUD As Long = 9600
-Const GPS_BUFFER As Long = 512                                ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
+Const GPS_BUFFER As Long = 512 ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
 
-Public SondeReadFailed As Boolean = False
 Alias SondeValuesSorted(45) = Sonde_Future1
 Alias SondeValuesSorted(46) = Sonde_Future2
 Alias SondeValuesSorted(47) = Sonde_Future3
@@ -259,11 +253,13 @@ Public HydrosphereData As String *(22+PARAMETERS_TO_SEND*10) ' one full record s
 Public HydrosphereDataBuffer(BUFFER_SIZE) As String *(22+PARAMETERS_TO_SEND*10)
 Public HydrosphereNames As String *(PARAMETERS_TO_SEND*26)' The combined descriptions into a single string
 
+' Check length of data buffer, and send to remote server if
+' there are new measurements.
 Sub Hydrosphere
   Dim Socket As Long
   Dim SerialOutResult As Long
   Dim TxAttempts As Long = 0
-  RealTime(rTime) ' Have If time statements at the top so none are missed from long scan times
+  RealTime(rTime)
   Message = "Hydrosphere report."
   If HydrosphereBufferNextPointer > 1 Then
     Do While (HydrosphereBufferNextPointer > 1) AND (TxAttempts < HYDROSPHERE_MAX_RETRIES)
@@ -380,10 +376,10 @@ Sub Initialization
   SetSetting("CellPwrStartTime", CELL_WINDOW_START) ' When to power up the modem
   SetSetting("CellPwrDuration", CELL_WINDOW_DURATION) ' How long is each window
   SetSetting("CellPwrRepeat", CELL_WINDOW_FREQUENCY) ' When does the window repeat, i.e. hourly
-  SetSetting("CellBillingDay", CellBillingDay) ' When to roll over the monthly usage
+  SetSetting("CellBillingDay", 1) ' When to roll over the monthly usage
   SetSetting("CellKeepAlive", "www.google.com") ' URL to ping to verify network connectivity.  If this fails, the logger will re-establish
   SetSetting("CellKeepAliveTime", 30) ' How often to ping test the link
-  IPNetPower(5, 1, 0) ' Make sure that it is turned on
+  IPNetPower(5, 1, 0) ' Make sure modem is on
   Call WritePort(Vx1, True)
   Call WritePort(SW12V, True)
   Message = "Powering sonde (" + 25 + "s)"
@@ -392,7 +388,7 @@ Sub Initialization
   findSonde(3)
   Message = "Sonde initialized. "
   Call WritePort(Vx1, 0) ' Turn off RS485 adapter.
-  If Status.LithiumBattery < 3.0 Then ' Check diagnostics are record to ErrorLog if a problem
+  If Status.LithiumBattery < 3.0 Then
     Call ErrorLog("Low (or no) Lithium Battery = " + Status.LithiumBattery)
     Delay(0, 500, mSec) ' Log with delay in case multiple messages are generated
   End If
@@ -408,9 +404,8 @@ EndSub
 
 Sub SensorMeasurements
   Message = "Waking up sonde."
-  SensorPowerStatus = True ' Public flag for SystemCheck to gracefully handle power loss
-  Call WritePort(SENSOR_POWER_PORT, SensorPowerStatus) ' Turn on the power to the sensors
-  Call WritePort(Vx1, SensorPowerStatus) ' Turn on the RS485 adapter
+  Call WritePort(SENSOR_POWER_PORT, True) ' Turn on the power to the sensors
+  Call WritePort(Vx1, True) ' Turn on the RS485 adapter
   Delay(0, 200, mSec) ' Allow sonde to wake up
   If NOT sondefound Then findSonde(3) ' YSI library
   Message = "Reading sonde. "
@@ -476,30 +471,30 @@ Sub SensorMeasurements
     HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CR
     HydrosphereBufferNextPointer += 1
   End If
-  SensorPowerStatus = False ' Allows `SystemCheck` to shutdown the modem
-  Call WritePort(SENSOR_POWER_PORT, SensorPowerStatus)
-  Call WritePort(Vx1, SensorPowerStatus)
+  Call WritePort(SENSOR_POWER_PORT, False)
+  Call WritePort(Vx1, False)
 EndSub
 
 
 Sub SensorCleaning
   Message = "Cleaning sonde."
-  SensorPowerStatus = True ' Public flag for SystemCheck to gracefully handle power loss
-  Call WritePort(SENSOR_POWER_PORT, SensorPowerStatus) ' Turn on the power to the sensors
-  Call WritePort(Vx1, SensorPowerStatus) ' Turn on the RS485 adapter
+  Call WritePort(SENSOR_POWER_PORT, True) ' Turn on the power to the sensors
+  Call WritePort(Vx1, True) ' Turn on the RS485 adapter
   Delay(0, 200, mSec) ' Allow sonde to wake up
   If NOT sondefound Then findSonde(3) ' YSI library
   Message = "Allowing " + 40 + " s for wiper."
   startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
   getWipeStatus() ' YSI library, updates `WiperPosition` variable?
   Delay(0, 40, Sec) ' Wait for wiper
-  SensorPowerStatus = False ' Allows `SystemCheck` to shutdown the modem
-  Call WritePort(SENSOR_POWER_PORT, SensorPowerStatus)
-  Call WritePort(Vx1, SensorPowerStatus)
+  Call WritePort(Vx1, False)
+  Call WritePort(SENSOR_POWER_PORT, False)
   Message = "Sonde cleaning complete."
 EndSub
 
+' SystemCheck variables
+Dim LowPowerMode As Boolean = False
 
+' Perform diagnostic checks
 Sub SystemCheck
   PanelTemp(InternalTemperature, FILTER_FREQUENCY) ' indicator for analog errors - when it has noise in the data
   Battery(BatteryVoltage) ' Measure using the CR300 battery voltage hardware
@@ -581,12 +576,10 @@ Sub SystemCheck
   End If
   Call WritePort(Vx2, 0)
 
-  If BatteryVoltage < LOW_BATTERY_SHUTDOWN_V Then
-    If NOT (SensorPowerStatus) Then
-      LowPowerMode = true
-      IPNetPower(5, 0, 0) ' Modem off
-    End If
-  ElseIf (LowPowerMode) AND (ProgramCounter > LastProgramCounter + 10) Then ' Only cycle power if not recently done
+  If NOT (LowPowerMode) AND (BatteryVoltage < LOW_BATTERY_SHUTDOWN_V) Then
+    LowPowerMode = true
+    IPNetPower(5, 0, 0) ' Modem off
+  ElseIf (LowPowerMode) AND (BatteryVoltage > LOW_BATTERY_RESTORE_V) Then
     LowPowerMode = false
     IPNetPower(5, 1, 0) ' Modem on
   End If
@@ -603,7 +596,6 @@ Sub ErrorLog(ErrorMessage As String * 96)
     ErrorHistory(i) = ErrorHistory(i+1)
   Next i
   ErrorHistory(HISTORY_RECORDS) = Errors
-  LastProgramCounter = ProgramCounter ' Program cycle when error occurred
 EndSub
 
 BeginProg
