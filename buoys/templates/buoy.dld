@@ -91,7 +91,7 @@ Public ProcessingTime: Units ProcessingTime = µS
 Dim rTime(9): Alias rTime(1) = Year: Alias rTime(2) = Month: Alias rTime(3) = DayOfMonth: Alias rTime(4) = Hour: Alias rTime(5) = Minute: Alias rTime(6) = Second: Alias rTime(7) = uSecond: Alias rTime(8) = WeekDay: Alias rTime(9) = DayOfYear
 Dim i As Long ' For internal counters only
 Dim AddressToRead As Long ' Used by several subroutines, for holding a memory address for a pointer
-Dim ValueToLoad As Float ' Internal processing only, the value at the pointer address in Float form
+
 
 Sub AddTime ' Adds time onto end of message, formatted to H:MM:SS
   Message += Hour + ":"
@@ -359,8 +359,6 @@ EndTable
 
 
 Sub Initialization
-  ValueToLoad = 0
-  AddressToRead = 0 ' Stops a warning if not used
   Call WritePort(Vx2, 0) ' put the power output port and regulator in a known state
   SerialOpen(GPS_PORT, GPS_BAUD, 0, 0, GPS_BUFFER, ALLOW_SLEEP)
   Message = "Initializing. "
