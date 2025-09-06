@@ -28,6 +28,7 @@ Const REPORT_INTERVAL_S As Long = 900 ' seconds
 Const MEASUREMENT_INTERVAL_S As Long = 3600 ' seconds
 Const CLEANING_INTERVAL_S As Long = 1800 ' seconds
 Const LOW_BATTERY_SHUTDOWN_V = 12.75' V
+Const LOW_BATTERY_RESTORE_V = 13.0' V
 Const COMMS As Long = CELLULAR
 Const CELL_WINDOW_START As Long = 1440
 Const CELL_WINDOW_DURATION As Long = 10
@@ -45,7 +46,6 @@ Const PRESSURE_FSR_PSI As Float = 43.5
 Const TRANSFER As Float = 0.1 ' Pressure sensor configuration
 Const PRESSURE_PORT As Long = 3
 Const PRESSURE_INTERFACE As Long = ANALOG
-Const SENSOR_POWER_PORT As Long = SW12V
 ' Available, C1. Recommended to keep for SDI12 in the future
 Const GPS_PORT As Long = ComC2_Rx ' C2. Serial Rx from GPS
 Const YSIPPORT As Long = ComRS232
@@ -129,13 +129,13 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
     WriteIO(&B00000010, StateMask)
   Case SE1
     If StateToWrite Then StateMask = &B00000100 Else StateMask = 0
-    Message = "Write to SE1 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
+    Message = "Write to SE1 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message
   Case SE2
     If StateToWrite Then StateMask = &B00001000 Else StateMask = 0
-    Message = "Write to SE2 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
+    Message = "Write to SE2 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message
   Case SE3 ' SE3 uses a different technique to drive regulators.  On is achieved by setting the port to high impedance (i.e. as an input).  Off is an output in the off state
     If StateToWrite Then StateMask = &B00010000 Else StateMask = 0
-    Message = "Write to SE3 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
+    Message = "Write to SE3 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message
   Case SE4 ' SE4 uses same technique as SE3, high impedance / 0V setting, using regulator internal pull up resistor
     If StateToWrite Then StateMask = &B00100000 Else StateMask = 0
     If StateToWrite Then 
@@ -404,7 +404,7 @@ EndSub
 
 Sub SensorMeasurements
   Message = "Waking up sonde."
-  Call WritePort(SENSOR_POWER_PORT, True) ' Turn on the power to the sensors
+  Call WritePort(SW12V, True) ' Turn on the power to the sensors
   Call WritePort(Vx1, True) ' Turn on the RS485 adapter
   Delay(0, 200, mSec) ' Allow sonde to wake up
   If NOT sondefound Then findSonde(3) ' YSI library
@@ -471,14 +471,14 @@ Sub SensorMeasurements
     HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CR
     HydrosphereBufferNextPointer += 1
   End If
-  Call WritePort(SENSOR_POWER_PORT, False)
+  Call WritePort(SW12V, False)
   Call WritePort(Vx1, False)
 EndSub
 
 
 Sub SensorCleaning
   Message = "Cleaning sonde."
-  Call WritePort(SENSOR_POWER_PORT, True) ' Turn on the power to the sensors
+  Call WritePort(SW12V, True) ' Turn on the power to the sensors
   Call WritePort(Vx1, True) ' Turn on the RS485 adapter
   Delay(0, 200, mSec) ' Allow sonde to wake up
   If NOT sondefound Then findSonde(3) ' YSI library
@@ -487,7 +487,7 @@ Sub SensorCleaning
   getWipeStatus() ' YSI library, updates `WiperPosition` variable?
   Delay(0, 40, Sec) ' Wait for wiper
   Call WritePort(Vx1, False)
-  Call WritePort(SENSOR_POWER_PORT, False)
+  Call WritePort(SW12V, False)
   Message = "Sonde cleaning complete."
 EndSub
 
@@ -576,12 +576,13 @@ Sub SystemCheck
   End If
   Call WritePort(Vx2, 0)
 
+  ' Toggle modem power based on battery voltage
   If NOT (LowPowerMode) AND (BatteryVoltage < LOW_BATTERY_SHUTDOWN_V) Then
     LowPowerMode = true
-    IPNetPower(5, 0, 0) ' Modem off
+    IPNetPower(5, 0)
   ElseIf (LowPowerMode) AND (BatteryVoltage > LOW_BATTERY_RESTORE_V) Then
     LowPowerMode = false
-    IPNetPower(5, 1, 0) ' Modem on
+    IPNetPower(5, 1)
   End If
   CallTable Ai1
   ProgramCounter += 1 ' Increment the program counter
