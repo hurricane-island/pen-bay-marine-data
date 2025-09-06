@@ -163,7 +163,7 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
   Case Is <= 0 
     Message = "Error, specify port to use"
   Case Else
-    Call ErrorLog("Port not recognized.  Port: " + PortToWrite + ", State: " + StateToWrite) ' Write to errors so this doesn't disappear
+    Message = "Error, Port not recognized." ' Write to errors so this doesn't disappear
   EndSelect
   If PortToWrite = VX1 Then PortToWrite = 9  ' Change from 101 to 512 so bitwise logic works
   If PortToWrite = VX2 Then PortToWrite = 10 ' Change from 102 to 1024 so bitwise logic works
@@ -365,7 +365,6 @@ Sub Initialization
   SerialOpen(GPS_PORT, GPS_BAUD, 0, 0, GPS_BUFFER, ALLOW_SLEEP)
   Message = "Initializing. "
   RealTime(rTime)
-  Call ErrorLog("Program restart") ' Record the program restart in the error log
   Delay(0, 500, mSec) ' Have a short delay incase multiple messages are generated
   i = 0  ' Just to stop a compile warning that it is unused
   SetSetting("PakBusTCPClients", TCP_CLIENT)
@@ -388,15 +387,7 @@ Sub Initialization
   findSonde(3)
   Message = "Sonde initialized. "
   Call WritePort(Vx1, 0) ' Turn off RS485 adapter.
-  If Status.LithiumBattery < 3.0 Then
-    Call ErrorLog("Low (or no) Lithium Battery = " + Status.LithiumBattery)
-    Delay(0, 500, mSec) ' Log with delay in case multiple messages are generated
-  End If
-  If Status.WatchdogErrors > 0 Then
-    Call ErrorLog("Watchdog errors = " + Status.WatchdogErrors)
-    Delay(0, 500, mSec) ' Log with delay in case multiple messages are generated
-  End If
-  DataloggerOSVersion = Right(Status.OSVersion, 5) ' Get the OS version and convert to a string, only needed at startup.  5 characters works for OS > 10.01
+  DataloggerOSVersion = Right(Status.OSVersion, 5) ' only needed at startup.  5 characters works for OS > 10.01
   Message += "System initialization complete."
   Call AddDate
 EndSub
@@ -589,15 +580,6 @@ Sub SystemCheck
   ProcessingTime = Status.ProcessTime ' checking that the program executes cleanly.  Should be last instruction
 EndSub
 
-Const HISTORY_RECORDS As Long = 3
-Public ErrorHistory(HISTORY_RECORDS) As String * 96 ' Retain recent messages
-Sub ErrorLog(ErrorMessage As String * 96)
-  Errors = ErrorMessage + ". " + Public.Timestamp(2,1)
-  For i = 1 To (HISTORY_RECORDS - 1)
-    ErrorHistory(i) = ErrorHistory(i+1)
-  Next i
-  ErrorHistory(HISTORY_RECORDS) = Errors
-EndSub
 
 BeginProg
   Call Initialization
