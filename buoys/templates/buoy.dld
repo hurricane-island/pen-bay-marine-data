@@ -1,8 +1,8 @@
 StationName = $STATION_NAME ' No quotes!
 Const HYDROSPHERE_ID = "$CLIENT_ID" ' Hydrosphere site.
-Const PARAMETERS_TO_SEND = 14 ' message width
-Const HYDROSPHERE_MAX_RETRIES = 5 ' Hydrosphere connection attempts
-Const BUFFER_SIZE As Long = 96 ' 96 is required for 15min data, for 12 hours - if daily updates are used
+Const PARAMETERS_TO_SEND = 14
+Const MAX_TX_ATTEMPTS = 5 ' Connection attempts
+Const BUFFER_SIZE As Long = 96 ' = 4 days
 Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s
 Const DIAGNOSTIC_INTERVAL_S As Long = 900 ' seconds
 Const REPORT_INTERVAL_S As Long = 900 ' seconds
@@ -14,24 +14,21 @@ Const CELL_WINDOW_START As Long = 1440
 Const CELL_WINDOW_DURATION As Long = 10
 Const CELL_WINDOW_FREQUENCY As Long = 1440  ' Modem is always on when CELL_WINDOW_START = 1440
 Const CURRENT_ZERO_mV As Long = 1250 ' mV. To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
-Const SENSOR_QTY As Long = 1  ' Number of sensors fitted to this station, repeat the measurements on sequential ports or address
+Const SENSOR_QTY As Long = 1  ' sensors fitted to this station
 Const TABLE_WQ As Long = 200000
 Const SONDE_USED As Boolean = True
 Const SONDE_USES_RS485 As Boolean = True
 Const SONDEVALUES_TBL_SIZE As Long = 5000
 Const PRESSURE_PORT As Long = 3
-Const GPS_PORT As Long = ComC2_Rx ' Serial Rx from GPS
 Const YSIPPORT As Long = ComRS232
-Const FILTER_FREQUENCY As Long = 4000 ' Set to 50 or 60 for situations with AC noise, otherwise 4000Hz provides quickest processing
+Const FILTER_FREQUENCY As Long = 4000 ' 50 or 60 for AC noise, otherwise 4000Hz
 Const ALLOW_SLEEP As Long = 1
 Const CR = CHR(13)
 Const hPa_TO_m As Float = 0.0101972
 Const CURRENT_PORT As Long = 5
 Const HUMIDITY_PORT As Long = 6
-Const READ_ATTEMPTS_LIMIT As Long = 4
-Const GPS_HEADER As String = "$GPGGA" ' header of the GPS string
-Const GPS_BAUD As Long = 9600
-Const GPS_BUFFER As Long = 512 ' The uBlox GPS outputs a lot more messages, allow a bigger string.
+Const MAX_READ_ATTEMPTS As Long = 4
+Const GPS_BUFFER As Long = 512 ' uBlox GPS message size
 Const GPS_PARAMETERS As Long = 9 ' 1=Time(UTC),2=Date,3=Lat(ddmm),4=Lat(.mmmmmm),5=Long(ddmm),6=Long(.mmmmmm),7=Alt,8=Fix,9=#Sat
 Const GPS_SATELLITES_REQUIRED As Long = 4 ' Minimum number of satellites to accept a GPS reading
 Const PRESSURE_READINGS As Long = 7 ' Number of measurements to take from averaging this single reading
@@ -65,7 +62,6 @@ Dim HydrosphereData As String *(22+PARAMETERS_TO_SEND*10) ' one full record stri
 Dim HydrosphereDataBuffer(BUFFER_SIZE) As String *(22+PARAMETERS_TO_SEND*10)
 Dim HydrosphereNames As String *(PARAMETERS_TO_SEND*26)
 
-
 Dim Pressure(3) As Float
 Alias Pressure(1) = Pressure_Voltage
 Alias Pressure(2) = Pressure_hPa
@@ -85,22 +81,22 @@ Alias rTime(6) = Second
 ' YSI Sonde Libraries
 Include "CPU:YSIP_CONST_Enc.CR300"
 Include "CPU:YSIP_CORE_Enc.CR300"
-Alias SondeValuesSorted(45) = Sonde_Future1
-Alias SondeValuesSorted(46) = Sonde_Future2
-Alias SondeValuesSorted(47) = Sonde_Future3
-Alias SondeValuesSorted(48) = Sonde_Future4
-Alias SondeValuesSorted(49) = Sonde_Future5
-Alias SondeValuesSorted(50) = Sonde_Future6
-Alias SondeValuesSorted(51) = Sonde_Future7
-Alias SondeValuesSorted(52) = Sonde_Future8
-Alias SondeValuesSorted(53) = Sonde_Future9
-Alias SondeValuesSorted(54) = Sonde_Future10
-Alias SondeValuesSorted(55) = Sonde_Future11
-Alias SondeValuesSorted(56) = Sonde_Future12
-Alias SondeValuesSorted(57) = Sonde_Future13
-Alias SondeValuesSorted(58) = Sonde_Future14
-Alias SondeValuesSorted(59) = Sonde_Future15
-Alias SondeValuesSorted(60) = Sonde_Future16
+' Alias SondeValuesSorted(45) = Sonde_Future1
+' Alias SondeValuesSorted(46) = Sonde_Future2
+' Alias SondeValuesSorted(47) = Sonde_Future3
+' Alias SondeValuesSorted(48) = Sonde_Future4
+' Alias SondeValuesSorted(49) = Sonde_Future5
+' Alias SondeValuesSorted(50) = Sonde_Future6
+' Alias SondeValuesSorted(51) = Sonde_Future7
+' Alias SondeValuesSorted(52) = Sonde_Future8
+' Alias SondeValuesSorted(53) = Sonde_Future9
+' Alias SondeValuesSorted(54) = Sonde_Future10
+' Alias SondeValuesSorted(55) = Sonde_Future11
+' Alias SondeValuesSorted(56) = Sonde_Future12
+' Alias SondeValuesSorted(57) = Sonde_Future13
+' Alias SondeValuesSorted(58) = Sonde_Future14
+' Alias SondeValuesSorted(59) = Sonde_Future15
+'Alias SondeValuesSorted(60) = Sonde_Future16
 
 
 DataTable(Ai1, True, 3000) ' Status information for remote diagnostics
@@ -132,24 +128,20 @@ DataTable(Ai1, True, 3000) ' Status information for remote diagnostics
 EndTable
 
 
-Sub AddTime ' Adds time onto end of message, formatted to H:MM:SS
-  Message += Hour + ":"
-  If Minute < 10 Then Message += "0" 
-  Message += Minute + ":"
-  If Second < 10 Then Message += "0"
-  Message += Second
-EndSub
-
-Sub AddDate
-  Message += ", " + DayOfMonth + "/" + Month + "/" + Year + "."
-EndSub
+Function TimeStamp As String ' Adds time onto end of message, formatted to H:MM:SS
+  TimeStamp = Year + "/" + Month + "/" + DayOfMonth + " "
+  If Hour < 10 Then TimeStamp += "0"
+  TimeStamp += Hour + ":"
+  If Minute < 10 Then TimeStamp += "0" 
+  TimeStamp += Minute + ":"
+  If Second < 10 Then TimeStamp += "0"
+  TimeStamp += Second
+EndFunction
 
 ' Turn on 12V and 5V power to Sonde and RS485 adapter
-Sub WakeUpSonde(Wait as Long)
-  Message = "Waking up sonde (" + Wait + " ms)"
+Sub WakeUpSonde()
   WriteIO(&B01000000, &B01000000)
   ExciteV(Vx1, 5000, 0)
-  Delay(0, Wait, mSec)
 EndSub
 
 ' Turn of 12V and 5V power to Sonde and RS485 adapter
@@ -158,11 +150,10 @@ Sub PowerDownSonde()
   ExciteV(Vx1, 0, 0)
 EndSub
 
-
+' Perform startup steps needed to being measurement
 Sub Initialization
   ExciteV(Vx2, 0, 0) ' put the power regulator in known off state
-  SerialOpen(GPS_PORT, GPS_BAUD, 0, 0, GPS_BUFFER, ALLOW_SLEEP)
-  Message = "Initializing. "
+  SerialOpen(ComC2_Rx, 9600, 0, 0, GPS_BUFFER, ALLOW_SLEEP)
   RealTime(rTime)
   Delay(0, 500, mSec) ' delay in case multiple messages are generated
   SetSetting("PakBusTCPClients", "(drema.konectgds.com,9200)") ' Pakbus Router
@@ -177,24 +168,21 @@ Sub Initialization
   SetSetting("CellKeepAlive", "www.google.com") ' URL to ping to verify network connectivity.
   SetSetting("CellKeepAliveTime", 30) ' How often to ping test the link, minutes
   IPNetPower(5, 1, 0) ' Make sure modem is on
-  Call WakeUpSonde(25000)
-  YSIPInit() ' YSI library
+  Call WakeUpSonde()
+  Delay(0, 25000, mSec)
+  YSIPInit() ' YSI library, can this happen on every measurement?
   findSonde(3) ' YSI library
   Call PowerDownSonde()
   DataloggerOSVersion = Right(Status.OSVersion, 5) ' Char(5) = 10.01
-  Message = "System initialization complete."
-  Call AddDate
-  Call AddTime
 EndSub
 
 
 ' Send to remote server if there are new measurements.
-Sub Hydrosphere
+Sub Hydrosphere(MaxAttempts As Long)
   Dim Socket As Long
   Dim TxResponse As Long
   Dim TxAttempts = 0
   RealTime(rTime)
-  Message = "Hydrosphere report."
 
   If HydrosphereBufferNextPointer > 1 Then
     HydrosphereNames = "SN="
@@ -204,7 +192,7 @@ Sub Hydrosphere
         HydrosphereNames += ","
       EndIf
     Next i
-    Do While (HydrosphereBufferNextPointer > 1) AND (TxAttempts < HYDROSPHERE_MAX_RETRIES)
+    Do While (HydrosphereBufferNextPointer > 1) AND (TxAttempts < MaxAttempts)
       TxAttempts += 1
       Socket = TCPOpen("stormcentral.waterlog.com", 32212, 1000, HYDROSPHERE_TIMEOUT)
       If Socket <> 0 Then
@@ -236,17 +224,25 @@ Sub Hydrosphere
   EndIf
 EndSub
 
-Sub SensorMeasurements
+Sub SensorMeasurements(MaxAttempts as Long)
   Dim AddressToRead As Long
   Call WakeUpSonde()
-  Message = "Reading sonde. "
-  If NOT sondefound Then findSonde(3) ' YSI library
+  Delay(0, 200, mSec)
+  ReadAttempts = 0
+  Do While NOT (sondefound) AND (ReadAttempts < MaxAttempts)
+    findSonde(3) ' YSI library
+  Loop
+  If NOT (sondefound) Then
+    Message = "No sonde found. " + TimeStamp()
+    Call PowerDownSonde()
+    Exit Sub
+  EndIf
   sondeCheck() ' YSI library
   getSondeParams() ' YSI library
   ReadAttempts = 0
-  Do
+  Do While (ReadAttempts < MaxAttempts)
     ReadAttempts += 1
-    Message = "Reading sonde values, attempt " + ReadAttempts
+    Message = "Reading sonde values, attempt " + ReadAttempts + TimeStamp()
     ' Prepare parameters to check with NaN so that a successful read is identified
     Sonde_External_Voltage = NaN ' YSI library
     External_Temp = NaN ' YSI library
@@ -256,18 +252,16 @@ Sub SensorMeasurements
     sortYSIPData() ' YSI library
     ExternalTemp = External_Temp ' Change naming
     If Sonde_External_Voltage = NaN Then 
-      Message = "Sonde communication error. "
+      Message = "Sonde communication error. " + TimeStamp()
     ElseIf Sonde_External_Voltage = 0 Then
-      Message = "Missing measurements error. "
+      Message = "Missing measurements error. " + TimeStamp()
     Else
-      Message = "Sonde read complete."
+      Message = "Sonde read complete." + TimeStamp()
       getSondeSN() ' YSI library
       CallTable SondeValues ' YSI library
       ExitDo
     EndIf
-    Call AddTime
-    Call AddDate
-  Loop Until (ReadAttempts >= READ_ATTEMPTS_LIMIT)
+  Loop
 
   CallTable YSISondeMeta ' YSI library, must take measurements first
 
@@ -303,15 +297,20 @@ Sub SensorMeasurements
 EndSub
 
 
-Sub SensorCleaning
-  Call WakeUpSonde(200)
-  If NOT sondefound Then findSonde(3) ' YSI library
-  Message = "Cleaning for " + 40 + " s."
-  startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
-  getWipeStatus() ' YSI library, updates `WiperPosition` variable?
-  Delay(0, 40, Sec) ' Wait for wiper
+Sub SensorCleaning(Wait as Long, MaxAttempts as Long)
+  Dim Attempts As Long = 0
+  Call WakeUpSonde()
+  Delay(0, 200, mSec)
+  Do While (NOT sondefound) AND (Attempts < MaxAttempts)
+    findSonde(3) ' YSI library
+  Loop
+  If (sondefound) Then
+    startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
+    Delay(0, Wait, Sec) ' Wait for wiper
+    ' YSI library, updates `WiperPosition` variable?
+    getWipeStatus()
+  EndIf
   Call PowerDownSonde()
-  Message = "Sonde cleaning complete."
 EndSub
 
 
@@ -348,7 +347,7 @@ Sub SystemCheck
   Battery(BatteryVoltage) ' Measure using the CR300 battery voltage hardware
 
   ExciteV(Vx2, 3300, 0) ' 3.3V for humidity sensor
-  VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000,FILTER_FREQUENCY, 1.0, 0)
+  VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000, FILTER_FREQUENCY, 1.0, 0)
   InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*InternalTemperature)
   If InternalHumidity > 100 Then InternalHumidity = 100
   ExciteV(Vx2, 5000, 0) ' Barometer uses 5V excitation
@@ -374,13 +373,13 @@ Sub SystemCheck
   Pressure_mH2O = (Pressure_hPa - 1013.25) * hPa_TO_m ' Offset relative to standard atmospheric pressure
   ExciteV(Vx2, 3300, 0) ' TODO: Needed?
   ExciteV(Vx2, 5000, 0) ' Step up to 5V for other internal sensors, including GPS
-  VoltSe(Current_mV, 1, mv2500, CURRENT_PORT, True, 0, FILTER_FREQUENCY, 1, 0) ' Read the raw mV output. Settling time is from humidity sensor
+  VoltSe(Current_mV, 1, mv2500, 5, True, 0, FILTER_FREQUENCY, 1, 0)
   Current_mA = (Current_mV - CURRENT_ZERO_mV) * 5 ' Normal output is 400mA/1000mV, or 2.5mV/mA, but with 2:1 voltage divider it is 5mV/mA
 
-  SerialIn(RawGPSString, GPS_PORT, 50, 0, GPS_BUFFER) ' Termination when characters stop being received
-  SerialFlush(GPS_PORT) ' Clear out any data so a fresh reading is taken next cycle
-  GPSStart = InStr(1, RawGPSString, GPS_HEADER, 2) ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
-  GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2) ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
+  SerialIn(RawGPSString, ComC2_Rx, 50, 0, GPS_BUFFER) ' Termination when characters stop being received
+  SerialFlush(ComC2_Rx) ' Clear out any data so a fresh reading is taken next cycle
+  GPSStart = InStr(1, RawGPSString, "$GPGGA", 2) ' http://aprs.gids.nl/nmea/#gga
+  GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2) ' Find the position of the terminator: http://aprs.gids.nl/nmea/#gga
   If (GPSStart>0) AND (GPSEnd>0) Then
     GPSString = Mid(RawGPSString,GPSStart,GPSEnd-GPSStart)  ' Get the part between the start and the end
     GPSLength = Len(GPSString)
@@ -430,7 +429,7 @@ Sub SystemCheck
   EndIf
   CallTable Ai1
   ProgramCounter += 1 ' Increment the program counter
-  ProcessingTime = Status.ProcessTime ' checking that the program executes cleanly.  Should be last instruction
+  ProcessingTime = Status.ProcessTime
 EndSub
 
 
@@ -439,7 +438,7 @@ BeginProg
 
   ' Measure water quality
   Scan(MEASUREMENT_INTERVAL_S, Sec, 0, 0)
-    Call SensorMeasurements
+    Call SensorMeasurements(MAX_READ_ATTEMPTS)
   NextScan
 
   ' System check
@@ -452,14 +451,14 @@ BeginProg
   ' Communications
   SlowSequence
     Scan(REPORT_INTERVAL_S, Sec, 0, 0)
-      Call Hydrosphere
+      Call Hydrosphere(MAX_TX_ATTEMPTS)
     NextScan
   EndSequence
 
   ' Sensor cleaning
   SlowSequence
     Scan(CLEANING_INTERVAL_S, Sec, 0, 0)
-      Call SensorCleaning
+      Call SensorCleaning(40, MAX_READ_ATTEMPTS)
     NextScan
   EndSequence
 
