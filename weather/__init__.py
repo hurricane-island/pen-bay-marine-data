@@ -34,7 +34,8 @@ from lib import (
     fahrenheit_to_kelvin,
     cardinal_direction_to_degrees,
     describe_data_frame,
-    StandardUnits
+    StandardUnits,
+    Source
 )
 
 
@@ -80,21 +81,6 @@ class ClickCommands(Enum):
     DESCRIBE = "describe"
     BACKFILL = "backfill"
     EXPORT = "export"
-
-
-# pylint: disable=too-few-public-methods
-class Source:
-    """
-    Abstraction for converting from a data source
-    to standard format.
-    """
-
-    name: str
-    transform: callable
-
-    def __init__(self, name: str, transform: callable):
-        self.name = name
-        self.transform = transform
 
 
 # pylint: disable=too-few-public-methods
@@ -311,7 +297,8 @@ weather.add_command(file)
 
 def source_options(function):
     """
-    Choose weather station and observation series.
+    Choose weather station and observation series. Re-usable decorator
+    for commands that need to select a station and series.
     """
     function = click.argument(
         "series", type=click.Choice(StandardNames, case_sensitive=False)

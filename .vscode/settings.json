@@ -4,6 +4,7 @@
         "APPRENTICESHOP",
         "autofmt",
         "balena",
+        "BLYNKEN",
         "cloudbase",
         "dewpoint",
         "figsize",
@@ -20,12 +21,14 @@
         "skiprows",
         "twinx",
         "WEEWX",
+        "WYNKEN",
         "xaxis",
         "xdate",
         "xlabel",
         "xlim",
         "xticks",
         "ylabel",
-        "ylim"
+        "ylim",
+        "zorder"
     ]
 }

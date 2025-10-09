@@ -27,6 +27,7 @@ class ImageFormat(Enum):
 
     PNG = "png"
 
+
 class StandardUnits(Enum):
     """
     CF Metadata Standard Units. These are all of the Davis Vantage Pro2
@@ -41,6 +42,21 @@ class StandardUnits(Enum):
     ENERGY = "$ W / m^2 $"
     FLUX = "$ kg / m^2 / s $"
     AMOUNT = "$ kg / m^2 $"
+
+
+# pylint: disable=too-few-public-methods
+class Source:
+    """
+    Abstraction for converting from a data source
+    to standard format.
+    """
+
+    name: str
+    transform: callable
+
+    def __init__(self, name: str, transform: callable):
+        self.name = name
+        self.transform = transform
 
 
 def influx_options(function):
@@ -151,9 +167,12 @@ def cardinal_direction_to_degrees(series: Series) -> Series:
     return series.map(wind)
 
 
-def plot_single_series(series: Series, ax: Axes, resample: Optional[str], label: str, **kwargs):
+def plot_single_series(
+    series: Series, ax: Axes, resample: Optional[str], label: str, **kwargs
+):
     """
-    Plot a single resampled time series.
+    Plot a single resampled time series. Key word arguments are
+    passed to the matplotlib Axes.plot() method.
     """
     observed_property: str = series.name
     observed_property = observed_property.replace("_", " ").title()
@@ -167,7 +186,16 @@ def plot_single_series(series: Series, ax: Axes, resample: Optional[str], label:
 
     ax.plot(series_to_plot.index, series_to_plot, label=plot_label, **kwargs)
 
-def plot_qartod_flags(ax: Axes, series: Series, observed_property: str, config: Config, time_column: str="time", zorder=3, label: bool=False):
+
+def plot_qartod_flags(
+    ax: Axes,
+    series: Series,
+    observed_property: str,
+    config: Config,
+    time_column: str = "time",
+    zorder: int = 3,
+    label: bool = False,
+):
     """
     Add scatter markers for flagged data points.
     """
@@ -192,10 +220,15 @@ def plot_qartod_flags(ax: Axes, series: Series, observed_property: str, config: 
     failed = series[gb["rollup"] == 4]
     if len(suspect) > 0:
         a = "suspect" if label else None
-        ax.scatter(suspect.index, suspect, label=a, color="orange", marker="x", zorder=zorder)
+        ax.scatter(
+            suspect.index, suspect, label=a, color="orange", marker="x", zorder=zorder
+        )
     if len(failed) > 0:
         b = "failed" if label else None
-        ax.scatter(failed.index, failed, label=b, color="red", marker="x", zorder=zorder)
+        ax.scatter(
+            failed.index, failed, label=b, color="red", marker="x", zorder=zorder
+        )
+
 
 def plot_tail(
     local: Series,
@@ -209,7 +242,7 @@ def plot_tail(
     resample: str = "1h",
     qartod: str = None,
     figsize: tuple[int, int] = (7, 3),
-    time_column: str = "time"
+    time_column: str = "time",
 ):
     """
     Plot the tail of a time series which has some values
@@ -224,9 +257,7 @@ def plot_tail(
     tail = remote.loc[remote.index > start]
     local_tail = local.loc[local.index > start]
 
-    plot_single_series(
-        local_tail, ax, resample, label="local", color="grey"
-    )
+    plot_single_series(local_tail, ax, resample, label="local", color="grey")
     plot_single_series(
         tail,
         ax,
@@ -238,8 +269,12 @@ def plot_tail(
 
     if qartod is not None:
         config = Config(qartod)
-        plot_qartod_flags(ax, tail, observed_property, config, time_column=time_column, label=True)
-        plot_qartod_flags(ax, local_tail, observed_property, config, time_column=time_column)
+        plot_qartod_flags(
+            ax, tail, observed_property, config, time_column=time_column, label=True
+        )
+        plot_qartod_flags(
+            ax, local_tail, observed_property, config, time_column=time_column
+        )
 
     display_name = observed_property.replace("_", " ").title()
     if start.year == end.year:
@@ -266,7 +301,8 @@ def group_observations_by_time(
     df: DataFrame, freq: str = "D"
 ) -> tuple[list[DataFrame], list[int]]:
     """
-    Group observations by a specified frequency.
+    Group observations by a specified frequency. Used in creating
+    box plots of time series data that aggregate by day, week, month, etc.
     """
     grouper = Grouper(freq=freq)
     gb = df.groupby(grouper, sort=True)
@@ -283,6 +319,7 @@ def group_observations_by_time(
         years += f"-{groups[-1].year}"
     return bins, positions, years
 
+
 def describe_data_frame(df: DataFrame, config_path: str):
     """
     Display a summary of the DataFrame without an overwhelming amount of detail.
@@ -291,11 +328,12 @@ def describe_data_frame(df: DataFrame, config_path: str):
     print("\nSamples:\n")
     print(summary)
     config = Config(config_path)
-    qa = test_data_frame(df.reset_index(), config, time_column='time')
+    qa = test_data_frame(df.reset_index(), config, time_column="time")
     gb = qa.groupby("observed_property")
     print("\nQuality Assurance Flags:\n")
     group_summary = gb.describe().T
     print(group_summary)
+
 
 def boxplot(
     df: DataFrame,
