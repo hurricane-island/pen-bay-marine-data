@@ -16,6 +16,7 @@ cli.add_command(weather)
 cli.add_command(buoys)
 
 if __name__ == "__main__":
+    # Show all data instead of substituting "..."
     set_option("display.max_columns", None)
     set_option("display.max_rows", None)
     cli()

@@ -1,0 +1,6 @@
+streams:
+  sea_water_temperature:
+    qartod:
+      gross_range_test:
+        suspect_span: [273, 305]  # K
+        fail_span: [263, 315] 
