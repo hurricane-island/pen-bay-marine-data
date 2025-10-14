@@ -9,24 +9,32 @@ Features:
 """
 from pathlib import Path
 from hashlib import md5
-from pandas import read_csv, DataFrame, concat
+from pandas import Series, read_csv, DataFrame, concat
 from datetime import datetime
 from enum import Enum
 import click
-from lib import Source, StandardUnits
+from lib import Source, StandardUnits, describe_data_frame, plot_tail, plot_options, boxplot
 
+DATA_DIR = Path(__file__).parent / "data"
+FIGURES_DIR = Path(__file__).parent / "figures"
 
 class ClickOptions(Enum):
     """
     Available commands for buoy data processing.
     """
 
+    # file and firmware commands
     LIST = "list"
     DESCRIBE = "describe"
     TEMPLATE = "template"
+    EXPORT = "export"
+    # groups
     FILE = "file"
     BUOYS = "buoys"
     PLOT = "plot"
+    # plotting commands
+    TAIL = "tail"
+    DAILY = "daily"
 
 
 class StationName(Enum):
@@ -37,6 +45,7 @@ class StationName(Enum):
     WYNKEN = "wynken"
     BLYNKEN = "blynken"
 
+
 class TableName(Enum):
     """
     Supported data table names.
@@ -45,11 +54,36 @@ class TableName(Enum):
     DIAGNOSTIC = "Ai1"
     SONDE = "SondeValues"
 
-class SeriesNames(Enum):
+
+class StandardNames(Enum):
     """
     Supported data series names.
     """
-    TEMPERATURE = "External_Temp"
+
+    SEA_WATER_TEMPERATURE = "sea_water_temperature"
+    MASS_CONCENTRATION_OF_OXYGEN_IN_SEA_WATER = (
+        "mass_concentration_of_oxygen_in_sea_water"
+    )
+    SEA_WATER_SALINITY = "sea_water_salinity"
+
+
+# pylint: disable=too-few-public-methods
+class ObservedProperty:
+    """
+    Abstraction for a single observed property, mapping
+    multiple sources into a single Schema based on CF Metadata
+    standards.
+    """
+
+    name: str
+    units: str
+    campbell_scientific: Source
+
+    def __init__(self, name: str, unit: str, campbell_scientific: Source):
+        self.name = name
+        self.unit = unit
+        self.campbell_scientific = campbell_scientific
+
 
 @click.group(name=ClickOptions.BUOYS.value)
 def buoys():
@@ -72,6 +106,23 @@ def file_group():
     """
 
 
+def source_options(function):
+    """
+    Choose weather station and observation series. Re-usable decorator
+    for commands that need to select a station and series.
+    """
+    function = click.argument(
+        "series", type=click.Choice(StandardNames, case_sensitive=False)
+    )(function)
+    function = click.argument(
+        "table", type=click.Choice(TableName, case_sensitive=False)
+    )(function)
+    function = click.argument(
+        "name", type=click.Choice(StationName, case_sensitive=False)
+    )(function)
+    return function
+
+
 # Subcommands assignment
 buoys.add_command(plot)
 buoys.add_command(file_group)
@@ -92,6 +143,7 @@ def list_buoys():
             print(station)
             seen.add(station)
 
+
 def read_single_campbell_logger_file(file: Path) -> DataFrame:
     """
     Read a single Campbell logger file and return a DataFrame.
@@ -100,14 +152,24 @@ def read_single_campbell_logger_file(file: Path) -> DataFrame:
     ts_col = df.columns[0]
     return df.set_index(ts_col)
 
-def read_and_concatenate
 
-@file_group.command(name=ClickOptions.DESCRIBE.value)
-@click.argument("name", type=click.Choice(StationName, case_sensitive=False))
-@click.argument("table", type=click.Choice(TableName, case_sensitive=False))
-def buoys_describe_series(name: StationName, table: TableName):
+def read_campbell_logger_files(files: list[Path]) -> DataFrame:
     """
-    Summarize available data for a station.
+    Read multiple Campbell logger files and return a single DataFrame.
+    """
+    all_data = []
+    for file in sorted(files):
+        df = read_single_campbell_logger_file(file)
+        # Add metadata column to be able to select overlapping data later without a join
+        time_recovered = file.stem.split("_")[2]
+        df["TimeRecovered"] = datetime.strptime(time_recovered, "%Y-%m-%dT%H-%M")
+        all_data.append(df)
+    return concat(all_data).dropna(how="all", axis=1)
+
+
+def filter_buoy_flat_files(name: StationName, table: TableName):
+    """
+    Filter buoy flat files based on command line options.
     """
     path: Path = Path(__file__).parent.absolute() / "data"
 
@@ -117,17 +179,76 @@ def buoys_describe_series(name: StationName, table: TableName):
         table_match = table.value.lower() in lower_name
         return station_match and table_match
 
-    files = filter(filter_prefix, path.glob("*.dat"))
-    all_data = []
-    for file in sorted(files):
-        df = read_single_campbell_logger_file(file)
-        # Add metadata column to be able to select overlapping data later without a join
-        time_recovered = file.stem.split("_")[2]
-        df["TimeRecovered"] = datetime.strptime(time_recovered, "%Y-%m-%dT%H-%M")
-        all_data.append(df)
-    _df = concat(all_data).dropna(how="all", axis=1)
-    print(_df.info())
-    print(_df.index.duplicated().sum(), "duplicate rows")
+    return filter(filter_prefix, path.glob("*.dat"))
+
+
+@file_group.command(name=ClickOptions.DESCRIBE.value)
+@click.argument("name", type=click.Choice(StationName, case_sensitive=False))
+@click.argument("table", type=click.Choice(TableName, case_sensitive=False))
+def buoy_file_describe(name: StationName, table: TableName):
+    """
+    Summarize available data for a station.
+    """
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(files)
+    summary = df.describe().T.drop(columns=["25%", "50%", "75%", "std", "mean"])
+    print("\nSamples:\n")
+    print(summary)
+
+
+@plot.command(name=ClickOptions.TAIL.value)
+@source_options
+@plot_options
+def buoy_plot_tail(
+    name: StationName, table: TableName, series: StandardNames, **kwargs
+):
+    """
+    Plot the most recent data from a buoy for a single data stream.
+    """
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(files)
+    local: Series = df["External_Temp"].squeeze()
+    local.name = "local"
+    print(type(local.squeeze().index))
+    plot_tail(
+        local,
+        None,
+        name.value,
+        series.value,
+        prefix=f"buoys/figures/{ClickOptions.TAIL.value}",
+        units=StandardUnits.TEMPERATURE.value,
+        **kwargs,
+    )
+
+
+@plot.command(name=ClickOptions.DAILY.value)
+@source_options
+@plot_options
+def buoy_plot_daily(name: StationName, table: TableName, series: StandardNames, **kwargs):
+    """
+    Plot a single `DataStream` aggregated by day.
+    """
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(files)
+    local = df["External_Temp"]
+    mask = ~df.index.duplicated(keep="first")
+    unique = local[mask].sort_index()
+    unique.index.rename("time", inplace=True)
+    prefix = f"buoys/figures/{ClickOptions.DAILY.value}"
+    boxplot(unique, name.value, series.value, prefix, units=StandardUnits.TEMPERATURE.value, **kwargs)
+
+
+@file_group.command(name=ClickOptions.EXPORT.value)
+@click.argument("name", type=click.Choice(StationName, case_sensitive=False))
+@click.argument("table", type=click.Choice(TableName, case_sensitive=False))
+def buoy_file_export(name: StationName, table: TableName):
+    """
+    Export buoy data to a different format.
+    """
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(files)
+    filename = DATA_DIR / f"{name.value}.{table.value}.csv"
+    df.to_csv(filename)
 
 
 @buoys.command(name=ClickOptions.TEMPLATE.value)
