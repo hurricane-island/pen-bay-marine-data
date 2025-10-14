@@ -232,7 +232,7 @@ def plot_qartod_flags(
 
 def plot_tail(
     local: Series,
-    remote: Series,
+    remote: Series | None,
     thing: str,
     observed_property: str,
     prefix: str,
@@ -254,18 +254,19 @@ def plot_tail(
     end: datetime = datetime.now()
     start: datetime = end - timedelta(days=days)
     fig, ax = plt.subplots(figsize=figsize)
-    tail = remote.loc[remote.index > start]
     local_tail = local.loc[local.index > start]
 
     plot_single_series(local_tail, ax, resample, label="local", color="grey")
-    plot_single_series(
-        tail,
-        ax,
-        resample,
-        label="remote",
-        color="black",
-        linestyle=":",
-    )
+    if remote is not None:
+        tail = remote.loc[remote.index > start]
+        plot_single_series(
+            tail,
+            ax,
+            resample,
+            label="remote",
+            color="black",
+            linestyle=":",
+        )
 
     if qartod is not None:
         config = Config(qartod)
@@ -355,6 +356,11 @@ def boxplot(
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=figsize)
     bins, positions, years = group_observations_by_time(df, freq=freq)
+    # hack for buoys...
+    if isinstance(bins[0], DataFrame):
+        col = bins[0].columns[0]
+        bins = [b[col].values for b in bins ]
+    # end hack for buoys...
     ax.boxplot(
         bins,
         notch=False,

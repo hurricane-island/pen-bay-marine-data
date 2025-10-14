@@ -421,12 +421,12 @@ def weather_describe_series(
     """
     Compare local and database data before merging or backfilling.
     """
-    remote = WeeWxInfluxArchive(measurement, token, host).df[series.value]
-    local = WeatherLinkArchive(station.value).df[series.value]
+    remote: Series = WeeWxInfluxArchive(measurement, token, host).df[series.value]
     remote.name = "influx"
+    local: Series = WeatherLinkArchive(station.value).df[series.value]
     local.name = "local"
-    df = concat([remote, local], axis=1)
-    print(df.describe())
+    summary = concat([remote, local], axis=1).describe()
+    print(summary)
 
 
 @plot.command(name=ClickCommands.TAIL.value)
@@ -461,8 +461,8 @@ def weather_plot_tail(
 
     Keyword arguments are passed through to the rendering function
     """
-    remote = WeeWxInfluxArchive(measurement, token, host).df[series.value]
-    local = WeatherLinkArchive(station.value).df[series.value]
+    remote: Series = WeeWxInfluxArchive(measurement, token, host).df[series.value]
+    local: Series = WeatherLinkArchive(station.value).df[series.value]
     prefix = f"{FIGURES_DIR}/{ClickCommands.TAIL.value}"
     unit = CF_STANDARDS.get(series).unit
     plot_tail(local, remote, station.value, series.value, prefix, units=unit, **kwargs)
@@ -475,7 +475,7 @@ def weather_plot_tail(
 # pylint: disable=too-many-locals,redefined-builtin
 def weather_plot_daily(
     station: StationName,
-    series: Enum,
+    series: StandardNames,
     host: str,
     measurement: str,
     token: str,
