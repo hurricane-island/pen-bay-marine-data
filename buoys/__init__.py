@@ -9,10 +9,13 @@ Features:
 """
 from pathlib import Path
 from hashlib import md5
+from matplotlib import text
 from pandas import Series, read_csv, DataFrame, concat
 from datetime import datetime
 from enum import Enum
 import click
+import re
+from typing import Tuple
 from lib import Source, StandardUnits, describe_data_frame, plot_tail, plot_options, boxplot
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -246,9 +249,32 @@ def buoy_file_export(name: StationName, table: TableName):
     Export buoy data to a different format.
     """
     files = filter_buoy_flat_files(name, table)
-    df = read_campbell_logger_files(files)
-    filename = DATA_DIR / f"{name.value}.{table.value}.csv"
-    df.to_csv(filename)
+    drop_columns = [
+        "RECORD", 
+        "WiperPosition",
+        "Sonde_External_Voltage",
+        "Sonde_Battery",
+        "WiperPeakCurrent",
+        "TimeRecovered",
+        ("Chlorophyll", "cells/mL"),
+        "BGA_PE_cellsmL",
+        "Pressure_Vert_Pos",
+        "Depth"
+    ]
+    df = read_campbell_logger_files(files).drop(columns=drop_columns)
+    mask = ~df.index.duplicated(keep=False) # drop all duplicates, temporary solution
+    unique = df[mask].sort_index()
+    unique.index.rename("time", inplace=True)
+    def format_column(col: Tuple[str, str, str]) -> str:
+        name, unit, _ = col
+        return f"{name} ({unit})"
+    headers = list(map(format_column, unique.columns))
+    print(headers)
+    parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
+    parts.insert(0, name.value)
+    filename = "-".join(parts).lower() + ".csv"
+    path = DATA_DIR / filename
+    unique.to_csv(path, header=headers)
 
 
 @buoys.command(name=ClickOptions.TEMPLATE.value)
