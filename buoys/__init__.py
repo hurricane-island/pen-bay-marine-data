@@ -234,7 +234,7 @@ def buoy_plot_daily(name: StationName, table: TableName, series: StandardNames, 
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(files)
     local = df["External_Temp"]
-    mask = ~df.index.duplicated(keep="first")
+    mask = ~df.index.duplicated(keep=False)
     unique = local[mask].sort_index()
     unique.index.rename("time", inplace=True)
     prefix = f"buoys/figures/{ClickOptions.DAILY.value}"
