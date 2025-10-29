@@ -260,7 +260,7 @@ def buoy_file_export(name: StationName, table: TableName):
         "Pressure_Vert_Pos",
         "Depth"
     ]
-    df = read_campbell_logger_files(files).drop(columns=drop_columns)
+    df = read_campbell_logger_files(files).drop(columns=drop_columns, errors='ignore')
     mask = ~df.index.duplicated(keep=False) # drop all duplicates, temporary solution
     unique = df[mask].sort_index()
     unique.index.rename("time", inplace=True)
