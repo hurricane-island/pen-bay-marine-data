@@ -261,7 +261,7 @@ def buoy_file_export(name: StationName, table: TableName):
         "Depth"
     ]
     df = read_campbell_logger_files(files).drop(columns=drop_columns, errors='ignore')
-    mask = ~df.index.duplicated(keep=False) # drop all duplicates, temporary solution
+    mask = ~df.index.duplicated(keep=False)  # TODO: This approach drops all duplicate index entries. Consider implementing a more nuanced duplicate handling strategy if needed.
     unique = df[mask].sort_index()
     unique.index.rename("time", inplace=True)
     def format_column(col) -> str:
