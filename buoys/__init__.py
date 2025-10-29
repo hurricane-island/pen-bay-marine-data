@@ -272,7 +272,6 @@ def buoy_file_export(name: StationName, table: TableName):
         # Fallback: just return string representation
         return str(col)
     headers = list(map(format_column, unique.columns))
-    print(headers)
     parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
     parts.insert(0, name.value)
     filename = "-".join(parts).lower() + ".csv"
