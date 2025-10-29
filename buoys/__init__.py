@@ -13,6 +13,8 @@ from pandas import Series, read_csv, DataFrame, concat
 from datetime import datetime
 from enum import Enum
 import click
+import re
+from typing import Tuple
 from lib import Source, StandardUnits, describe_data_frame, plot_tail, plot_options, boxplot
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -231,7 +233,7 @@ def buoy_plot_daily(name: StationName, table: TableName, series: StandardNames, 
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(files)
     local = df["External_Temp"]
-    mask = ~df.index.duplicated(keep="first")
+    mask = ~df.index.duplicated(keep=False)
     unique = local[mask].sort_index()
     unique.index.rename("time", inplace=True)
     prefix = f"buoys/figures/{ClickOptions.DAILY.value}"
@@ -246,9 +248,35 @@ def buoy_file_export(name: StationName, table: TableName):
     Export buoy data to a different format.
     """
     files = filter_buoy_flat_files(name, table)
-    df = read_campbell_logger_files(files)
-    filename = DATA_DIR / f"{name.value}.{table.value}.csv"
-    df.to_csv(filename)
+    drop_columns = [
+        "RECORD", 
+        "WiperPosition",
+        "Sonde_External_Voltage",
+        "Sonde_Battery",
+        "WiperPeakCurrent",
+        "TimeRecovered",
+        ("Chlorophyll", "cells/mL"),
+        "BGA_PE_cellsmL",
+        "Pressure_Vert_Pos",
+        "Depth"
+    ]
+    df = read_campbell_logger_files(files).drop(columns=drop_columns, errors='ignore')
+    mask = ~df.index.duplicated(keep=False)  # TODO: This approach drops all duplicate index entries. Consider implementing a more nuanced duplicate handling strategy if needed.
+    unique = df[mask].sort_index()
+    unique.index.rename("time", inplace=True)
+    def format_column(col) -> str:
+        # Handle columns that are not 3-tuples gracefully
+        if isinstance(col, tuple) and len(col) == 3:
+            name, unit, _ = col
+            return f"{name} ({unit})"
+        # Fallback: just return string representation
+        return str(col)
+    headers = list(map(format_column, unique.columns))
+    parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
+    parts.insert(0, name.value)
+    filename = "-".join(parts).lower() + ".csv"
+    path = DATA_DIR / filename
+    unique.to_csv(path, header=headers)
 
 
 @buoys.command(name=ClickOptions.TEMPLATE.value)
