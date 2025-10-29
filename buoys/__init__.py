@@ -9,7 +9,6 @@ Features:
 """
 from pathlib import Path
 from hashlib import md5
-from matplotlib import text
 from pandas import Series, read_csv, DataFrame, concat
 from datetime import datetime
 from enum import Enum
