@@ -264,9 +264,13 @@ def buoy_file_export(name: StationName, table: TableName):
     mask = ~df.index.duplicated(keep=False) # drop all duplicates, temporary solution
     unique = df[mask].sort_index()
     unique.index.rename("time", inplace=True)
-    def format_column(col: Tuple[str, str, str]) -> str:
-        name, unit, _ = col
-        return f"{name} ({unit})"
+    def format_column(col) -> str:
+        # Handle columns that are not 3-tuples gracefully
+        if isinstance(col, tuple) and len(col) == 3:
+            name, unit, _ = col
+            return f"{name} ({unit})"
+        # Fallback: just return string representation
+        return str(col)
     headers = list(map(format_column, unique.columns))
     print(headers)
     parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
