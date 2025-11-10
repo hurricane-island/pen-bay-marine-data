@@ -9,13 +9,6 @@ Const HYDROSPHERE_PORT As Long = 32212
 Const HYDROSPHERE_MAX_RETRIES As Long = 5 ' Hydrosphere connection attempts
 Const HYDROSPHERE_BUFFER_SIZE As Long = 96 ' 96 is required for 15min data, for 12 hours - if daily updates are used
 Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s
-Const CELLULAR As Long = 1
-Const SDI12 As Long = 1
-Const RS232 As Long = 2
-Const ANALOG As Long = 3
-Const RS485 As Long = 4
-Const ABSOLUTE As Long = 1
-Const DIFFERENTIAL As Long = 2
 Public Errors As String * 128 = ""
 Public Message As String * 256 = ""
 Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval.
@@ -24,24 +17,12 @@ Const SLOW_MEASUREMENT_INTERVAL_S As Long = 3600 ' interval for less critical me
 Const DATA_STORAGE_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' Store data every measurement cycle
 Const LOW_BATTERY_SAVER_V = 12.83
 Const LOW_BATTERY_SHUTDOWN_V = 12.75
-Const COMMS As Long = CELLULAR
 Const CELL_WINDOW_START As Long = 1440
 Const CELL_WINDOW_DURATION As Long = 10
 Const CELL_WINDOW_FREQUENCY As Long = 1440  ' Modem is always on when CELL_WINDOW_START = 1440
 Const CURRENT_ZERO_mV As Long = 1250 ' mV, To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
-Const A3_RATIO As Float = 1.000 ' Factory calibrated.  2:1 voltage divider fitted on A3
-Const SENSOR_QTY As Long = 1  ' Number of sensors fitted to this station, repeat the measurements on sequential ports or address
-Const GPS_INTERFACE As Long = RS232
-Const TABLE_WQ As Long = 200000
-Const SONDE_USED As Boolean = TRUE
-Const SONDE_USES_RS485 As Boolean = True
-Const SONDEVALUES_TBL_SIZE As Long = 5000
-Const PRESSURE_TYPE As Long = ABSOLUTE
-Const PRESSURE_FSR_PSI As Float = 43.5
 Const TRANSFER As Float = 0.1 ' Pressure sensor configuration
 Const PRESSURE_PORT As Long = 3
-Const PRESSURE_INTERFACE As Long = ANALOG
-Const YSIPPORT As Long = ComRS232
 Public Ai1WipesSonde As Boolean = True
 PreserveOneVariable(Ai1WipesSonde)
 Dim ParameterToSend(PARAMETERS_TO_SEND) As Long ' points to the address of each variable to send
@@ -53,7 +34,6 @@ Dim DataloggerOSVersion As Float ' Used for holding CR300 OS version
 Const FILTER_FREQUENCY As Long = 4000 ' Set to 50 or 60 for situations with AC noise, otherwise 4000Hz provides quickest processing
 Const TIMER_STOP As Long = 1
 Const TIMER_RESET_AND_START As Long = 2
-Const TIMER_RESET_AND_STOP As Long = 3
 Const TIMER_READ As Long = 4
 Const ALLOW_SLEEP As Long = 1
 Const GPS_TIMER As Long = 11
@@ -67,10 +47,7 @@ Dim ProgramCounter As Long: Units ProgramCounter = Cycles ' Program cycles since
 Dim LastProgramCounter As Long: Units LastProgramCounter = Cycles ' Error tracking
 Public BatteryVoltage As Float: Units BatteryVoltage = Volts
 Dim Vx1Voltage As Long
-Dim Vx2Voltage As Long ' Keep track of the excitation port voltage so that it can safely be turned off after status readings  
-Const PRESSURE_SUPPLY As Float = 5.0 ' All use 5V for maximum output
-Const PRESSURE_ZERO_OFFSET As Float = TRANSFER * PRESSURE_SUPPLY
-Const PRESSURE_FSR As Float = (1 - TRANSFER) * PRESSURE_SUPPLY
+Dim Vx2Voltage As Long ' Keep track of the excitation port voltage so that it can safely be turned off after status readings
 Const PRESSURE_PARAMETERS As Long = 3
 Public Pressure(PRESSURE_PARAMETERS) As Float
 Alias Pressure(1) = Pressure_Voltage: Units Pressure_Voltage = Volts
@@ -129,7 +106,7 @@ EndSub
 Dim CommsPowerOnStatus As Boolean = True
 Dim CellBillingDay = 1 ' Day of Month
 Public Control_____________ As Boolean = False ' This groups all the program control flags into one section for ease of use
-Dim ReadGPSNow As Boolean = False: Units ReadGPSNow = True = Trigger a new GPS reading ' Set by setting ReadStatusSensors true
+Dim ReadGPSNow As Boolean = False ' Set by setting ReadStatusSensors true
 Dim SendToHydrosphere As Boolean ' Set true to initiate data record and transfer.
 
 Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
@@ -139,7 +116,7 @@ Dim SensorKeepRS485OnLast As Boolean = False ' Keep track of when this is first 
 Dim SensorProgramOn As Boolean = False
 Dim SensorProgramOff As Boolean = False ' Program controlled power operation 
 Public Measurements________ As Boolean = False
-Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON
+Dim SensorPowerStatus
 Public GPSPowerStatus As Boolean: Units GPSPowerStatus = Returns True If GPS Is ON
 Const GPS_BAUD As Long = 9600
 Const GPS_BUFFER As Long = 512 ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
@@ -382,14 +359,14 @@ Sub Initialization
   YSIPInit()
   findSonde(3)
   Message = "Sonde initialized. "
-  Call WritePort(Vx1, 0) ' Turn off RS485 adapter.  Don't check SensorKeepRS485On because this is during initialization
+  Call WritePort(Vx1, 0) ' Turn off RS485 adapter.
   If Status.LithiumBattery < 3.0 Then ' Check diagnostics are record to ErrorLog if a problem
     Call ErrorLog("Low (or no) Lithium Battery = " + Status.LithiumBattery)
-    Delay(0, 500, mSec) ' Log with delay incase multiple messages are generated
+    Delay(0, 500, mSec) ' Log with delay in case multiple messages are generated
   End If
   If Status.WatchdogErrors > 0 Then
     Call ErrorLog("Watchdog errors = " + Status.WatchdogErrors)
-    Delay(0, 500, mSec) ' Log with delay incase multiple messages are generated
+    Delay(0, 500, mSec) ' Log with delay in case multiple messages are generated
   End If
   ' Check that all the measurement parameters are correct and evenly divisible (or measurements wont be taken correctly)
   If MEASUREMENT_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("MEASUREMENT_INTERVAL_S (" + MEASUREMENT_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
@@ -494,7 +471,7 @@ Sub SystemCheck
     If InternalHumidity > 80 Then Message = "Change desiccant ASAP, condensation likely.  Ref: Ai1 manual section 22.":  Call AddTime: Errors = Message
     ExciteV(Vx2,5000,0) ' Barometer uses 5V excitation
     For i = 1 To PRESSURE_READINGS
-      VoltSe(PressureArray(i),1,mv2500,PRESSURE_PORT,True,2000,50,0.001,0) ' Measure the voltage of the barometric pressure sensor.  Sensor uses 5V excitation.  0.001 convert to volts
+      VoltSe(PressureArray(i), 1, mv2500, PRESSURE_PORT, True, 2000, 50, 0.001, 0) ' Measure the voltage of the barometric pressure sensor.  Sensor uses 5V excitation.  0.001 convert to volts
     Next i
     SortSpa(PressureArray(), PRESSURE_READINGS, PressureArray())
     Pressure_Voltage = PressureArray(Ceiling(PRESSURE_READINGS/2))
