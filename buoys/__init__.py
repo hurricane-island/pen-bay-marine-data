@@ -10,6 +10,8 @@ Features:
 from pathlib import Path
 from hashlib import md5
 from pandas import Series, read_csv, DataFrame, concat
+import gpxpy
+import gpxpy.gpx
 from datetime import datetime
 from enum import Enum
 import click
@@ -19,6 +21,7 @@ from lib import Source, StandardUnits, describe_data_frame, plot_tail, plot_opti
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
+EXPORT_DIR = Path(__file__).parent / "export"
 
 class ClickOptions(Enum):
     """
@@ -275,9 +278,44 @@ def buoy_file_export(name: StationName, table: TableName):
     parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
     parts.insert(0, name.value)
     filename = "-".join(parts).lower() + ".csv"
-    path = DATA_DIR / filename
+    path = EXPORT_DIR / filename
     unique.to_csv(path, header=headers)
 
+@file_group.command(name='gpx')
+@click.argument("name", type=click.Choice(StationName, case_sensitive=False))
+def buoy_file_gpx(name: StationName):
+    """
+    Export buoy data to a different format.
+    """
+    table = TableName.DIAGNOSTIC
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(files)
+    mask = ~df.index.duplicated(keep=False)
+    unique = df[mask].sort_index()
+    unique.index.rename("time", inplace=True)
+    gpx = gpxpy.gpx.GPX()
+
+    # Create first track in our GPX:
+    gpx_track = gpxpy.gpx.GPXTrack()
+    gpx.tracks.append(gpx_track)
+
+    # Create first segment in our GPX track:
+    gpx_segment = gpxpy.gpx.GPXTrackSegment()
+    gpx_track.segments.append(gpx_segment)
+
+    for time, row in unique.tail(24).iterrows():
+        latitude = row[('Latitude', 'Decimal Degrees (N=+,S=-)', "Smp")]
+        longitude = row[('Longitude', 'Decimal Degrees (E=+,W=-)', "Smp")]
+        gpx_segment.points.append(gpxpy.gpx.GPXTrackPoint(latitude, longitude, elevation=0, time=time))
+
+    # You can add routes and waypoints, too...
+
+    parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
+    parts.insert(0, name.value)
+    filename = "-".join(parts).lower() + ".gpx"
+    path = EXPORT_DIR / filename
+    with open(path, "w", encoding="utf-8") as fid:
+        fid.write(gpx.to_xml())
 
 @buoys.command(name=ClickOptions.TEMPLATE.value)
 @click.option("--name", required=True, help="Station name")
