@@ -21,9 +21,10 @@ matplotlib = ">=3.10.5,<4"
 numpy = ">=2.3.2,<3"
 pip = ">=25.2,<26"
 ioos_qc = ">=2.2.1,<3"
+gpxpy = ">=1.6.2,<2"
 
 [pypi-dependencies]
-"influxdb3-python" = "~=0.15.0"
+"influxdb3-python" = "~=0.16.0"
 weewx = ">=5.1.0, <6"
 balena-sdk = ">=15.1.4, <16"
 sphinx = ">=8.2.3, <9"

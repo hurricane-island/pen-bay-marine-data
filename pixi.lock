@@ -38,6 +38,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/geographiclib-2.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/geojson-3.2.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/geos-3.13.1-h97f6797_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/gpxpy-1.6.2-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/graphite2-1.3.14-hecca717_2.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/h5netcdf-1.6.4-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/h5py-3.14.0-nompi_py313hfaf8fd4_100.conda
@@ -193,7 +194,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ff/62/85c4c919272577931d407be5ba5d71c20f0b616d31a0befe0ae45bb79abd/imagesize-1.4.1-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0d/38/221e5b2ae676a3938c2c1919131410c342b6efc2baffeda395dd66eeca8f/incremental-24.7.2-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5f/3f/6333820b49a7b59cc5dc8e88fb560245fc8b5903912f12a3fc8490f638aa/influxdb3_python-0.15.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/00/13/5ded7bea72d34b9d892fb0b72e0bfa29c081cdf806a9170c34d7fd15e587/influxdb3_python-0.16.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0c/91/96cf928db8236f1bfab6ce15ad070dfdd02ed88261c2afafd4b43575e9e9/MarkupSafe-3.0.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/14/bf/3e7803b9142514cccf9f4f41f40d8f2efcf5341c266edb0f44c719d6d0e7/pine_client-0.2.0-py3-none-any.whl
@@ -246,6 +247,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/geographiclib-2.0-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/geojson-3.2.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/geos-3.13.1-hc9a1286_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/gpxpy-1.6.2-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/h5netcdf-1.6.4-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/h5py-3.13.0-nompi_py313hcdf59df_100.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/hdf5-1.14.3-nompi_ha698983_109.conda
@@ -347,7 +349,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ff/62/85c4c919272577931d407be5ba5d71c20f0b616d31a0befe0ae45bb79abd/imagesize-1.4.1-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0d/38/221e5b2ae676a3938c2c1919131410c342b6efc2baffeda395dd66eeca8f/incremental-24.7.2-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5f/3f/6333820b49a7b59cc5dc8e88fb560245fc8b5903912f12a3fc8490f638aa/influxdb3_python-0.15.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/00/13/5ded7bea72d34b9d892fb0b72e0bfa29c081cdf806a9170c34d7fd15e587/influxdb3_python-0.16.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2b/6d/9409f3684d3335375d04e5f05744dfe7e9f120062c9857df4ab490a1031a/MarkupSafe-3.0.2-cp313-cp313-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/14/bf/3e7803b9142514cccf9f4f41f40d8f2efcf5341c266edb0f44c719d6d0e7/pine_client-0.2.0-py3-none-any.whl
@@ -1065,6 +1067,17 @@ packages:
   purls: []
   size: 1470335
   timestamp: 1741051878236
+- conda: https://conda.anaconda.org/conda-forge/noarch/gpxpy-1.6.2-pyhd8ed1ab_1.conda
+  sha256: c5265bd8e2ba0d49b455e9b8ea4bf3d8dbea7dd54aa48bb608f7853144294372
+  md5: c38ac3b6580a9527d31d2415a51d5f65
+  depends:
+  - python >=3.9
+  license: Apache-2.0
+  license_family: APACHE
+  purls:
+  - pkg:pypi/gpxpy?source=hash-mapping
+  size: 40816
+  timestamp: 1734959730238
 - conda: https://conda.anaconda.org/conda-forge/linux-64/graphite2-1.3.14-hecca717_2.conda
   sha256: 25ba37da5c39697a77fce2c9a15e48cf0a84f1464ad2aafbe53d8357a9f6cc8c
   md5: 2cd94587f3a401ae05e03a6caf09539d
@@ -1223,10 +1236,10 @@ packages:
   - tomli ; python_full_version < '3.11'
   - click>=6.0 ; extra == 'scripts'
   requires_python: '>=3.8'
-- pypi: https://files.pythonhosted.org/packages/5f/3f/6333820b49a7b59cc5dc8e88fb560245fc8b5903912f12a3fc8490f638aa/influxdb3_python-0.15.0-py3-none-any.whl
+- pypi: https://files.pythonhosted.org/packages/00/13/5ded7bea72d34b9d892fb0b72e0bfa29c081cdf806a9170c34d7fd15e587/influxdb3_python-0.16.0-py3-none-any.whl
   name: influxdb3-python
-  version: 0.15.0
-  sha256: ccbf22dfef32fe86464d258f94ed66631257b5f6f1624ae0969e23522ca27e3d
+  version: 0.16.0
+  sha256: 2f6d8caf671b25e0a19aeba5ed13eca6adc5bf141ef615b7e3d0f9f419a7711d
   requires_dist:
   - reactivex>=4.0.4
   - certifi>=14.5.14

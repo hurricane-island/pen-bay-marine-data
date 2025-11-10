@@ -4,6 +4,7 @@
         "APPRENTICESHOP",
         "autofmt",
         "balena",
+        "BLYNKEN",
         "cloudbase",
         "dewpoint",
         "figsize",
@@ -22,12 +23,14 @@
         "sondes",
         "twinx",
         "WEEWX",
+        "WYNKEN",
         "xaxis",
         "xdate",
         "xlabel",
         "xlim",
         "xticks",
         "ylabel",
-        "ylim"
+        "ylim",
+        "zorder"
     ]
 }

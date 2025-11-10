@@ -34,7 +34,8 @@ from lib import (
     fahrenheit_to_kelvin,
     cardinal_direction_to_degrees,
     describe_data_frame,
-    StandardUnits
+    StandardUnits,
+    Source
 )
 
 
@@ -80,21 +81,6 @@ class ClickCommands(Enum):
     DESCRIBE = "describe"
     BACKFILL = "backfill"
     EXPORT = "export"
-
-
-# pylint: disable=too-few-public-methods
-class Source:
-    """
-    Abstraction for converting from a data source
-    to standard format.
-    """
-
-    name: str
-    transform: callable
-
-    def __init__(self, name: str, transform: callable):
-        self.name = name
-        self.transform = transform
 
 
 # pylint: disable=too-few-public-methods
@@ -311,7 +297,8 @@ weather.add_command(file)
 
 def source_options(function):
     """
-    Choose weather station and observation series.
+    Choose weather station and observation series. Re-usable decorator
+    for commands that need to select a station and series.
     """
     function = click.argument(
         "series", type=click.Choice(StandardNames, case_sensitive=False)
@@ -434,12 +421,12 @@ def weather_describe_series(
     """
     Compare local and database data before merging or backfilling.
     """
-    remote = WeeWxInfluxArchive(measurement, token, host).df[series.value]
-    local = WeatherLinkArchive(station.value).df[series.value]
+    remote: Series = WeeWxInfluxArchive(measurement, token, host).df[series.value]
     remote.name = "influx"
+    local: Series = WeatherLinkArchive(station.value).df[series.value]
     local.name = "local"
-    df = concat([remote, local], axis=1)
-    print(df.describe())
+    summary = concat([remote, local], axis=1).describe()
+    print(summary)
 
 
 @plot.command(name=ClickCommands.TAIL.value)
@@ -474,8 +461,8 @@ def weather_plot_tail(
 
     Keyword arguments are passed through to the rendering function
     """
-    remote = WeeWxInfluxArchive(measurement, token, host).df[series.value]
-    local = WeatherLinkArchive(station.value).df[series.value]
+    remote: Series = WeeWxInfluxArchive(measurement, token, host).df[series.value]
+    local: Series = WeatherLinkArchive(station.value).df[series.value]
     prefix = f"{FIGURES_DIR}/{ClickCommands.TAIL.value}"
     unit = CF_STANDARDS.get(series).unit
     plot_tail(local, remote, station.value, series.value, prefix, units=unit, **kwargs)
@@ -488,7 +475,7 @@ def weather_plot_tail(
 # pylint: disable=too-many-locals,redefined-builtin
 def weather_plot_daily(
     station: StationName,
-    series: Enum,
+    series: StandardNames,
     host: str,
     measurement: str,
     token: str,
