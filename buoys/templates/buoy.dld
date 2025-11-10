@@ -141,13 +141,13 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
     WriteIO(&B00000010, StateMask)
   Case SE1
     If StateToWrite Then StateMask = &B00000100 Else StateMask = 0
-    Message = "Write to SE1 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrrorLog as it may be repeated
+    Message = "Write to SE1 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
   Case SE2
     If StateToWrite Then StateMask = &B00001000 Else StateMask = 0
-    Message = "Write to SE2 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrrorLog as it may be repeated
+    Message = "Write to SE2 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
   Case SE3 ' SE3 uses a different technique to drive regulators.  On is achieved by setting the port to high impedance (i.e. as an input).  Off is an output in the off state
     If StateToWrite Then StateMask = &B00010000 Else StateMask = 0
-    Message = "Write to SE3 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrrorLog as it may be repeated
+    Message = "Write to SE3 not supported or analog read instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrorLog as it may be repeated
   Case SE4 ' SE4 uses same technique as SE3, high impedance / 0V setting, using regulator internal pull up resistor
     If StateToWrite Then StateMask = &B00100000 Else StateMask = 0
     If StateToWrite Then 
@@ -164,11 +164,11 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
   Case P_SW ' 8
     If StateToWrite Then StateMask = &B10000000 Else StateMask = 0
     Message = "Write to P_SW not supported or PulseCount instructions result in compilation failure. ": Call AddTime: Errors = Message ' Don't use ErrrorLog as it may be repeated
-  Case Vx1                                                    ' Vx1/Vx2 do not use WriteIO, it must set to the desired state
+  Case Vx1 ' Vx1/Vx2 do not use WriteIO, it must set to the desired state
     If StateToWrite Then Vx1Voltage = 5000 Else Vx1Voltage = 0 ' Vx1 is either 5V or 0V
     Message = "Setting Vx1 to " + (Vx1Voltage/1000) + "V"
     ExciteV(Vx1,Vx1Voltage,0) 
-  Case Vx2                                                    ' Vx2 has high power regulator as well.  Due to enable/disable circuit Vx2 can not be fully turned off. Anything >400mV is accurate.  
+  Case Vx2 ' Vx2 has high power regulator as well.  Due to enable/disable circuit Vx2 can not be fully turned off. Anything >400mV is accurate.  
     If StateToWrite Then Vx2Voltage = 3300 Else Vx2Voltage = 0 ' Vx2 is either 3.3V or 0V
     Message = "Setting Vx2 to " + (Vx2Voltage/1000) + "V"
     ExciteV(Vx2,Vx2Voltage,0)
@@ -186,7 +186,7 @@ Sub WritePort(PortToWrite As Long, StateToWrite As Boolean)
       Message += ". Port was off (now on)"
       PortsON = PortsON + (2^PortToWrite)
     End If
-  Else                  ' If Turning a port off
+  Else ' If Turning a port off
     If (PortsON AND (2^PortToWrite)) Then
       Message += ". Port was on (now off)"
       PortsON = PortsON - (2^PortToWrite)
@@ -237,8 +237,8 @@ EndSub
 
 
 Dim CommsPowerOnStatus As Boolean = True  ' CommsPowerOnStatus returns the state of the internal cellular modem power when controlled by battery saver and shutdown settings, but does not indicate the state due to window duration and frequency.  IPNetPower overrides all other power control options
-Dim CellBillingDay = 1 ' Day of Month                         ' For data usage calculations, to know which day of month the billing cycle resets
-Public Control_____________ As Boolean = False                ' This groups all the program control flags into one section for ease of use
+Dim CellBillingDay = 1 ' Day of Month
+Public Control_____________ As Boolean = False ' This groups all the program control flags into one section for ease of use
 Dim ReadGPSNow As Boolean = False: Units ReadGPSNow = True = Trigger a new GPS reading ' Set by setting ReadStatusSensors true
 Dim SendToHydrosphere As Boolean ' Set true to initiate data record and transfer.
 
@@ -249,18 +249,18 @@ EndSub
 
 Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
 Public ReadStatusSensors As Boolean = False
-Public SensorKeepRS485On As Boolean = False                   ' Set true if power is to be kept on between readings.  May be useful to see the full boot-up message from the sonde.  No, it stops this working at all.  Only get a couple of bytes, 00 FF
-Dim SensorKeepRS485OnLast As Boolean = False                  ' Keep track of when this is first turned on, so you can power up the adapter
+Public SensorKeepRS485On As Boolean = False ' Set true if power is to be kept on between readings.  May be useful to see the full boot-up message from the sonde.  No, it stops this working at all.  Only get a couple of bytes, 00 FF
+Dim SensorKeepRS485OnLast As Boolean = False ' Keep track of when this is first turned on, so you can power up the adapter
 Dim SensorProgramOn As Boolean = False
 Dim SensorProgramOff As Boolean = False ' Program controlled power operation 
 Public Measurements________ As Boolean = False
 Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON ' No longer need this public, have PortsStatus
 Public GPSPowerStatus As Boolean: Units GPSPowerStatus = Returns True If GPS Is ON
 Const GPS_BAUD As Long = 9600
-Const GPS_BUFFER As Long = 512                                ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
+Const GPS_BUFFER As Long = 512 ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
 
 Public SondeReadFailed As Boolean = False
-Dim WQTemporaryRS485(YSISWATH) As Float                       ' A temporary array to be used to hold returned values prior to confirming as valid
+Dim WQTemporaryRS485(YSISWATH) As Float ' A temporary array to be used to hold returned values prior to confirming as valid
 Alias SondeValuesSorted(45) = Sonde_Future1
 Alias SondeValuesSorted(46) = Sonde_Future2
 Alias SondeValuesSorted(47) = Sonde_Future3
@@ -283,7 +283,7 @@ Sub MeasureWaterQuality
   Call WritePort(Vx1, True) ' Turn on the RS485 adapter
   Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
   WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
-  If NOT sondefound Then findSonde(3)                         ' If the sonde hasn't been found, then attempt to find first
+  If NOT sondefound Then findSonde(3)
   If Ai1WipesSonde Then ' When using Sample&Hold in the sonde, the sonde controls the wiping frequency, no need to duplicate here
     Message = "Allowing time for sonde wiper."
     startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
@@ -343,7 +343,7 @@ Public HydrosphereNames As String *(PARAMETERS_TO_SEND*26)' The combined descrip
 Dim HydrosphereBufferNextPointer As Long = 1
 
 Dim HydrosphereDescription(PARAMETERS_TO_SEND) As String * 26 ' The string description of each parameter, up to 24 characters in length 
-Dim HydrosphereValues(PARAMETERS_TO_SEND) As Float        ' The actual values to send
+Dim HydrosphereValues(PARAMETERS_TO_SEND) As Float
 Dim HydrosphereSocket As Long
 Dim SerialOutResult As Long
 Dim HydrosphereRetries As Long
@@ -413,7 +413,7 @@ Alias GPSReadings(6) = GPS_QualityIndicator: Units GPS_QualityIndicator = 0=NoFi
 Alias GPSReadings(7) = GPS_Satellites: Units GPS_Satellites = count
 Alias GPSReadings(8) = GPS_HDOP: Units GPS_HDOP = error estimate
 Alias GPSReadings(9) = GPS_Height: Units GPS_Height = meters
-Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)  ' Latitude recombined into a single value.  These are what are stored in the data tables
+Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)
 Public Longitude As Float: Units Longitude = Decimal Degrees (E=+,W=-)
 Public UTCTime As Long: Units UTCTime = HHMMSS
 Dim UTCDate As Long: Units UTCDate = YYMMDD
@@ -435,26 +435,26 @@ EndSub
 
 Sub ReadGPS
   If ReadGPSNow Then
-    If NOT(GPSPowerStatus) Then                               ' If it wasn't previously on
+    If NOT(GPSPowerStatus) Then ' If it wasn't previously on
       Message = "Powering GPS for location tracking. "
-      Call WritePort(Vx2,True)                                ' Use WritePort first so it keeps track of the status of the port
-      ExciteV(Vx2,5000,0)                                     ' Then set it to 5V which is higher than the 3.3V default
+      Call WritePort(Vx2, True) ' Use WritePort first so it keeps track of the status of the port
+      ExciteV(Vx2, 5000, 0) ' Then set it to 5V which is higher than the 3.3V default
       GPSPowerStatus = True
-      Timer(GPS_TIMER, Sec, TIMER_RESET_AND_START)              ' Start the GPS timer
+      Timer(GPS_TIMER, Sec, TIMER_RESET_AND_START) ' Start the GPS timer
     End If
     If (Timer(GPS_TIMER, Sec, TIMER_READ) > GPS_MAX_ON_TIME) Then
       Call GPSOff
       Message = "GPS timer shutdown"
     End If
-    SerialIn(RawGPSString, GPS_PORT, 50, 0, GPS_BUFFER)           ' Read in the serial data.  Termination is the time when characters stop being received (i.e. a break)
-    SerialFlush(GPS_PORT)                                     ' Clear out any data so a fresh reading is taken next cycle
-    GPSStart = InStr(1, RawGPSString, GPS_HEADER, 2)             ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
-    GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2)             ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
+    SerialIn(RawGPSString, GPS_PORT, 50, 0, GPS_BUFFER) ' Read in the serial data.  Termination is the time when characters stop being received (i.e. a break)
+    SerialFlush(GPS_PORT) ' Clear out any data so a fresh reading is taken next cycle
+    GPSStart = InStr(1, RawGPSString, GPS_HEADER, 2) ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
+    GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2) ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
     If (GPSStart>0) AND (GPSEnd>0) Then
       GPSString = Mid(RawGPSString,GPSStart,GPSEnd-GPSStart)  ' Get the part between the start and the end
       GPSLength = Len(GPSString)
       Comma2 = 1
-      CommaCount = 0                                ' Now parse the information and convert to double precision data, starting at the start of the string
+      CommaCount = 0 ' Now parse the information and convert to double precision data, starting at the start of the string
       For InternalCounter = 1 To GPS_PARAMETERS
         Comma1 = InStr(Comma2, GPSString, ",", 2)
         Comma2 = InStr(Comma1+1, GPSString, ",", 2) ' Start searching at the position of the last comma
@@ -469,7 +469,7 @@ Sub ReadGPS
       If CommaCount >= 9 AND (GPSReadings(7) >= GPSSatellitesRequired) Then ' We have enough satellites so save the information
         Latitude = Floor(GPS_Latitude_dddmm / 100.0) + (GPS_Latitude_dddmm MOD 100)/60
         Longitude = Floor(GPS_Longitude_dddmm / 100.0) + (GPS_Longitude_dddmm MOD 100)/60
-        If GPSReadingsString(3) = "S" Then                    ' Add the sign to the latitude / longitude
+        If GPSReadingsString(3) = "S" Then ' Add the sign to the latitude / longitude
           GPSReadings(3) = -1
           GPS_Latitude_dddmm = -GPS_Latitude_dddmm
           Latitude = -Latitude
@@ -499,13 +499,13 @@ DataTable(Ai1, True, 3000) ' Records status information for remote diagnostics
   Sample(1, BatteryVoltage, FP2)
   Sample(1, InternalTemperature, FP2)
   Sample(1, InternalHumidity, FP2)
-  Average(1,Current_mA,FP2,False): FieldNames("CurrentAverage:mA"): Units CurrentAverage = mA (-=Charge, +=Discharge) ' Can not use UINT2, must be FP2
+  Average(1,Current_mA,FP2,False): FieldNames("CurrentAverage:mA"): Units CurrentAverage = mA (-=Charge, +=Discharge)
   Maximum(1,Current_mA,FP2,False,False): FieldNames("CurrentMaximum:mA"): Units CurrentMaximum = mA (-=Charge, +=Discharge)
   Sample(1, ProcessingTime, UINT2)
   Sample(1, Status.SerialNumber, UINT2)
   Sample(1, DataloggerOSVersion, FP2)
   Sample(1, Ai1OSVersion, FP2)
-  Sample(1,Status.ProgSignature,UINT2): FieldNames("ProgramSignature:0-65535)"): Units ProgramSignature = (0-65535) ' Store the program signature to know when a program has changed
+  Sample(1,Status.ProgSignature,UINT2): FieldNames("ProgramSignature:0-65535)"): Units ProgramSignature = (0-65535)
   Sample(1,ProgramCounter,Long)
   Sample(1,Status.StartUpCode,FP2): FieldNames("StartUpCode:0=Ok,-1=Power Loss,-2=Watchdog"): Units StartUpCode = (0=Ok, -1=Power, -2=Watchdog)
   Sample(1,Status.WatchdogErrors,FP2): FieldNames("WatchdogErrors:Watchdog Errors Since Compile"): Units WatchdogErrors = Errors Since Compile
@@ -513,7 +513,7 @@ DataTable(Ai1, True, 3000) ' Records status information for remote diagnostics
   Sample(1,Status.MemoryFree, UINT2): FieldNames("MemoryFree:Bytes"): Units MemoryFree = Bytes
   Sample(1,Status.CellUsageToday,FP2): FieldNames("CellUsageToday:kB"): Units CellUsageToday = kB
   Sample(1,Status.CellUsageMonth,Long): FieldNames("CellUsageThisMonth:kB"): Units CellUsageThisMonth = kB 
-  Sample(1,Status.CellRSSI,FP2): FieldNames("CellRSSI:dBm"): Units CellRSSI = dBm ' 3G: Status.CellRSSI.  Excellent: Less than -70dBm, Good: -70dBm to -85dBm, Fair: -85dBm to -100dBm, Poor: Worse than -100dBm
+  Sample(1,Status.CellRSSI,FP2): FieldNames("CellRSSI:dBm"): Units CellRSSI = dBm ' 3G: Status.CellRSSI.
   Sample(1,Status.CellNetBand,FP2): FieldNames("CellNetBand:band")
   Sample(1, Latitude, IEEE4)
   Sample(1, Longitude, IEEE4)
@@ -543,9 +543,9 @@ Sub Initialization
   SetSetting("CellPwrStartTime", CELL_WINDOW_START) ' When to power up the modem
   SetSetting("CellPwrDuration", CELL_WINDOW_DURATION) ' How long is each window
   SetSetting("CellPwrRepeat", CELL_WINDOW_FREQUENCY) ' When does the window repeat, i.e. hourly
-  SetSetting("CellBillingDay", CellBillingDay)                 ' When to roll over the monthly usage
-  SetSetting("CellKeepAlive", "www.google.com")                ' URL to ping to verify network connectivity.  If this fails, the datalogger will re-establish
-  SetSetting("CellKeepAliveTime", 30)                          ' How often to ping test the link
+  SetSetting("CellBillingDay", CellBillingDay) ' When to roll over the monthly usage
+  SetSetting("CellKeepAlive", "www.google.com") ' verify network connectivity.  If this fails, the logger will re-establish
+  SetSetting("CellKeepAliveTime", 30) ' How often to ping test the link
   CommsPowerOnStatus = true
   IPNetPower(5, 1, 0) ' Make sure that it is turned on
   Call WritePort(Vx1, True)
