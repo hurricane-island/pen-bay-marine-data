@@ -19,6 +19,7 @@ from lib import Source, StandardUnits, describe_data_frame, plot_tail, plot_opti
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
+EXPORT_DIR = Path(__file__).parent / "export"
 
 class ClickOptions(Enum):
     """
@@ -275,7 +276,7 @@ def buoy_file_export(name: StationName, table: TableName):
     parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
     parts.insert(0, name.value)
     filename = "-".join(parts).lower() + ".csv"
-    path = DATA_DIR / filename
+    path = EXPORT_DIR / filename
     unique.to_csv(path, header=headers)
 
 @file_group.command(name='gpx')
@@ -301,7 +302,7 @@ def buoy_file_gpx(name: StationName):
     parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
     parts.insert(0, name.value)
     filename = "-".join(parts).lower() + ".csv"
-    path = DATA_DIR / filename
+    path = EXPORT_DIR / filename
     unique.to_csv(path, header=headers)
 
 @buoys.command(name=ClickOptions.TEMPLATE.value)
