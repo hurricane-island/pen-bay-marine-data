@@ -278,6 +278,31 @@ def buoy_file_export(name: StationName, table: TableName):
     path = DATA_DIR / filename
     unique.to_csv(path, header=headers)
 
+@file_group.command(name='gpx')
+@click.argument("name", type=click.Choice(StationName, case_sensitive=False))
+def buoy_file_gpx(name: StationName):
+    """
+    Export buoy data to a different format.
+    """
+    table = TableName.DIAGNOSTIC
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(files)
+    mask = ~df.index.duplicated(keep=False)
+    unique = df[mask].sort_index()
+    unique.index.rename("time", inplace=True)
+    def format_column(col) -> str:
+        # Handle columns that are not 3-tuples gracefully
+        if isinstance(col, tuple) and len(col) == 3:
+            name, unit, _ = col
+            return f"{name} ({unit})"
+        # Fallback: just return string representation
+        return str(col)
+    headers = list(map(format_column, unique.columns))
+    parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
+    parts.insert(0, name.value)
+    filename = "-".join(parts).lower() + ".csv"
+    path = DATA_DIR / filename
+    unique.to_csv(path, header=headers)
 
 @buoys.command(name=ClickOptions.TEMPLATE.value)
 @click.option("--name", required=True, help="Station name")
