@@ -10,6 +10,8 @@ Features:
 from pathlib import Path
 from hashlib import md5
 from pandas import Series, read_csv, DataFrame, concat
+import gpxpy
+import gpxpy.gpx
 from datetime import datetime
 from enum import Enum
 import click
@@ -291,19 +293,29 @@ def buoy_file_gpx(name: StationName):
     mask = ~df.index.duplicated(keep=False)
     unique = df[mask].sort_index()
     unique.index.rename("time", inplace=True)
-    def format_column(col) -> str:
-        # Handle columns that are not 3-tuples gracefully
-        if isinstance(col, tuple) and len(col) == 3:
-            name, unit, _ = col
-            return f"{name} ({unit})"
-        # Fallback: just return string representation
-        return str(col)
-    headers = list(map(format_column, unique.columns))
+    gpx = gpxpy.gpx.GPX()
+
+    # Create first track in our GPX:
+    gpx_track = gpxpy.gpx.GPXTrack()
+    gpx.tracks.append(gpx_track)
+
+    # Create first segment in our GPX track:
+    gpx_segment = gpxpy.gpx.GPXTrackSegment()
+    gpx_track.segments.append(gpx_segment)
+
+    for time, row in unique.tail(24).iterrows():
+        latitude = row[('Latitude', 'Decimal Degrees (N=+,S=-)', "Smp")]
+        longitude = row[('Longitude', 'Decimal Degrees (E=+,W=-)', "Smp")]
+        gpx_segment.points.append(gpxpy.gpx.GPXTrackPoint(latitude, longitude, elevation=0, time=time))
+
+    # You can add routes and waypoints, too...
+
     parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
     parts.insert(0, name.value)
-    filename = "-".join(parts).lower() + ".csv"
+    filename = "-".join(parts).lower() + ".gpx"
     path = EXPORT_DIR / filename
-    unique.to_csv(path, header=headers)
+    with open(path, "w", encoding="utf-8") as fid:
+        fid.write(gpx.to_xml())
 
 @buoys.command(name=ClickOptions.TEMPLATE.value)
 @click.option("--name", required=True, help="Station name")
