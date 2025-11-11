@@ -148,7 +148,6 @@ Public Control_____________ As Boolean = False ' This groups all the program con
 Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
 Public ReadStatusSensors As Boolean = False
 
-Dim SensorProgramOn As Boolean = False
 Dim SensorProgramOff As Boolean = False ' Program controlled power operation 
 Public Measurements________ As Boolean = False
 Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON
@@ -323,23 +322,22 @@ Sub Initialization
   SetSetting("CellKeepAliveTime", 30) ' How often to ping test the link
   CommsPowerOnStatus = true
   IPNetPower(5, 1, 0) ' Make sure modem is turned on
-  Call WritePort(Vx1, True)
   Call WritePort(SW12V, True)
-  For i = 25 To 1 Step -1
-    Delay(0, 1, Sec)
-    Message = "Powering sonde (" + i + "s remaining)" ' Wait for sonde to power up
-  Next i
+  Call WritePort(Vx1, True)
+  Message = "Powering sonde (25s remaining)"
+  Delay(0, 25, Sec)
   YSIPInit()
   findSonde(3)
   Message = "Sonde initialized. "
-  Call WritePort(Vx1, 0) ' Turn off RS485 adapter.
+  Call WritePort(Vx1, False) ' Turn off RS485 adapter.
+  Call WritePort(SW12V, False)
   If Status.LithiumBattery < 3.0 Then ' Check diagnostics are record to ErrorLog if a problem
     Call ErrorLog("Low (or no) Lithium Battery = " + Status.LithiumBattery)
-    Delay(0, 500, mSec) ' Log with delay incase multiple messages are generated
+    Delay(0, 500, mSec) ' Log with delay in case multiple messages are generated
   EndIf
   If Status.WatchdogErrors > 0 Then
     Call ErrorLog("Watchdog errors = " + Status.WatchdogErrors)
-    Delay(0, 500, mSec) ' Log with delay incase multiple messages are generated
+    Delay(0, 500, mSec) ' Log with delay in case multiple messages are generated
   EndIf
   ' Check that all the measurement parameters are correct and evenly divisible (or measurements wont be taken correctly)
   If MEASUREMENT_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("MEASUREMENT_INTERVAL_S (" + MEASUREMENT_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
@@ -347,7 +345,6 @@ Sub Initialization
   If DATA_STORAGE_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then
     Call ErrorLog("DATA_STORAGE_INTERVAL_S (" + DATA_STORAGE_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
   EndIf
-  SensorProgramOn = True ' Warmup = 0, means always on, start powered up
   DataloggerOSVersion = Right(Status.OSVersion, 5) ' Get the OS version and convert to a string, only needed at startup.  5 characters works for OS > 10.01
   Message += "System initialization complete."
   Call AddDate
@@ -355,21 +352,13 @@ EndSub
 
 
 Sub SensorMeasurements
-
   Public HydrosphereData As String *(22+PARAMETERS_TO_SEND*10) ' The string repr of one full record
   If TimeIntoInterval(0, MEASUREMENT_INTERVAL_S, Sec) Then 
     ReadNow = True
-    SensorProgramOn = True ' always on
-  EndIf
-  If (SensorProgramOn) Then
-    If NOT (SensorPowerStatus) Then ' Only turn it on if it is not already
-      Call WritePort(SW12V, True)
-      SensorPowerStatus = True
-    EndIf
-    SensorProgramOn = False
   EndIf
   If (ReadNow) Then
     Message = "Powering RS485 adapter for communications"
+    Call WritePort(SW12V, True)
     Call WritePort(Vx1, True) ' Turn on the RS485 adapter
     Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
     WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
@@ -420,6 +409,7 @@ Sub SensorMeasurements
     CallTable YSISondeMeta
     Message += ".  Shutting down RS485 adapter"
     Call WritePort(Vx1, False) ' sonde in lower power state
+    Call WritePort(SW12V, False)
     ReadNow = False
   EndIf
 
@@ -461,15 +451,6 @@ Sub SensorMeasurements
       NextRecord += 1
     EndIf
   EndIf
-  If (SensorProgramOff) Then
-    If SensorPowerStatus Then ' Only turn off if currently on
-      Call WritePort(SW12V, False)
-      SensorPowerStatus = False
-    EndIf
-    SensorProgramOff = False ' Only do this once
-  EndIf
-  Message = "Turning off RS485 adapter"
-  Call WritePort(Vx1, False)
 EndSub
 
 
@@ -478,10 +459,10 @@ Sub SystemCheck
     ReadStatusSensors = True
   EndIf
   PanelTemp(InternalTemperature, FILTER_FREQUENCY) ' Measure each time as this is a surrogate indicator for analog errors - when it has noise in the data
-  Battery(BatteryVoltage) ' Measure using the CR300 battery voltage hardware
+  Battery(BatteryVoltage)
   If ReadStatusSensors Then
     Call WritePort(Vx2, True) ' Start with 3.3V for humidity. Must be 3V3 or the output will be above 2.5V for SE channel.  Have tested 5V sensor to read correctly at 3V3
-    VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000,FILTER_FREQUENCY, 1.0, 0)
+    VoltSe(HumidityVoltage, 1, mV2500, HUMIDITY_PORT, True, 50000, FILTER_FREQUENCY, 1.0, 0)
     InternalHumidity = (((HumidityVoltage/3300)-0.1515)/0.0052)/(1.0546-0.00216*InternalTemperature)
     If InternalHumidity > 100 Then InternalHumidity = 100
     If InternalHumidity > 80 Then Message = "Change desiccant ASAP, condensation likely.  Ref: Ai1 manual section 22.":  Call AddTime: Errors = Message
