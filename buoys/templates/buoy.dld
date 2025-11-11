@@ -4,21 +4,18 @@ Const PAKBUS_ADDRESS As Long = $PAKBUS_ADDRESS ' network address
 Const TCP_CLIENT As String = "(drema.konectgds.com,9200)" ' Pakbus Router
 Public AccessPointName As String = "so01.VZWSTATIC" ' Cell APN
 Const PARAMETERS_TO_SEND = 14 ' message width for cloud
-Const HYDROSPHERE_HOST As String = "stormcentral.waterlog.com"
-Const HYDROSPHERE_PORT As Long = 32212
-Const HYDROSPHERE_MAX_RETRIES As Long = 5 ' Hydrosphere connection attempts
 Const HYDROSPHERE_BUFFER_SIZE As Long = 96 ' 96 is required for 15min data, for 12 hours - if daily updates are used
-Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s
-Const CELLULAR As Long = 1
+
+' Const CELLULAR As Long = 1
 Const SDI12 As Long = 1
 Const RS232 As Long = 2
 Const ANALOG As Long = 3
 Const RS485 As Long = 4
 Const ABSOLUTE As Long = 1
-Const DIFFERENTIAL As Long = 2
+' Const DIFFERENTIAL As Long = 2
 Public Errors As String * 128 = ""
 Public Message As String * 256 = ""
-Public PortsStatus As String * 90
+' Public PortsStatus As String * 90
 Dim PortsON As Long = 0
 Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval.
 Const MEASUREMENT_INTERVAL_S As Long = 600 ' Sensor measurement interval
@@ -26,14 +23,14 @@ Const SLOW_MEASUREMENT_INTERVAL_S As Long = 300 ' interval for less critical mea
 Const DATA_STORAGE_INTERVAL_S As Long = 600 ' Store data every measurement cycle
 Const LOW_BATTERY_SAVER_V = 12.83
 Const LOW_BATTERY_SHUTDOWN_V = 12.75' V  ' Battery protection thresholds.
-Const COMMS As Long = CELLULAR
+' Const COMMS As Long = CELLULAR
 Const CELL_WINDOW_START As Long = 1440
 Const CELL_WINDOW_DURATION As Long = 10
 Const CELL_WINDOW_FREQUENCY As Long = 1440  ' Modem is always on when CELL_WINDOW_START = 1440
 Const CURRENT_ZERO_mV As Long = 1250 ' mV.To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
 Const A3_RATIO As Float = 1.000 ' Factory calibrated.  2:1 voltage divider fitted on A3
 Const SENSOR_QTY As Long = 1  ' Number of sensors fitted to this station, repeat the measurements on sequential ports or address
-Const GPS_INTERFACE As Long = RS232
+' Const GPS_INTERFACE As Long = RS232
 Const TABLE_WQ As Long = 200000
 Const SONDE_USED As Boolean = TRUE
 Const SONDE_USES_RS485 As Boolean = True
@@ -154,7 +151,7 @@ Dim SensorKeepRS485OnLast As Boolean = False                  ' Keep track of wh
 Dim SensorProgramOn As Boolean = False
 Dim SensorProgramOff As Boolean = False ' Program controlled power operation 
 Public Measurements________ As Boolean = False
-Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON ' No longer need this public, have PortsStatus
+Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON
 Public GPSPowerStatus As Boolean: Units GPSPowerStatus = Returns True If GPS Is ON
 Const GPS_BAUD As Long = 9600
 Const GPS_BUFFER As Long = 512 ' The uBlox GPS output
@@ -245,18 +242,20 @@ Dim HydrosphereValues(PARAMETERS_TO_SEND) As Float ' values to send
 Sub Hydrosphere
   Dim Socket As Long
   Dim Output As Long
-  Dim Attempts As Long = 0
+  Dim Attempts = 0
+  Dim MaxRetries = 5
+  Dim Timeout = 500 ' x 0.01s
 
   If NextRecord > 1 Then
-    Do While NextRecord > 1 AND Attempts < HYDROSPHERE_MAX_RETRIES
+    Do While NextRecord > 1 AND Attempts < MaxRetries
       Attempts += 1
-      Socket = TCPOpen(HYDROSPHERE_HOST, HYDROSPHERE_PORT, 1000, HYDROSPHERE_TIMEOUT)
+      Socket = TCPOpen("stormcentral.waterlog.com", 32212, 1000, Timeout)
       If Socket <> 0 Then
         SerialFlush(Socket)
-        SerialOut(Socket, "SL(" + HYDROSPHERE_ID + ")" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
-        SerialOut(Socket, Labels, "OK", 1, HYDROSPHERE_TIMEOUT)
-        Output = SerialOut(Socket, Queue(1), "OK", 1, HYDROSPHERE_TIMEOUT)
-        SerialOut(Socket, "DIS" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
+        SerialOut(Socket, "SL(" + HYDROSPHERE_ID + ")" + CR, "OK", 1, Timeout)
+        SerialOut(Socket, Labels, "OK", 1, Timeout)
+        Output = SerialOut(Socket, Queue(1), "OK", 1, Timeout)
+        SerialOut(Socket, "DIS" + CR, "OK", 1, Timeout)
         TCPClose(Socket)
       Else
         Message = "No connection"
@@ -271,7 +270,7 @@ Sub Hydrosphere
         NextRecord -= 1
         Queue(NextRecord) = "" ' Clear buffer
         Message = "Report " + NextRecord + " sent"
-      ElseIf Attempts = HYDROSPHERE_MAX_RETRIES Then 
+      ElseIf Attempts = MaxRetries Then 
         Message = "Tx failed after " + Attempts + " attempts"
       Else
         Message = "No OK (" + Output + "). Retrying..."
