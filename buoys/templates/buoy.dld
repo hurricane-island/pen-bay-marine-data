@@ -147,8 +147,7 @@ Dim CellBillingDay = 1 ' Day of Month
 Public Control_____________ As Boolean = False ' This groups all the program control flags into one section for ease of use
 Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
 Public ReadStatusSensors As Boolean = False
-Public SensorKeepRS485On As Boolean = False ' Set true if power is to be kept on between readings.  May be useful to see the full boot-up message from the sonde.  No, it stops this working at all.  Only get a couple of bytes, 00 FF
-Dim SensorKeepRS485OnLast As Boolean = False ' Keep track of when this is first turned on, so you can power up the adapter
+
 Dim SensorProgramOn As Boolean = False
 Dim SensorProgramOff As Boolean = False ' Program controlled power operation 
 Public Measurements________ As Boolean = False
@@ -226,12 +225,8 @@ Sub MeasureWaterQuality
     CallTable SondeValues ' Only store if successful
   EndIf
   CallTable YSISondeMeta
-  If SensorKeepRS485On Then
-    Message += ".  Keeping RS485 powered on (override by SensorKeepRS485On)" ' Set by program control for testing.  High power.
-  Else
-    Message += ".  Shutting down RS485 adapter"
-    Call WritePort(Vx1, False) ' sonde in lower power state
-  EndIf
+  Message += ".  Shutting down RS485 adapter"
+  Call WritePort(Vx1, False) ' sonde in lower power state
 EndSub
 
 Public Queue(HYDROSPHERE_BUFFER_SIZE) As String *(22+PARAMETERS_TO_SEND*10)
@@ -390,7 +385,7 @@ Sub Initialization
   YSIPInit()
   findSonde(3)
   Message = "Sonde initialized. "
-  Call WritePort(Vx1, 0) ' Turn off RS485 adapter.  Don't check SensorKeepRS485On because this is during initialization
+  Call WritePort(Vx1, 0) ' Turn off RS485 adapter.
   If Status.LithiumBattery < 3.0 Then ' Check diagnostics are record to ErrorLog if a problem
     Call ErrorLog("Low (or no) Lithium Battery = " + Status.LithiumBattery)
     Delay(0, 500, mSec) ' Log with delay incase multiple messages are generated
@@ -476,15 +471,8 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
     EndIf
     SensorProgramOff = False ' Only do this once
   EndIf
-  If SensorKeepRS485On AND NOT(SensorKeepRS485OnLast) Then
-    Message = "Turning on RS485 adapter based on SensorKeepRS485On setting"
-    Call WritePort(Vx1, True)
-  EndIf
-  If NOT(SensorKeepRS485On) AND SensorKeepRS485OnLast Then
-    Message = "Turning off RS485 adapter based on SensorKeepRS485On setting"
-    Call WritePort(Vx1, False)
-  EndIf
-  SensorKeepRS485OnLast = SensorKeepRS485On
+  Message = "Turning off RS485 adapter"
+  Call WritePort(Vx1, False)
 EndSub
 
 
