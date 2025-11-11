@@ -9,16 +9,16 @@ Const HYDROSPHERE_PORT As Long = 32212
 Const HYDROSPHERE_MAX_RETRIES As Long = 5 ' Hydrosphere connection attempts
 Const HYDROSPHERE_BUFFER_SIZE As Long = 96 ' 96 is required for 15min data, for 12 hours - if daily updates are used
 Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s
-Const CELLULAR As Long = 1
+' Const CELLULAR As Long = 1
 Const SDI12 As Long = 1
 Const RS232 As Long = 2
 Const ANALOG As Long = 3
 Const RS485 As Long = 4
 Const ABSOLUTE As Long = 1
-Const DIFFERENTIAL As Long = 2
+' Const DIFFERENTIAL As Long = 2
 Public Errors As String * 128 = ""
 Public Message As String * 256 = ""
-Public PortsStatus As String * 90
+' Public PortsStatus As String * 90
 Dim PortsON As Long = 0
 Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval.
 Const MEASUREMENT_INTERVAL_S As Long = 600 ' Sensor measurement interval
@@ -26,14 +26,14 @@ Const SLOW_MEASUREMENT_INTERVAL_S As Long = 300 ' interval for less critical mea
 Const DATA_STORAGE_INTERVAL_S As Long = 600 ' Store data every measurement cycle
 Const LOW_BATTERY_SAVER_V = 12.83
 Const LOW_BATTERY_SHUTDOWN_V = 12.75' V  ' Battery protection thresholds.
-Const COMMS As Long = CELLULAR
+' Const COMMS As Long = CELLULAR
 Const CELL_WINDOW_START As Long = 1440
 Const CELL_WINDOW_DURATION As Long = 10
 Const CELL_WINDOW_FREQUENCY As Long = 1440  ' Modem is always on when CELL_WINDOW_START = 1440
 Const CURRENT_ZERO_mV As Long = 1250 ' mV.To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
-Const A3_RATIO As Float = 1.000 ' Factory calibrated.  2:1 voltage divider fitted on A3
+' Const A3_RATIO As Float = 1.000 ' Factory calibrated.  2:1 voltage divider fitted on A3
 Const SENSOR_QTY As Long = 1  ' Number of sensors fitted to this station, repeat the measurements on sequential ports or address
-Const GPS_INTERFACE As Long = RS232
+' Const GPS_INTERFACE As Long = RS232
 Const TABLE_WQ As Long = 200000
 Const SONDE_USED As Boolean = TRUE
 Const SONDE_USES_RS485 As Boolean = True
@@ -43,7 +43,7 @@ Const PRESSURE_FSR_PSI As Float = 43.5
 Const TRANSFER As Float = 0.1 ' Pressure sensor configuration
 Const PRESSURE_PORT As Long = 3
 Const PRESSURE_INTERFACE As Long = ANALOG
-Const SENSOR_POWER_PORT As Long = SW12V
+' Const SENSOR_POWER_PORT As Long = SW12V
 Const GPS_PORT As Long = ComC2_Rx
 Const YSIPPORT As Long = ComRS232
 Public Ai1WipesSonde As Boolean = True
@@ -151,7 +151,7 @@ Public ReadStatusSensors As Boolean = False
 Dim SensorProgramOn As Boolean = False
 Dim SensorProgramOff As Boolean = False ' Program controlled power operation 
 Public Measurements________ As Boolean = False
-Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON ' No longer need this public, have PortsStatus
+Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON
 Public GPSPowerStatus As Boolean: Units GPSPowerStatus = Returns True If GPS Is ON
 Const GPS_BAUD As Long = 9600
 Const GPS_BUFFER As Long = 512 ' The uBlox GPS output
@@ -175,59 +175,6 @@ Alias SondeValuesSorted(58) = Sonde_Future14
 Alias SondeValuesSorted(59) = Sonde_Future15
 Alias SondeValuesSorted(60) = Sonde_Future16
 
-Sub MeasureWaterQuality
-  Message = "Powering RS485 adapter for communications"
-  Call WritePort(Vx1, True) ' Turn on the RS485 adapter
-  Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
-  WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
-  If NOT sondefound Then findSonde(3) ' If the sonde hasn't been found, then attempt to find first
-  If Ai1WipesSonde Then ' When using Sample&Hold in the sonde, the sonde controls the wiping frequency, no need to duplicate here
-    Message = "Allowing time for sonde wiper."
-    startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
-    getWipeStatus()
-    For i = 40 To 1 Step -1
-      Delay(0, 1, Sec)
-      Message = "Allowing time for sonde wiper (" + i + "s remaining)"
-    Next i
-  EndIf
-  Message = "Reading sonde and updating available parameters. "
-  sondeCheck()
-  getSondeParams() ' Handle any sonde changes and update parameters
-  ReadAttempts = 0
-  Do
-    ReadAttempts += 1
-    Message = "Reading sonde values, attempt " + ReadAttempts
-    Sonde_External_Voltage = NaN
-    External_Temp = NaN
-    Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
-    getSondeValues() ' Populate available parameters
-    sortYSIPData()
-    ExternalTemp = External_Temp ' Map the temperature reading so that Hydrosphere and Satellite naming will work
-    SondeReadFailed = False
-    If (Sonde_External_Voltage = NaN) AND (WiperPosition = NAN) Then SondeReadFailed = True ' NAN's occur if there is no communications to sonde
-    If (Sonde_External_Voltage = 0) AND (WiperPosition = 0) Then SondeReadFailed = True ' 0's can occur if the sonde has failed to measure sensors yet, but ready to talk
-  Loop While (SondeReadFailed AND (ReadAttempts <= READ_ATTEMPTS_LIMIT)) ' Repeat if the read failed (any non-NaN value will mark success)
-  If SondeReadFailed Then ' Restore the previous values
-    SondeValuesSorted() = WQTemporaryRS485()
-    Message = "No valid Data ("
-    If Sonde_External_Voltage = NaN Then 
-      Message += "NAN returned"
-    ElseIf Sonde_External_Voltage = 0 Then Message += "Zero's returned"
-      Message += "Unspecified response"
-    EndIf
-    Message += "), restoring previous values. "
-    Call AddTime
-    Call AddDate
-    Errors = Message ' Message only, not logged
-  Else
-    Message = "Sonde read completed"
-    getSondeSN()
-    CallTable SondeValues ' Only store if successful
-  EndIf
-  CallTable YSISondeMeta
-  Message += ".  Shutting down RS485 adapter"
-  Call WritePort(Vx1, False) ' sonde in lower power state
-EndSub
 
 Public Queue(HYDROSPHERE_BUFFER_SIZE) As String *(22+PARAMETERS_TO_SEND*10)
 Public Labels As String *(PARAMETERS_TO_SEND*26)
@@ -407,7 +354,7 @@ Sub Initialization
 EndSub
 
 
-Sub SensorMeasurements ' Time commands at the top, so slow commands don't interfere
+Sub SensorMeasurements
 
   Public HydrosphereData As String *(22+PARAMETERS_TO_SEND*10) ' The string repr of one full record
   If TimeIntoInterval(0, MEASUREMENT_INTERVAL_S, Sec) Then 
@@ -416,14 +363,64 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
   EndIf
   If (SensorProgramOn) Then
     If NOT (SensorPowerStatus) Then ' Only turn it on if it is not already
-      Call WritePort(SENSOR_POWER_PORT, True)
+      Call WritePort(SW12V, True)
       SensorPowerStatus = True
     EndIf
-    SensorProgramOn = false ' Only do this once
+    SensorProgramOn = False
   EndIf
   If (ReadNow) Then
-    Call MeasureWaterQuality
-    ReadNow = false
+    Message = "Powering RS485 adapter for communications"
+    Call WritePort(Vx1, True) ' Turn on the RS485 adapter
+    Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
+    WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
+    If NOT sondefound Then findSonde(3) ' If the sonde hasn't been found, then attempt to find first
+    If Ai1WipesSonde Then ' When using Sample&Hold in the sonde, the sonde controls the wiping frequency, no need to duplicate here
+      Message = "Allowing time for sonde wiper."
+      startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
+      getWipeStatus()
+      For i = 40 To 1 Step -1
+        Delay(0, 1, Sec)
+        Message = "Allowing time for sonde wiper (" + i + "s remaining)"
+      Next i
+    EndIf
+    Message = "Reading sonde and updating available parameters. "
+    sondeCheck()
+    getSondeParams() ' Handle any sonde changes and update parameters
+    ReadAttempts = 0
+    Do
+      ReadAttempts += 1
+      Message = "Reading sonde values, attempt " + ReadAttempts
+      Sonde_External_Voltage = NaN
+      External_Temp = NaN
+      Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
+      getSondeValues() ' Populate available parameters
+      sortYSIPData()
+      ExternalTemp = External_Temp ' Map the temperature reading so that Hydrosphere and Satellite naming will work
+      SondeReadFailed = False
+      If (Sonde_External_Voltage = NaN) AND (WiperPosition = NAN) Then SondeReadFailed = True ' NAN's occur if there is no communications to sonde
+      If (Sonde_External_Voltage = 0) AND (WiperPosition = 0) Then SondeReadFailed = True ' 0's can occur if the sonde has failed to measure sensors yet, but ready to talk
+    Loop While (SondeReadFailed AND (ReadAttempts <= READ_ATTEMPTS_LIMIT)) ' Repeat if the read failed (any non-NaN value will mark success)
+    If SondeReadFailed Then ' Restore the previous values
+      SondeValuesSorted() = WQTemporaryRS485()
+      Message = "No valid Data ("
+      If Sonde_External_Voltage = NaN Then 
+        Message += "NAN returned"
+      ElseIf Sonde_External_Voltage = 0 Then Message += "Zero's returned"
+        Message += "Unspecified response"
+      EndIf
+      Message += "), restoring previous values. "
+      Call AddTime
+      Call AddDate
+      Errors = Message ' Message only, not logged
+    Else
+      Message = "Sonde read completed"
+      getSondeSN()
+      CallTable SondeValues ' Only store if successful
+    EndIf
+    CallTable YSISondeMeta
+    Message += ".  Shutting down RS485 adapter"
+    Call WritePort(Vx1, False) ' sonde in lower power state
+    ReadNow = False
   EndIf
 
   If TimeIntoInterval(0, DATA_STORAGE_INTERVAL_S, Sec) Then ' store at interval
@@ -466,7 +463,7 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
   EndIf
   If (SensorProgramOff) Then
     If SensorPowerStatus Then ' Only turn off if currently on
-      Call WritePort(SENSOR_POWER_PORT, False)
+      Call WritePort(SW12V, False)
       SensorPowerStatus = False
     EndIf
     SensorProgramOff = False ' Only do this once
