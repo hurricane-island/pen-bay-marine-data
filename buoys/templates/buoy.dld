@@ -75,10 +75,7 @@ Dim ProgramCounter As Long: Units ProgramCounter = Cycles ' Program cycles since
 Dim LastProgramCounter As Long: Units LastProgramCounter = Cycles ' Error tracking
 Public BatteryVoltage As Float: Units BatteryVoltage = Volts
 Dim Vx1Voltage As Long
-Dim Vx2Voltage As Long ' Keep track of the excitation port voltage so that it can safely be turned off after status readings  
-Const PRESSURE_SUPPLY As Float = 5.0 ' All use 5V for maximum output
-Const PRESSURE_ZERO_OFFSET As Float = TRANSFER * PRESSURE_SUPPLY
-Const PRESSURE_FSR As Float = (1 - TRANSFER) * PRESSURE_SUPPLY
+Dim Vx2Voltage As Long ' Keep track of the excitation port voltage so that it can safely be turned off after status readings 
 Const PRESSURE_PARAMETERS As Long = 3
 Public Pressure(PRESSURE_PARAMETERS) As Float
 Alias Pressure(1) = Pressure_Voltage: Units Pressure_Voltage = Volts
@@ -96,7 +93,16 @@ Public InternalTemperature As Float: Units InternalTemperature = °C
 Public InternalHumidity As Long: Units InternalHumidity = % ' Report only whole numbers
 Public HumidityVoltage As Float: Units HumidityVoltage = mV
 Public ProcessingTime: Units ProcessingTime = µS
-Dim rTime(9): Alias rTime(1) = Year: Alias rTime(2) = Month: Alias rTime(3) = DayOfMonth: Alias rTime(4) = Hour: Alias rTime(5) = Minute: Alias rTime(6) = Second: Alias rTime(7) = uSecond: Alias rTime(8) = WeekDay: Alias rTime(9) = DayOfYear
+Dim rTime(9)
+Alias rTime(1) = Year
+Alias rTime(2) = Month
+Alias rTime(3) = DayOfMonth
+Alias rTime(4) = Hour
+Alias rTime(5) = Minute
+Alias rTime(6) = Second
+Alias rTime(7) = uSecond
+Alias rTime(8) = WeekDay
+Alias rTime(9) = DayOfYear
 Dim i As Long ' For internal counters only
 Dim AddressToRead As Long ' Used by several subroutines, for holding a memory address for a pointer
 Dim ValueToLoad As Float ' Internal processing only, the value at the pointer address in Float form
@@ -141,8 +147,6 @@ Dim CommsPowerOnStatus As Boolean = True
 Dim CellBillingDay = 1 ' Day of Month
 Public Control_____________ As Boolean = False ' This groups all the program control flags into one section for ease of use
 Dim ReadGPSNow As Boolean = False: Units ReadGPSNow = True = Trigger a new GPS reading ' Set by setting ReadStatusSensors true
-Dim SendToHydrosphere As Boolean ' Set true to initiate data record and transfer.
-
 
 Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
 Public ReadStatusSensors As Boolean = False
@@ -154,7 +158,7 @@ Public Measurements________ As Boolean = False
 Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON ' No longer need this public, have PortsStatus
 Public GPSPowerStatus As Boolean: Units GPSPowerStatus = Returns True If GPS Is ON
 Const GPS_BAUD As Long = 9600
-Const GPS_BUFFER As Long = 512 ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
+Const GPS_BUFFER As Long = 512 ' The uBlox GPS output
 
 Public SondeReadFailed As Boolean = False
 Dim WQTemporaryRS485(YSISWATH) As Float ' A temporary array to be used to hold returned values prior to confirming as valid
@@ -180,7 +184,7 @@ Sub MeasureWaterQuality
   Call WritePort(Vx1, True) ' Turn on the RS485 adapter
   Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
   WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
-  If NOT sondefound Then findSonde(3)                         ' If the sonde hasn't been found, then attempt to find first
+  If NOT sondefound Then findSonde(3) ' If the sonde hasn't been found, then attempt to find first
   If Ai1WipesSonde Then ' When using Sample&Hold in the sonde, the sonde controls the wiping frequency, no need to duplicate here
     Message = "Allowing time for sonde wiper."
     startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
@@ -241,50 +245,47 @@ Dim HydrosphereBufferNextPointer As Long = 1
 
 Dim HydrosphereDescription(PARAMETERS_TO_SEND) As String * 26 ' The string description of each parameter, up to 24 characters in length 
 Dim HydrosphereValues(PARAMETERS_TO_SEND) As Float ' The actual values to send
-Dim HydrosphereSocket As Long
-Dim SerialOutResult As Long
-Dim HydrosphereRetries As Long
 
 Sub Hydrosphere
+  Dim Socket As Long
+  Dim Output As Long
+  Dim Attempts As Long = 0
+
   RealTime(rTime) ' Have If time statements at the top so none are missed from long scan times
-  If (SendToHydrosphere) Then
-    HydrosphereRetries = 0 ' Send the buffer
-    Message = "Hydrosphere ("
-    Call AddTime
-    Message += "). "
-    If HydrosphereBufferNextPointer > 1 Then
-      Do While HydrosphereBufferNextPointer > 1 AND HydrosphereRetries < HYDROSPHERE_MAX_RETRIES
-        HydrosphereRetries += 1
-        HydrosphereSocket = TCPOpen(HYDROSPHERE_HOST,HYDROSPHERE_PORT,1000,HYDROSPHERE_TIMEOUT)
-        If HydrosphereSocket <> 0 Then
-          SerialFlush(HydrosphereSocket)
-          SerialOut(HydrosphereSocket,"SL(" + HYDROSPHERE_ID + ")" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
-          SerialOut(HydrosphereSocket, HydrosphereNames, "OK", 1, HYDROSPHERE_TIMEOUT)
-          SerialOutResult = SerialOut(HydrosphereSocket, HydrosphereDataBuffer(1), "OK", 1, HYDROSPHERE_TIMEOUT)
-          SerialOut(HydrosphereSocket, "DIS" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
-          TCPClose(HydrosphereSocket)
-        Else
-          Message += "No connection. "
-          SerialOutResult = 0 ' Make sure that the last OK is not still in the status
+  Message = "Hydrosphere ("
+  Call AddTime
+  Message += "). "
+  If HydrosphereBufferNextPointer > 1 Then
+    Do While HydrosphereBufferNextPointer > 1 AND Attempts < HYDROSPHERE_MAX_RETRIES
+      Attempts += 1
+      Socket = TCPOpen(HYDROSPHERE_HOST, HYDROSPHERE_PORT, 1000, HYDROSPHERE_TIMEOUT)
+      If Socket <> 0 Then
+        SerialFlush(Socket)
+        SerialOut(Socket, "SL(" + HYDROSPHERE_ID + ")" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
+        SerialOut(Socket, HydrosphereNames, "OK", 1, HYDROSPHERE_TIMEOUT)
+        Output = SerialOut(Socket, HydrosphereDataBuffer(1), "OK", 1, HYDROSPHERE_TIMEOUT)
+        SerialOut(Socket, "DIS" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
+        TCPClose(Socket)
+      Else
+        Message += "No connection. "
+        Output = 0 ' Make sure that the last OK is not still in the status
+      End If
+      If Output = 2 Then ' If "OK" was sent
+        If HydrosphereBufferNextPointer > 2 Then ' If we still have at least 2 data values in the Buffer (one of which was just sent), move the Buffer forward by one.
+          For i = 1 To (HydrosphereBufferNextPointer - 2)
+            HydrosphereDataBuffer(i) = HydrosphereDataBuffer(i+1)
+          Next i
         End If
-        If SerialOutResult = 2 Then ' If "OK" was sent
-          If HydrosphereBufferNextPointer > 2 Then ' If we still have at least 2 data values in the Buffer (one of which was just sent), move the Buffer forward by one.
-            For i = 1 To (HydrosphereBufferNextPointer - 2)
-              HydrosphereDataBuffer(i) = HydrosphereDataBuffer(i+1)
-            Next i
-          End If
-          HydrosphereDataBuffer(HydrosphereBufferNextPointer-1) = "" ' Clear the details of the last Message from the Buffer (as they have been shifted forward by one now).
-          HydrosphereBufferNextPointer = HydrosphereBufferNextPointer - 1
-          Message += "Report " + HydrosphereBufferNextPointer + " sent. "
-        Else
-          Message += "No OK (" + SerialOutResult + "). "
-          If HydrosphereRetries = HYDROSPHERE_MAX_RETRIES Then Message += "Failed. " + HydrosphereRetries + "/" + HYDROSPHERE_MAX_RETRIES + " tries."
-        End If
-      Loop
-    Else
-      Message += "No data to send."
-    End If
-    SendToHydrosphere = False
+        HydrosphereDataBuffer(HydrosphereBufferNextPointer-1) = "" ' Clear the details of the last Message from the Buffer (as they have been shifted forward by one now).
+        HydrosphereBufferNextPointer = HydrosphereBufferNextPointer - 1
+        Message += "Report " + HydrosphereBufferNextPointer + " sent. "
+      Else
+        Message += "No OK (" + Output + "). "
+        If Attempts = HYDROSPHERE_MAX_RETRIES Then Message += "Failed. " + Attempts + "/" + HYDROSPHERE_MAX_RETRIES + " tries."
+      End If
+    Loop
+  Else
+    Message += "No data to send."
   End If
 EndSub
 
@@ -533,7 +534,6 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
       HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CR
       HydrosphereBufferNextPointer += 1
     End If
-    SendToHydrosphere = True ' If new data saved, then next time through, send it to Hydrosphere
   End If
   If (SensorProgramOff) Then
     If SensorPowerStatus Then ' Only turn off if currently on
