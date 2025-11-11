@@ -2,7 +2,7 @@ StationName = $STATION_NAME ' No quotes!
 Const HYDROSPHERE_ID = "$CLIENT_ID" ' Hydrosphere site.
 Const PAKBUS_ADDRESS As Long = $PAKBUS_ADDRESS ' network address
 Const TCP_CLIENT As String = "(drema.konectgds.com,9200)" ' Pakbus Router
-Public AccessPointName As String = "so01.VZWSTATIC" ' Cell APN
+Const AP_NAME As String = "so01.VZWSTATIC" ' Cell APN
 Const OBSERVED_PROPERTIES = 14
 Const HYDROSPHERE_HOST As String = "stormcentral.waterlog.com"
 Const HYDROSPHERE_PORT As Long = 32212
@@ -16,7 +16,6 @@ Const RS485 As Long = 4
 Const ABSOLUTE As Long = 1
 Public Errors As String * 128 = ""
 Public Message As String * 256 = ""
-' Dim PortsON As Long = 0
 Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval.
 Const MEASUREMENT_INTERVAL_S As Long = 600 ' Sensor measurement interval
 Const SLOW_MEASUREMENT_INTERVAL_S As Long = 300 ' interval for less critical measurements, such as GPS
@@ -27,9 +26,7 @@ Const CELL_WINDOW_DURATION As Long = 10
 Const CELL_WINDOW_FREQUENCY As Long = 1440  ' Modem is always on when CELL_WINDOW_START = 1440
 Const CURRENT_ZERO_mV As Long = 1250 ' mV.To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
 
-Const SENSOR_QTY As Long = 1  ' Number of sensors fitted to this station, repeat the measurements on sequential ports or address
 Const TABLE_WQ As Long = 200000
-Const SONDE_USED As Boolean = TRUE
 Const SONDE_USES_RS485 As Boolean = True
 Const SONDEVALUES_TBL_SIZE As Long = 5000
 Const PRESSURE_TYPE As Long = ABSOLUTE
@@ -38,9 +35,9 @@ Const TRANSFER As Float = 0.1 ' Pressure sensor configuration
 Const PRESSURE_PORT As Long = 3
 Const PRESSURE_INTERFACE As Long = ANALOG
 ' Const SENSOR_POWER_PORT As Long = SW12V
-Const GPS_PORT As Long = ComC2_Rx
+' Const GPS_PORT As Long = ComC2_Rx
 Const YSIPPORT As Long = ComRS232
-Dim Ai1WipesSonde As Boolean = True
+' Dim Ai1WipesSonde As Boolean = True
 ' PreserveOneVariable(Ai1WipesSonde)
 Dim ObservedProperty(OBSERVED_PROPERTIES) As Long ' points to the address of each variable to send
 Public ExternalTemp As Float ' First reading from the sonde, use this instead of External_Temp
@@ -56,7 +53,7 @@ Const FILTER_FREQUENCY As Long = 4000 ' Set to 50 or 60 for situations with AC n
 Const TIMER_STOP As Long = 1
 Const TIMER_RESET_AND_START As Long = 2
 Const TIMER_READ As Long = 4
-Const ALLOW_SLEEP As Long = 1
+' Const ALLOW_SLEEP As Long = 1
 Const GPS_TIMER As Long = 11
 Const CR = CHR(13)
 Const hPa_TO_m As Float = 0.0101972
@@ -112,11 +109,9 @@ EndSub
 Dim CommsPowerOnStatus As Boolean = True
 Dim CellBillingDay = 1 ' Day of Month
 
-Public ReadNow As Boolean = False
+Dim ReadNow As Boolean = False
 Public ReadStatusSensors As Boolean = False
 
-Public Measurements________ As Boolean = False
-Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON
 Public GPSPowerStatus As Boolean: Units GPSPowerStatus = Returns True If GPS Is ON
 Const GPS_BAUD As Long = 9600
 Const GPS_BUFFER As Long = 512 ' The uBlox GPS output
@@ -233,7 +228,6 @@ Sub GPSOff
 EndSub
 
 DataTable(Ai1, True, 3000) ' Records status information for remote diagnostics
-  DataInterval(0, SLOW_MEASUREMENT_INTERVAL_S, Sec, 0)
   Sample(1, BatteryVoltage, FP2)
   Sample(1, InternalTemperature, FP2)
   Sample(1, InternalHumidity, FP2)
@@ -264,26 +258,25 @@ EndTable
 Sub Initialization
   AddressToRead = 0 ' Stops a warning if not used
   Call GPSOff ' turn the GPS off to put the power output port and regulator in a known state
-  SerialOpen(GPS_PORT, GPS_BAUD, 0, 0, GPS_BUFFER, ALLOW_SLEEP)
+  SerialOpen(ComC2_Rx, GPS_BAUD, 0, 0, GPS_BUFFER, 1)
   Message = "Initializing... "
   RealTime(rTime)
   Call ErrorLog("Program restart") ' Record the program restart in the error log
   Delay(0, 500, mSec) ' Have a short delay incase multiple messages are generated
 
-  Measurements________ = false
   i = 0  ' Just to stop a compile warning that it is unused
   SetSetting("PakBusTCPClients", TCP_CLIENT)
   SetSetting("PakBusAddress", PAKBUS_ADDRESS)
   Battery(BatteryVoltage) ' Get a battery voltage reading so that on first execution it will have a reading
   SetSetting("CellEnabled", True) ' Make sure that the modem is turned on
-  SetSetting("CellAPN", AccessPointName) ' Configure the APN.  It is possible to set this through the constant table
+  SetSetting("CellAPN", AP_NAME) ' Configure the APN.
   SetSetting("CellPwrStartTime", CELL_WINDOW_START) ' When to power up the modem
   SetSetting("CellPwrDuration", CELL_WINDOW_DURATION) ' How long is each window
   SetSetting("CellPwrRepeat", CELL_WINDOW_FREQUENCY) ' When does the window repeat, i.e. hourly
   SetSetting("CellBillingDay", CellBillingDay) ' When to roll over the monthly usage
   SetSetting("CellKeepAlive", "www.google.com") ' verify network connectivity.  If this fails, the datalogger will re-establish
   SetSetting("CellKeepAliveTime", 30) ' How often to ping test the link
-  CommsPowerOnStatus = true
+  CommsPowerOnStatus = True
   IPNetPower(5, 1, 0) ' Make sure modem is turned on
   WriteIO(&B01000000, &B01000000)
   ExciteV(Vx1, 5000, 0)
@@ -303,77 +296,76 @@ Sub Initialization
     Delay(0, 500, mSec) ' Log with delay in case multiple messages are generated
   EndIf
   ' Check that all the measurement parameters are correct and evenly divisible (or measurements wont be taken correctly)
-  If MEASUREMENT_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("MEASUREMENT_INTERVAL_S (" + MEASUREMENT_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
   If SLOW_MEASUREMENT_INTERVAL_S MOD SCAN_INTERVAL_S > 0 Then Call ErrorLog("SLOW_MEASUREMENT_INTERVAL_S (" + SLOW_MEASUREMENT_INTERVAL_S + " sec) needs to be a multiple of SCAN_INTERVAL_S (" + SCAN_INTERVAL_S + " sec)")
-  DataloggerOSVersion = Right(Status.OSVersion, 5) ' Get the OS version and convert to a string, only needed at startup.  5 characters works for OS > 10.01
+  DataloggerOSVersion = Right(Status.OSVersion, 5)
   Message += "System initialization complete."
   Call AddDate
 EndSub
 
+Sub Wiper
+  Message = "Cleaning sensor probes"
+  WriteIO(&B01000000, &B01000000)
+  ExciteV(Vx1, 5000, 0)
+  Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
+  If NOT sondefound Then findSonde(3) ' If the sonde hasn't been found, then attempt to find first
+  startWipe() ' 2 passes in each direction, takes up to 30s
+  Delay(0, 60, Sec)
+  getWipeStatus()
+  ExciteV(Vx1, 0, 0) ' sonde in low power state
+  WriteIO(&B01000000, 0)
+EndSub
 
 Sub SensorMeasurements
   Public Serialized As String *(22+OBSERVED_PROPERTIES*10) ' The string repr of one full record
   Dim Values(OBSERVED_PROPERTIES) As Float ' values to send
   Dim WQTemporaryRS485(YSISWATH) As Float ' hold returned values prior to confirming as valid
-  If TimeIntoInterval(0, MEASUREMENT_INTERVAL_S, Sec) Then 
-    ReadNow = True
-  EndIf
-  If (ReadNow) Then
-    Message = "Powering RS485 adapter for communications"
-    WriteIO(&B01000000, &B01000000)
-    ExciteV(Vx1, 5000, 0) ' Turn on the RS485 adapter
-    Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
-    WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
-    If NOT sondefound Then findSonde(3) ' If the sonde hasn't been found, then attempt to find first
-    If Ai1WipesSonde Then ' When using Sample&Hold in the sonde, the sonde controls the wiping frequency, no need to duplicate here
-      Message = "Allowing time for sonde wiper."
-      startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
-      getWipeStatus()
-      For i = 40 To 1 Step -1
-        Delay(0, 1, Sec)
-        Message = "Allowing time for sonde wiper (" + i + "s remaining)"
-      Next i
-    EndIf
-    Message = "Reading sonde and updating available parameters. "
-    sondeCheck()
-    getSondeParams() ' Handle any sonde changes and update parameters
-    ReadAttempts = 0
-    Do
-      ReadAttempts += 1
-      Message = "Reading sonde values, attempt " + ReadAttempts
-      Sonde_External_Voltage = NaN
-      External_Temp = NaN
-      Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
-      getSondeValues() ' Populate available parameters
-      sortYSIPData()
-      ExternalTemp = External_Temp ' Map the temperature reading so that Hydrosphere and Satellite naming will work
-      SondeReadFailed = False
-      If (Sonde_External_Voltage = NaN) AND (WiperPosition = NAN) Then SondeReadFailed = True ' NAN's occur if there is no communications to sonde
-      If (Sonde_External_Voltage = 0) AND (WiperPosition = 0) Then SondeReadFailed = True ' 0's can occur if the sonde has failed to measure sensors yet, but ready to talk
-    Loop While (SondeReadFailed AND (ReadAttempts <= READ_ATTEMPTS_LIMIT)) ' Repeat if the read failed (any non-NaN value will mark success)
-    If SondeReadFailed Then ' Restore the previous values
-      SondeValuesSorted() = WQTemporaryRS485()
-      Message = "No valid Data ("
-      If Sonde_External_Voltage = NaN Then 
-        Message += "NAN returned"
-      ElseIf Sonde_External_Voltage = 0 Then Message += "Zero's returned"
-        Message += "Unspecified response"
-      EndIf
-      Message += "), restoring previous values. "
-      Call AddTime
-      Call AddDate
-      Errors = Message ' Message only, not logged
+
+  Message = "Powering RS485 adapter for communications"
+  WriteIO(&B01000000, &B01000000)
+  ExciteV(Vx1, 5000, 0) ' Turn on the RS485 adapter
+  Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
+  WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
+  If NOT sondefound Then findSonde(3) ' If the sonde hasn't been found, then attempt to find first
+  Message = "Reading sonde and updating available parameters. "
+  sondeCheck()
+  getSondeParams() ' Handle any sonde changes and update parameters
+  ReadAttempts = 0
+  Do
+    ReadAttempts += 1
+    Message = "Reading sonde values, attempt " + ReadAttempts
+    Sonde_External_Voltage = NaN
+    External_Temp = NaN
+    Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
+    getSondeValues() ' Populate available parameters
+    sortYSIPData()
+    ExternalTemp = External_Temp ' Map the temperature reading so that Hydrosphere and Satellite naming will work
+    SondeReadFailed = False
+    If (Sonde_External_Voltage = NaN) AND (WiperPosition = NAN) Then SondeReadFailed = True ' no communications
+    If (Sonde_External_Voltage = 0) AND (WiperPosition = 0) Then SondeReadFailed = True ' ready to talk
+  Loop While (SondeReadFailed AND (ReadAttempts <= READ_ATTEMPTS_LIMIT))
+  If SondeReadFailed Then ' Restore the previous values
+    SondeValuesSorted() = WQTemporaryRS485()
+    Message = "No valid Data ("
+    If Sonde_External_Voltage = NaN Then 
+      Message += "NAN returned"
+    ElseIf Sonde_External_Voltage = 0 Then
+      Message += "Zero's returned"
     Else
-      Message = "Sonde read completed"
-      getSondeSN()
-      CallTable SondeValues ' Only store if successful
+      Message += "Unspecified response"
     EndIf
-    CallTable YSISondeMeta
-    Message += ".  Shutting down RS485 adapter"
-    ExciteV(Vx1, 0, 0) ' sonde in low power state
-    WriteIO(&B01000000, 0)
-    ReadNow = False
+    Message += "), restoring previous values. "
+    Call AddTime
+    Call AddDate
+    Errors = Message ' Message only, not logged
+  Else
+    Message = "Sonde read completed"
+    getSondeSN()
+    CallTable SondeValues ' Only store if successful
   EndIf
+  CallTable YSISondeMeta
+  Message += ".  Shutting down RS485 adapter"
+  ExciteV(Vx1, 0, 0) ' sonde in low power state
+  WriteIO(&B01000000, 0)
 
   ObservedProperty(1) = @ExternalTemp
   ObservedProperty(2) = @SpConductivity_us
@@ -463,8 +455,8 @@ Sub SystemCheck
       Call GPSOff
       Message = "GPS timer shutdown"
     EndIf
-    SerialIn(RawGPSString, GPS_PORT, 50, 0, GPS_BUFFER) ' Read in the serial data
-    SerialFlush(GPS_PORT) ' Clear out any data so a fresh reading is taken next cycle
+    SerialIn(RawGPSString, ComC2_Rx, 50, 0, GPS_BUFFER) ' Read in the serial data
+    SerialFlush(ComC2_Rx) ' Clear out any data so a fresh reading is taken next cycle
     GPSStart = InStr(1, RawGPSString, GPS_HEADER, 2) ' position of $GPGGA (start)
     GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2) ' position of the terminator
     If (GPSStart>0) AND (GPSEnd>0) Then
@@ -527,7 +519,7 @@ Sub SystemCheck
       If CommsPowerOnStatus = false Then
         If ProgramCounter > LastProgramCounter + 10 Then ' Only cycle power if not recently done
           Call ErrorLog("Battery power restored, resuming normal operation.  Ref: Ai1_manual section 9.2")
-          CommsPowerOnStatus = true
+          CommsPowerOnStatus = True
           IPNetPower(5, 1, 0) ' Modem on
         EndIf
       EndIf
@@ -552,18 +544,24 @@ EndSub
 BeginProg
   Call Initialization
 
-  Scan (SCAN_INTERVAL_S, Sec, 0, 0)
+  Scan (6, Min, 0, 0)
     Call SensorMeasurements
   NextScan
 
   SlowSequence
-    Scan (SCAN_INTERVAL_S, Sec, 0, 0)
+    Scan (2, Min, 0, 0)
+      Call Wiper
+    NextScan
+  EndSequence
+
+  SlowSequence
+    Scan (5, Sec, 0, 0)
       Call SystemCheck
     NextScan
   EndSequence
 
   SlowSequence
-    Scan (60, Sec, 0, 0)
+    Scan (15, Min, 0, 0)
       Call Hydrosphere
     NextScan
   EndSequence
