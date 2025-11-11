@@ -37,6 +37,7 @@ class ClickOptions(Enum):
     FILE = "file"
     BUOYS = "buoys"
     PLOT = "plot"
+    FIRMWARE = "firmware"
     # plotting commands
     TAIL = "tail"
     DAILY = "daily"
@@ -96,6 +97,12 @@ def buoys():
     Command line interface for working with buoy data and firmware.
     """
 
+@click.group(name=ClickOptions.FIRMWARE.value)
+def firmware():
+    """
+    Command line interface for working with buoy data and firmware.
+    """
+
 
 @click.group(name=ClickOptions.PLOT.value)
 def plot():
@@ -130,6 +137,7 @@ def source_options(function):
 
 # Subcommands assignment
 buoys.add_command(plot)
+buoys.add_command(firmware)
 buoys.add_command(file_group)
 
 
@@ -317,12 +325,12 @@ def buoy_file_gpx(name: StationName):
     with open(path, "w", encoding="utf-8") as fid:
         fid.write(gpx.to_xml())
 
-@buoys.command(name=ClickOptions.TEMPLATE.value)
+@firmware.command(name=ClickOptions.TEMPLATE.value)
 @click.option("--name", required=True, help="Station name")
 @click.option("--address", required=True, help="Pakbus address")
 @click.option("--client", required=True, help="Client ID")
 @click.option("--file", default="buoy.dld", help="Template file")
-def template(name: str, address: str, client: str, file: str):
+def buoys_firmware_template(name: str, address: str, client: str, file: str):
     """
     Fill in firmware template with options passed on
     the command line.
@@ -345,7 +353,29 @@ def template(name: str, address: str, client: str, file: str):
     hasher.update(encoded_data)
     checksum = hasher.hexdigest()
     prefix = name.lower()
-    firmware = f"{path}/firmware/{prefix}.{checksum}.dld"
-    Path(firmware).parent.mkdir(parents=True, exist_ok=True)
-    with open(firmware, "w", encoding="utf-8") as fid:
+    filename = f"{path}/firmware/{prefix}.{checksum}.dld"
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+    with open(filename, "w", encoding="utf-8") as fid:
+        fid.write(filedata)
+
+
+@firmware.command(name="lib")
+@click.option("--file", default="lib.dld", help="Template file")
+def buoys_firmware_library(file: str):
+    """
+    Fill in firmware template with options passed on
+    the command line.
+    """
+    path = Path(__file__).parent.absolute()
+    template_path = f"{path}/templates/{file}"
+    with open(template_path, "r", encoding="utf-8") as fid:
+        filedata = fid.read()
+
+    encoded_data = filedata.encode("utf-8")
+    hasher = md5()
+    hasher.update(encoded_data)
+    checksum = hasher.hexdigest()
+    filename = f"{path}/firmware/lib.{checksum}.dld"
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+    with open(filename, "w", encoding="utf-8") as fid:
         fid.write(filedata)
