@@ -24,6 +24,44 @@ Public Message As String * 256 = ""
 Public PortsStatus As String * 90
 Dim PortsON As Long = 0
 
+Const R As Float = 6371000 ' Earth's radius in meters
+Const PI As Float = 3.14159265358979
+Public DistanceOffStation As Float: Units DistanceOffStation = m
+Function Haversine(Lat As Float, Lon As Float) As Float
+    Dim Lat2 As Float = $LATITUDE ' expected latitude
+    Dim Lon2 As Float = $LONGITUDE ' expected longitude
+
+    ' Convert degrees to radians
+    Dim RadLat1 As Float
+    Dim RadLon1 As Float
+    Dim RadLat2 As Float
+    Dim RadLon2 As Float
+    
+    RadLat = Lat * PI / 180
+    RadLon = Lon * PI / 180
+    RadLat2 = Lat2 * PI / 180
+    RadLon2 = Lon2 * PI / 180
+
+    ' Calculate difference in latitudes and longitudes
+    Dim dLat As Float
+    Dim dLon As Float
+    
+    dLat = RadLat2 - RadLat
+    dLon = RadLon2 - RadLon
+
+    ' Apply Haversine formula
+    Dim a As Float
+    Dim c As Float
+    Dim d As Float
+    
+    a = Sin(dLat / 2) * Sin(dLat / 2) + Cos(RadLat1) * Cos(RadLat2) * Sin(dLon / 2) * Sin(dLon / 2)
+    c = 2 * Atn(Sqr(a) / Sqr(1 - a))
+    d = R * c
+
+    Haversine = d
+EndFunction
+
+
 ' Factory configuration constants
 Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval.
 Const MEASUREMENT_INTERVAL_S As Long = 3600 ' Sensor measurement interval
@@ -488,6 +526,7 @@ Sub ReadGPS
         UTCDate = 0
         GPSSatellitesInView = GPS_Satellites ' UTCDate isn't part of serial message
         Message = "GPS location complete, using " + GPSReadings(7) + " satellites."
+        DistanceOffStation = Haversine(Latitude, Longitude)
         Call GPSOff
       End If
     End If
