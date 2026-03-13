@@ -1,0 +1,91 @@
+' Wiring Details: 
+' YSI EXO3 SDI12. MCBH6F. Orange=1(Orange-C1), Black=2(Black-GND), Red=3(Red-SW12V). Coil Yellow+White and insulate pins
+StationName = $STATION_NAME ' No quotes!
+Const PAKBUS_ADDRESS As Long = $PAKBUS_ADDRESS
+Const SCAN_INTERVAL_S As Long = 5
+Const MEASUREMENT_INTERVAL_S As Long = 3600
+Const SENSOR_WARMUP_S As Long = 45
+Const SONDE_PARAMETERS As Long = 12
+Public Message As String * 256 = ""
+Const READ_ATTEMPTS_LIMIT As Long = 3
+Public ReadAttempts As Long
+Dim ReadNow As Boolean = False
+Public WQReadings(SONDE_PARAMETERS) As Float = NAN ' Define array for sonde
+Dim WQVerification As Float = NAN
+
+
+DataTable (SondeValues, 1, 10000) ' To be triggered after each read instruction
+  Sample(SONDE_PARAMETERS, WQReadings, IEEE4)
+  Sample(1, ReadAttempts, FP2)
+EndTable
+
+
+DataTable(Ai1, True, 1000)
+  Sample(1, Status.SerialNumber, UINT2)
+  Sample(1, Status.ProgSignature, UINT2): FieldNames("ProgramSignature:0-65535)"): Units ProgramSignature = (0-65535)
+  Sample(1, Status.StartUpCode, FP2): FieldNames("StartUpCode:0=Ok,-1=Power Loss,-2=Watchdog"): Units StartUpCode = (0=Ok, -1=Power, -2=Watchdog)
+  Sample(1, Status.WatchdogErrors, FP2): FieldNames("WatchdogErrors:Watchdog Errors Since Compile"): Units WatchdogErrors = Errors Since Compile
+  Sample(1, Status.SkippedScan, FP2): FieldNames("SkippedScans:Scans Skipped"): Units SkippedScans = Scans Skipped
+  Sample(1, Status.MemoryFree, UINT2): FieldNames("MemoryFree:Bytes"): Units MemoryFree = Bytes
+  Sample(1, Status.CommsMemFree, String) ' A String indicating memory free for various comms buffers
+  Sample(1, Status.CellUsageToday, FP2): FieldNames("CellUsageToday:kB"): Units CellUsageToday = kB
+  Sample(1, Status.CellUsageMonth, Long): FieldNames("CellUsageThisMonth:kB"): Units CellUsageThisMonth = kB
+  Sample(1, Status.CellRSSI, FP2): FieldNames("CellRSSI:dBm"): Units CellRSSI = dBm
+  Sample(1, Status.CellState, String)
+EndTable
+
+
+Sub Initialization
+  ExciteV(Vx2, 0, 0)
+  SetSetting("PakBusTCPClients", "(drema.konectgds.com,9200)")
+  SetSetting("PakBusAddress", PAKBUS_ADDRESS)
+  SetSetting("CellEnabled", True)
+  SetSetting("CellAPN", "so01.VZWSTATIC")
+  SetSetting("CellPwrStartTime", 1440) ' When to power up the modem
+  SetSetting("CellPwrDuration", 10) ' How long is each window
+  SetSetting("CellPwrRepeat", 60) ' When does the window repeat
+  SetSetting("CellBillingDay", 1)
+  SetSetting("CellKeepAlive","www.google.com")
+  SetSetting("CellKeepAliveTime", 30)
+  IPNetPower(5, 1, 0)
+EndSub
+
+
+Sub SensorMeasurements
+  If TimeIntoInterval(0, MEASUREMENT_INTERVAL_S, Sec) Then ReadNow = True
+
+  If (ReadNow) Then
+    WriteIO(&B01000000, &B01000000)
+    Delay(0, SENSOR_WARMUP_S, Sec)
+    SDI12Recorder(WQVerification, C1, 0, "V!", 1.0, 0, 0, 1) ' If a sonde doesn't wake up straight away, this gives it a few tries
+    Message = "Requesting SDI12 measurement from Address 0 and waiting for response. "
+    ReadAttempts = 0
+    Do
+      SDI12Recorder(WQReadings(), C1, 0, "C!", 1.0, 0, 0, 1) ' concurrent command (C!) and wait for the response
+      ReadAttempts += 1
+    Loop While ((WQReadings(1)=NAN) AND (ReadAttempts <= READ_ATTEMPTS_LIMIT))
+    If WQReadings(1) <> NAN Then 
+      Message = "SDI12 Read completed after " + ReadAttempts + " attempt(s)"
+      CallTable SondeValues
+    Else
+      Message = "Sonde failed to return valid data after " + ReadAttempts
+    EndIf
+    WriteIO(&B01000000, 0)
+    ReadNow = False
+  EndIf
+EndSub
+
+BeginProg
+  Call Initialization
+
+  Scan (SCAN_INTERVAL_S,Sec,0,0)
+    Call SensorMeasurements
+  NextScan
+
+  SlowSequence
+    Scan (SCAN_INTERVAL_S,Sec,0,0)
+      CallTable Ai1
+    NextScan
+  EndSequence
+
+EndProg
