@@ -24,12 +24,9 @@ DataTable(Ai1, True, 1000)
   Sample(1, Status.SerialNumber, UINT2)
   Sample(1, Status.ProgSignature, UINT2): FieldNames("ProgramSignature:0-65535)"): Units ProgramSignature = (0-65535)
   Sample(1, Status.StartUpCode, FP2): FieldNames("StartUpCode:0=Ok,-1=Power Loss,-2=Watchdog"): Units StartUpCode = (0=Ok, -1=Power, -2=Watchdog)
-  Sample(1, Status.WatchdogErrors, FP2): FieldNames("WatchdogErrors:Watchdog Errors Since Compile"): Units WatchdogErrors = Errors Since Compile
   Sample(1, Status.SkippedScan, FP2): FieldNames("SkippedScans:Scans Skipped"): Units SkippedScans = Scans Skipped
   Sample(1, Status.MemoryFree, UINT2): FieldNames("MemoryFree:Bytes"): Units MemoryFree = Bytes
   Sample(1, Status.CommsMemFree, String) ' A String indicating memory free for various comms buffers
-  Sample(1, Status.CellUsageToday, FP2): FieldNames("CellUsageToday:kB"): Units CellUsageToday = kB
-  Sample(1, Status.CellUsageMonth, Long): FieldNames("CellUsageThisMonth:kB"): Units CellUsageThisMonth = kB
   Sample(1, Status.CellRSSI, FP2): FieldNames("CellRSSI:dBm"): Units CellRSSI = dBm
   Sample(1, Status.CellState, String)
 EndTable
@@ -78,12 +75,12 @@ EndSub
 BeginProg
   Call Initialization
 
-  Scan (SCAN_INTERVAL_S,Sec,0,0)
+  Scan(SCAN_INTERVAL_S, Sec, 0, 0)
     Call SensorMeasurements
   NextScan
 
   SlowSequence
-    Scan (SCAN_INTERVAL_S,Sec,0,0)
+    Scan(SCAN_INTERVAL_S, Sec, 0, 0)
       CallTable Ai1
     NextScan
   EndSequence
