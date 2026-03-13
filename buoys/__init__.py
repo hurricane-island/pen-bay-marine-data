@@ -7,17 +7,17 @@ Features:
 - Match weather API as much as possible
 
 """
+
+import re
 from pathlib import Path
+from enum import Enum
+from datetime import datetime
 from hashlib import md5
 from pandas import Series, read_csv, DataFrame, concat
 import gpxpy
 import gpxpy.gpx
-from datetime import datetime
-from enum import Enum
 import click
-import re
-from typing import Tuple
-from lib import Source, StandardUnits, describe_data_frame, plot_tail, plot_options, boxplot
+from lib import Source, StandardUnits, plot_tail, plot_options, boxplot
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
