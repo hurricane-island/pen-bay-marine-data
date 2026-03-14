@@ -153,7 +153,7 @@ buoys.add_command(file_group)
 
 
 @file_group.command(name=ClickOptions.LIST.value)
-def buoy_file_list():
+def buoys_file_list():
     """
     List available stations from static data.
     """
@@ -206,7 +206,7 @@ def filter_buoy_flat_files(name: StationName, table: TableName):
 @file_group.command(name=ClickOptions.DESCRIBE.value)
 @station_name
 @data_table
-def buoy_file_describe(name: StationName, table: TableName):
+def buoys_file_describe(name: StationName, table: TableName):
     """
     Summarize available data for a station.
     """
@@ -220,7 +220,7 @@ def buoy_file_describe(name: StationName, table: TableName):
 @plot.command(name=ClickOptions.TAIL.value)
 @source_options
 @plot_options
-def buoy_plot_tail(
+def buoys_plot_tail(
     name: StationName, table: TableName, series: StandardNames, **kwargs
 ):
     """
@@ -247,7 +247,7 @@ def buoy_plot_tail(
 @plot.command(name=ClickOptions.DAILY.value)
 @source_options
 @plot_options
-def buoy_plot_daily(name: StationName, table: TableName, series: StandardNames, **kwargs):
+def buoys_plot_daily(name: StationName, table: TableName, series: StandardNames, **kwargs):
     """
     Plot a single `DataStream` aggregated by day.
     """
@@ -266,7 +266,7 @@ def buoy_plot_daily(name: StationName, table: TableName, series: StandardNames, 
 @file_group.command(name=ClickOptions.EXPORT.value)
 @station_name
 @data_table
-def buoy_file_export(name: StationName, table: TableName):
+def buoys_file_export(name: StationName, table: TableName):
     """
     Export buoy data to a different format.
     """
@@ -303,7 +303,7 @@ def buoy_file_export(name: StationName, table: TableName):
 
 @file_group.command(name='gpx')
 @station_name
-def buoy_file_gpx(name: StationName):
+def buoys_file_gpx(name: StationName):
     """
     Export buoy data to a different format.
     """
