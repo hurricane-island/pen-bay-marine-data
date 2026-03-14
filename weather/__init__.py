@@ -138,7 +138,7 @@ CF_STANDARDS = {
     ),
     StandardNames.RELATIVE_HUMIDITY: ObservedProperty(
         name=StandardNames.RELATIVE_HUMIDITY.value,
-        unit=None,
+        unit="",
         weather_link=Source(
             name="Out Hum", transform=lambda x: x * PERCENT_TO_FRACTION
         ),
@@ -197,7 +197,7 @@ CF_STANDARDS = {
     ),
     StandardNames.ULTRAVIOLET_INDEX: ObservedProperty(
         name=StandardNames.ULTRAVIOLET_INDEX.value,
-        unit=None,
+        unit="",
         weather_link=Source(name="UV Index", transform=lambda x: x),
         weewx=Source(name="UV", transform=lambda x: x),
     ),

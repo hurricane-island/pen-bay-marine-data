@@ -6,7 +6,7 @@ to processing Pandas DataFrames and plotting with Matplotlib.
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.axes import Axes
 from click import Choice, option
@@ -52,9 +52,9 @@ class Source:
     """
 
     name: str
-    transform: callable
+    transform: Callable
 
-    def __init__(self, name: str, transform: callable):
+    def __init__(self, name: str, transform: Callable):
         self.name = name
         self.transform = transform
 
@@ -175,7 +175,7 @@ def plot_single_series(
     Plot a single resampled time series. Key word arguments are
     passed to the matplotlib Axes.plot() method.
     """
-    observed_property: str = series.name
+    observed_property = str(series.name)
     observed_property = observed_property.replace("_", " ").title()
     if resample:
         resampled = series.resample(resample)
@@ -233,15 +233,15 @@ def plot_qartod_flags(
 
 def plot_tail(
     local: Series,
-    remote: Series | None,
+    remote: Optional[Series],
     thing: str,
     observed_property: str,
     prefix: str,
-    units: str = None,
+    units: Optional[str] = None,
     image_format: ImageFormat = ImageFormat.PNG,
     days: int = 30,
     resample: str = "1h",
-    qartod: str = None,
+    qartod: Optional[str] = None,
     figsize: tuple[int, int] = (7, 3),
     time_column: str = "time",
 ):
@@ -256,6 +256,9 @@ def plot_tail(
     start: datetime = end - timedelta(days=days)
     fig, ax = plt.subplots(figsize=figsize)
     local_tail = local.loc[local.index > start]
+    config = None
+    if qartod is not None:
+        config = Config(qartod)
 
     plot_single_series(local_tail, ax, resample, label="local", color="grey")
     if remote is not None:
@@ -268,12 +271,11 @@ def plot_tail(
             color="black",
             linestyle=":",
         )
-
-    if qartod is not None:
-        config = Config(qartod)
-        plot_qartod_flags(
-            ax, tail, observed_property, config, time_column=time_column, label=True
-        )
+        if config is not None:
+            plot_qartod_flags(
+                ax, tail, observed_property, config, time_column=time_column, label=True
+            )
+    if config is not None:
         plot_qartod_flags(
             ax, local_tail, observed_property, config, time_column=time_column
         )
