@@ -73,6 +73,7 @@ def influx_options(function):
     function = option(
         "--measurement",
         default="observations",
+        envvar="INFLUXDB_MEASUREMENT",
         help="The InfluxDB measurement (table) name.",
     )(function)
     function = option(

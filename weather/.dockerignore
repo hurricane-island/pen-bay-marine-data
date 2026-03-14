@@ -1,6 +1,6 @@
 __init__.py
-cli.py
 data/
 __pycache__/
 figures/
 qartod.yaml
+test_*.py
