@@ -9,7 +9,7 @@ Const HYDROSPHERE_PORT As Long = 32212
 Const HYDROSPHERE_MAX_RETRIES As Long = 5 ' Hydrosphere connection attempts
 Const HYDROSPHERE_BUFFER_SIZE As Long = 96 ' Readings stored while waiting for comms.  96 is required for 15min data, for 12 hours - if daily updates are used
 Const HYDROSPHERE_TIMEOUT As Long = 500 ' x 0.01s
-Const DIFFERENTIAL As Long = 2
+
 
 Public Errors As String * 128 = ""
 Public Message As String * 256 = ""
@@ -61,11 +61,11 @@ Const LOW_BATTERY_SHUTDOWN_V = 12.75' V  ' Battery protection thresholds.  SAVER
 Const CELL_WINDOW_START As Long = 1440
 Const CELL_WINDOW_DURATION As Long = 10
 Const CELL_WINDOW_FREQUENCY As Long = 1440  ' Modem is always on when CELL_WINDOW_START = 1440
-Const CURRENT_ZERO_mV As Long = 1250 ' mV.                    ' Factory calibrated.  To recalibrate: Remove fuse and power Ai1 from charging input, measure Current_mV
-Const SONDEVALUES_TBL_SIZE As Long = 5000
+Const CURRENT_ZERO_mV As Long = 1250 ' Factory calibrated: Remove fuse and power Ai1 from charging input, measure Current_mV
+Const SONDEVALUES_TBL_SIZE As Long = 5000  ' used in YSI headers
 Const PRESSURE_PORT As Long = 3
 Const GPS_PORT As Long = ComC2_Rx ' C2. Serial Rx from GPS
-Const YSIPPORT As Long = ComRS232
+Const YSIPPORT As Long = ComRS232 ' used in YSI headers
 Public Ai1WipesSonde As Boolean = True
 PreserveOneVariable(Ai1WipesSonde)
 
@@ -138,22 +138,16 @@ Dim CommsPowerOnStatus As Boolean = True ' CommsPowerOnStatus returns the state 
 Dim CellBillingDay = 1 ' Day of Month
 Public Control_____________ As Boolean = False ' This groups all the program control flags into one section for ease of use
 Dim ReadGPSNow As Boolean = False ' Set by setting ReadStatusSensors
-Dim SendToHydrosphere As Boolean ' initiate data record and transfer.
+Dim SendToHydrosphere As Boolean = False ' initiate data record and transfer.
 
-Sub Communications
-  RealTime(rTime) ' Have If time statements at the top so none are missed from long scan times
-  Call Hydrosphere
-EndSub
+
 
 Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
 Public ReadStatusSensors As Boolean = False
-Public SensorKeepRS485On As Boolean = False ' Set if power is to be kept on between readings.  May be useful to see the full boot-up message from the sonde.  No, it stops this working at all.  Only get a couple of bytes, 00 FF
-Dim SensorKeepRS485OnLast As Boolean = False ' Keep track of when this is first turned on, so you can power up the adapter
 Dim SensorProgramOn As Boolean = False
-Dim SensorProgramOff As Boolean = False ' Program controlled power operation 
-Public Measurements________ As Boolean = False
-Dim SensorPowerStatus: Units SensorPowerStatus = Returns True If Sensor Is ON ' No longer need this public, have PortsStatus
-Public GPSPowerStatus As Boolean: Units GPSPowerStatus = Returns True If GPS Is ON
+Dim SensorProgramOff As Boolean = False ' Program controlled power operation
+Dim SensorPowerStatus As Boolean = False
+Dim GPSPowerStatus As Boolean = False
 Const GPS_BAUD As Long = 9600
 Const GPS_BUFFER As Long = 512 ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
 
@@ -178,7 +172,7 @@ Alias SondeValuesSorted(60) = Sonde_Future16
 
 Sub MeasureWaterQuality
   Message = "Powering RS485 adapter for communications"
-  ExciteV(Vx1,5000,0) ' Turn on the RS485 adapter
+  ExciteV(Vx1, 5000, 0) ' Turn on the RS485 adapter
   Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
   WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
   If NOT sondefound Then findSonde(3)                         ' If the sonde hasn't been found, then attempt to find first
@@ -226,12 +220,8 @@ Sub MeasureWaterQuality
     CallTable SondeValues ' Only store if successful
   EndIf
   CallTable YSISondeMeta
-  If SensorKeepRS485On Then
-    Message += ".  Keeping RS485 powered on (override by SensorKeepRS485On)" ' Set by program control for testing.  High power.
-  Else
-    Message += ".  Shutting down RS485 adapter"
-    ExciteV(Vx1, 0, 0) ' sonde in lower power state
-  EndIf
+  Message += ".  Shutting down RS485 adapter"
+  ExciteV(Vx1, 0, 0) ' sonde in lower power state
 EndSub
 
 
@@ -240,48 +230,49 @@ Public HydrosphereDataBuffer(HYDROSPHERE_BUFFER_SIZE) As String *(22+PARAMETERS_
 Public HydrosphereNames As String *(PARAMETERS_TO_SEND*26)' The combined descriptions into a single string
 Dim HydrosphereBufferNextPointer As Long = 1
 Dim HydrosphereDescription(PARAMETERS_TO_SEND) As String * 26 ' The string description of each parameter, up to 24 characters in length 
-Dim HydrosphereValues(PARAMETERS_TO_SEND) As Float        ' The actual values to send
+Dim HydrosphereValues(PARAMETERS_TO_SEND) As Float ' The actual values to send
 
-
-
-
-Sub Hydrosphere
-  Dim HydrosphereRetries As Long
+Sub Communications
+  ' Send data to cloud if new data has been collected.
+  Dim Attempts As Long
   Dim SerialOutResult As Long
-  Dim HydrosphereSocket As Long
+  Dim Socket As Long
 
+  RealTime(rTime)
   If (SendToHydrosphere) Then
-    HydrosphereRetries = 0 ' Send the buffer
+    Attempts = 0
     Message = "Hydrosphere ("
     Call AddTime
     Message += "). "
     If HydrosphereBufferNextPointer > 1 Then
-      Do While HydrosphereBufferNextPointer > 1 AND HydrosphereRetries < HYDROSPHERE_MAX_RETRIES
-        HydrosphereRetries += 1
-        HydrosphereSocket = TCPOpen(HYDROSPHERE_HOST,HYDROSPHERE_PORT,1000,HYDROSPHERE_TIMEOUT)
-        If HydrosphereSocket <> 0 Then
-          SerialFlush(HydrosphereSocket)
-          SerialOut(HydrosphereSocket,"SL(" + HYDROSPHERE_ID + ")" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
-          SerialOut(HydrosphereSocket, HydrosphereNames, "OK", 1, HYDROSPHERE_TIMEOUT)
-          SerialOutResult = SerialOut(HydrosphereSocket, HydrosphereDataBuffer(1), "OK", 1, HYDROSPHERE_TIMEOUT)
-          SerialOut(HydrosphereSocket, "DIS" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
-          TCPClose(HydrosphereSocket)
+      Do While HydrosphereBufferNextPointer > 1 AND Attempts < HYDROSPHERE_MAX_RETRIES
+        Attempts += 1
+        Socket = TCPOpen(HYDROSPHERE_HOST, HYDROSPHERE_PORT, 1000, HYDROSPHERE_TIMEOUT)
+        If Socket <> 0 Then
+          SerialFlush(Socket)
+          SerialOut(Socket,"SL(" + HYDROSPHERE_ID + ")" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
+          SerialOut(Socket, HydrosphereNames, "OK", 1, HYDROSPHERE_TIMEOUT)
+          SerialOutResult = SerialOut(Socket, HydrosphereDataBuffer(1), "OK", 1, HYDROSPHERE_TIMEOUT)
+          SerialOut(Socket, "DIS" + CR, "OK", 1, HYDROSPHERE_TIMEOUT)
+          TCPClose(Socket)
         Else
           Message += "No connection. "
           SerialOutResult = 0 ' Make sure that the last OK is not still in the status
         EndIf
-        If SerialOutResult = 2 Then ' If "OK" was sent
-          If HydrosphereBufferNextPointer > 2 Then ' If we still have at least 2 data values in the Buffer (one of which was just sent), move the Buffer forward by one.
+        If SerialOutResult = 2 Then ' OK was sent
+          If HydrosphereBufferNextPointer > 2 Then ' move the Buffer forward by one.
             For i = 1 To (HydrosphereBufferNextPointer - 2)
               HydrosphereDataBuffer(i) = HydrosphereDataBuffer(i+1)
             Next i
           EndIf
-          HydrosphereDataBuffer(HydrosphereBufferNextPointer-1) = "" ' Clear the details of the last Message from the Buffer (as they have been shifted forward by one now).
+          HydrosphereDataBuffer(HydrosphereBufferNextPointer-1) = "" ' Clear last Message from the Buffer.
           HydrosphereBufferNextPointer = HydrosphereBufferNextPointer - 1
           Message += "Report " + HydrosphereBufferNextPointer + " sent. "
         Else
           Message += "No OK (" + SerialOutResult + "). "
-          If HydrosphereRetries = HYDROSPHERE_MAX_RETRIES Then Message += "Failed. " + HydrosphereRetries + "/" + HYDROSPHERE_MAX_RETRIES + " tries."
+          If Attempts = HYDROSPHERE_MAX_RETRIES Then 
+            Message += "Failed. " + Attempts + "/" + HYDROSPHERE_MAX_RETRIES + " tries."
+          EndIf
         EndIf
       Loop
     Else
@@ -293,37 +284,14 @@ EndSub
 
 
 Const GPS_PARAMETERS As Long = 9 ' 1=Time(UTC),2=Date,3=Lat(ddmm),4=Lat(.mmmmmm),5=Long(ddmm),6=Long(.mmmmmm),7=Alt,8=Fix,9=#Sat
-Dim GPSReadings(GPS_PARAMETERS) As Float
 Public GPSString As String * GPS_BUFFER: Units GPSString = NMEA 0183 Processed String
 Const GPS_HEADER As String = "$GPGGA" ' This is the header of the GPS string
-Dim CommaCount As Long ' Use to make sure I have enough data
-Dim GPSReadingsString(GPS_PARAMETERS) As String * 16
-Dim RawGPSString As String * GPS_BUFFER: Units RawGPSString = NMEA 0183 String buffer
-Dim GPSStart As Long: Units GPSStart = Start character For NMEA Message
-Dim GPSEnd As Long: Units GPSEnd = End character For NMEA Message
-Dim GPSLength As Long: Units GPSLength = characters in NMEA Message
-Dim Comma1 As Long
-Dim Comma2 As Long
-Dim InternalCounter As Long
-Alias GPSReadings(1) = GPS_UTCtime: Units GPS_UTCtime = HHMMSS
-Alias GPSReadings(2) = GPS_Latitude_dddmm: Units GPS_Latitude_dddmm = dddmm.mmmm
-Alias GPSReadings(3) = GPS_LatitudeHemisphere: Units GPS_LatitudeHemisphere = 1=N, -1=S
-Alias GPSReadings(4) = GPS_Longitude_dddmm: Units GPS_Longitude_dddmm = dddmm.mmmm
-Alias GPSReadings(5) = GPS_LongitudeHemisphere: Units GPS_LongitudeHemisphere = 1=E, -1=W
-Alias GPSReadings(6) = GPS_QualityIndicator: Units GPS_QualityIndicator = 0=NoFix,1=GPS,2=DIFFERENTIAL
-Alias GPSReadings(7) = GPS_Satellites: Units GPS_Satellites = count
-Alias GPSReadings(8) = GPS_HDOP: Units GPS_HDOP = error estimate
-Alias GPSReadings(9) = GPS_Height: Units GPS_Height = meters
-Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)  ' Latitude recombined into a single value.  These are what are stored in the data tables
+Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)
 Public Longitude As Float: Units Longitude = Decimal Degrees (E=+,W=-)
-Public UTCTime As Long: Units UTCTime = HHMMSS
-Dim UTCDate As Long: Units UTCDate = YYMMDD
-Dim GPSFix As Long: Units GPSFix = 0=No FIX, 1=FIX, 2=DIFFERENTIAL FIX
 Public GPSSatellitesInView As Long: Units GPSSatellitesInView = GPS Satellites visible
 PreserveOneVariable(Latitude)
 PreserveOneVariable(Longitude) ' Save these values so a power cycle does not reset them and cause the icon to jump around
-Public GPSSatellitesRequired As Long = 4
-PreserveOneVariable(GPSSatellitesRequired) ' Specifies the required satellites for an accurate GPS fix.  Up to 7 or 8 is possible
+Const GPSSatellitesRequired As Long = 4
 Const GPS_MAX_ON_TIME As Long = 180 ' turns off this many seconds
 
 Sub GPSOff
@@ -335,6 +303,16 @@ Sub GPSOff
 EndSub
 
 Sub ReadGPS
+  Dim Comma1 As Long
+  Dim Comma2 As Long
+  Dim CommaCount As Long
+  Dim InternalCounter As Long
+  Dim GPSStart As Long
+  Dim GPSEnd As Long
+  Dim RawGPSString As String * GPS_BUFFER
+  Dim GPSReadingsString(GPS_PARAMETERS) As String * 16
+  Dim GPSReadings(GPS_PARAMETERS) As Float
+
   If ReadGPSNow Then
     If NOT(GPSPowerStatus) Then ' If it wasn't previously on
       Message = "Powering GPS for location tracking. "
@@ -348,11 +326,10 @@ Sub ReadGPS
     EndIf
     SerialIn(RawGPSString, GPS_PORT, 50, 0, GPS_BUFFER) ' Read in the serial data.  Termination is the time when characters stop being received (i.e. a break)
     SerialFlush(GPS_PORT) ' Clear out any data so a fresh reading is taken next cycle
-    GPSStart = InStr(1, RawGPSString, GPS_HEADER, 2)             ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
-    GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2)             ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
+    GPSStart = InStr(1, RawGPSString, GPS_HEADER, 2) ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
+    GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2) ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
     If (GPSStart>0) AND (GPSEnd>0) Then
       GPSString = Mid(RawGPSString,GPSStart,GPSEnd-GPSStart)  ' Get the part between the start and the end
-      GPSLength = Len(GPSString)
       Comma2 = 1
       CommaCount = 0 ' Now parse the information and convert to double precision data, starting at the start of the string
       For InternalCounter = 1 To GPS_PARAMETERS
@@ -366,27 +343,24 @@ Sub ReadGPS
       For InternalCounter = 1 To GPS_PARAMETERS
         GPSReadings(InternalCounter) = GPSReadingsString(InternalCounter) ' Convert from string to double
       Next InternalCounter
-      If CommaCount >= 9 AND (GPSReadings(7) >= GPSSatellitesRequired) Then ' We have enough satellites so save the information
-        Latitude = Floor(GPS_Latitude_dddmm / 100.0) + (GPS_Latitude_dddmm MOD 100)/60
-        Longitude = Floor(GPS_Longitude_dddmm / 100.0) + (GPS_Longitude_dddmm MOD 100)/60
+      If CommaCount >= 9 AND (GPSReadings(7) >= GPSSatellitesRequired) Then
+        Latitude = Floor(GPSReadings(2) / 100.0) + (GPSReadings(2) MOD 100)/60
+        Longitude = Floor(GPSReadings(4) / 100.0) + (GPSReadings(4) MOD 100)/60
         If GPSReadingsString(3) = "S" Then
           GPSReadings(3) = -1
-          GPS_Latitude_dddmm = -GPS_Latitude_dddmm
+          GPSReadings(2) = -GPSReadings(2)
           Latitude = -Latitude
         Else
           GPSReadings(3) = 1
         EndIf
         If GPSReadingsString(5) = "W" Then
           GPSReadings(5) = -1
-          GPS_Longitude_dddmm = -GPS_Longitude_dddmm
+          GPSReadings(4) = -GPSReadings(4)
           Longitude = -Longitude
         Else
           GPSReadings(5) = 1
         EndIf
-        GPSFix = GPS_QualityIndicator
-        UTCTime = GPS_UTCtime
-        UTCDate = 0
-        GPSSatellitesInView = GPS_Satellites ' UTCDate isn't part of serial message
+        GPSSatellitesInView = GPSReadings(7)
         Message = "GPS location complete, using " + GPSReadings(7) + " satellites."
         DistanceOffStation = Haversine(Latitude, Longitude)
         Call GPSOff
@@ -433,7 +407,6 @@ Sub Initialization
   Call ErrorLog("Program restart") ' Record the program restart in the error log
   Delay(0, 500, mSec) ' Have a short delay incase multiple messages are generated
   Control_____________ = False
-  Measurements________ = False
   i = 0  ' Just to stop a compile warning that it is unused
   SetSetting("PakBusTCPClients", TCP_CLIENT)
   SetSetting("PakBusAddress", PAKBUS_ADDRESS)
@@ -455,7 +428,7 @@ Sub Initialization
   YSIPInit()
   findSonde(3)
   Message = "Sonde initialized. "
-  ExciteV(Vx1, 5000, 0) ' Turn off RS485 adapter.  Don't check SensorKeepRS485On because this is during initialization
+  ExciteV(Vx1, 5000, 0) ' Turn off RS485 adapter.
   If Status.LithiumBattery < 3.0 Then ' Check diagnostics are record to ErrorLog if a problem
     Call ErrorLog("Low (or no) Lithium Battery = " + Status.LithiumBattery)
     Delay(0, 500, mSec) ' Log with delay incase multiple messages are generated
@@ -532,15 +505,8 @@ Sub SensorMeasurements ' Time commands at the top, so slow commands don't interf
     EndIf
     SensorProgramOff = False
   EndIf
-  If SensorKeepRS485On AND NOT(SensorKeepRS485OnLast) Then
-    Message = "Turning on RS485 adapter based on SensorKeepRS485On setting"
-    ExciteV(Vx1, 5000, 0)
-  EndIf
-  If NOT(SensorKeepRS485On) AND SensorKeepRS485OnLast Then
-    Message = "Turning off RS485 adapter based on SensorKeepRS485On setting"
-    ExciteV(Vx1, 0, 0)
-  EndIf
-  SensorKeepRS485OnLast = SensorKeepRS485On
+  Message = "Turning off RS485 adapter"
+  ExciteV(Vx1, 0, 0)
 EndSub
 
 
