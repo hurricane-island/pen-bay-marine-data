@@ -17,10 +17,11 @@ from enum import Enum
 from datetime import datetime
 from hashlib import md5
 from pandas import read_csv, DataFrame, concat
+from influxdb_client_3 import InfluxDBClient3
 import gpxpy
 import gpxpy.gpx
 import click
-from lib import Source, plot_tail, plot_options, boxplot
+from lib import Source, influx_options, plot_tail, plot_options, boxplot, influx_host, influx_api_token
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
@@ -43,6 +44,7 @@ class ClickOptions(Enum):
     BUOYS = "buoys"
     PLOT = "plot"
     FIRMWARE = "firmware"
+    DB = "db"
     # plotting commands
     TAIL = "tail"
     DAILY = "daily"
@@ -130,6 +132,12 @@ def file_group():
     Commands that interact with the buoy data file system.
     """
 
+@click.group(name=ClickOptions.DB.value)
+def database():
+    """
+    Commands that interact with the buoy database.
+    """
+
 station_name = click.argument("name", type=click.Choice(StationName, case_sensitive=False))
 data_table = click.argument("table", type=click.Choice(TableName, case_sensitive=False))
 
@@ -150,6 +158,7 @@ def source_options(function):
 buoys.add_command(plot)
 buoys.add_command(firmware)
 buoys.add_command(file_group)
+buoys.add_command(database)
 
 
 @file_group.command(name=ClickOptions.LIST.value)
@@ -387,3 +396,47 @@ def buoys_firmware_library(file: str):
     filename.parent.mkdir(parents=True, exist_ok=True)
     with open(filename, "w", encoding="utf-8") as fid:
         fid.write(filedata)
+
+
+@database.command(name="upload")
+@station_name
+@data_table
+@influx_host
+@influx_api_token
+def buoys_db_upload(name: StationName, table: TableName, host: str, token: str):
+    """
+    Upload buoy data to the database. 
+    """
+    files = list(filter_buoy_flat_files(name, table))
+    client = InfluxDBClient3(host=host, database="buoy-test-3", token=token)
+    # columns = [VendoredNames.SEA_WATER_TEMPERATURE, VendoredNames.SEA_WATER_SALINITY]
+    columns = [VendoredNames.SEA_WATER_TEMPERATURE]
+    rename = [StandardNames[key.name].value for key in columns]
+    for each in files:
+        df = read_single_campbell_logger_file(each)
+        subset = df[[key.value for key in columns]]
+        subset.columns = rename
+        subset.index.name = "time"
+        with open(each, "r", encoding="utf-8") as fid:
+            metadata = fid.readline().split(",")
+        subset.insert(column="location", value=metadata[1].lower(), loc=0)
+        subset.insert(column="thing", value=metadata[3], loc=1)
+        subset.insert(column="firmware", value=metadata[5][5:-1], loc=2)
+        client.write(
+            subset,
+            data_frame_measurement_name=table.value,
+            data_frame_tag_columns=["location", "thing", "firmware"]
+        )
+
+@database.command(name="describe")
+@station_name
+@data_table
+@influx_options
+def buoys_db_describe(name: StationName, table: TableName, host: str, measurement: str, token: str):
+    time ="time"
+    client = InfluxDBClient3(host=host, database="buoy-test", token=token)
+    read_back: DataFrame = client.query(
+        f"SELECT * FROM {measurement} ORDER BY {time} LIMIT 10",
+        mode="pandas",
+    )
+    print(read_back.head())

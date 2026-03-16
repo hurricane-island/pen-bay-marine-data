@@ -58,6 +58,17 @@ class Source:
         self.name = name
         self.transform = transform
 
+influx_api_token = option(
+    "--token",
+    envvar="INFLUX_API_TOKEN",
+    help="The InfluxDB API token. Defaults to environment variable INFLUX_API_TOKEN",
+)
+
+influx_host = option(
+    "--host",
+    envvar="INFLUX_SERVER_URL",
+    help="The InfluxDB server URL. Defaults to environment variable INFLUX_SERVER_URL",
+)
 
 def influx_options(function):
     """
@@ -65,22 +76,14 @@ def influx_options(function):
     a decorator, the arguments and options will be supplied
     to the wrapped function in reverse order.
     """
-    function = option(
-        "--token",
-        envvar="INFLUX_API_TOKEN",
-        help="The InfluxDB API token. Defaults to environment variable INFLUX_API_TOKEN",
-    )(function)
+    function = influx_api_token(function)
     function = option(
         "--measurement",
         default="observations",
         envvar="INFLUXDB_MEASUREMENT",
         help="The InfluxDB measurement (table) name.",
     )(function)
-    function = option(
-        "--host",
-        envvar="INFLUX_SERVER_URL",
-        help="The InfluxDB server URL. Defaults to environment variable INFLUX_SERVER_URL",
-    )(function)
+    function = influx_host(function)
     return function
 
 
