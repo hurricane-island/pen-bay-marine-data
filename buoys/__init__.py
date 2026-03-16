@@ -360,7 +360,9 @@ def checksum(contents: str) -> str:
 @click.option("--address", required=True, help="Pakbus address")
 @click.option("--client", required=True, help="Client ID")
 @click.option("--file", default="buoy.dld", help="Template file")
-def buoys_firmware_template(name: StationName, address: str, client: str, file: str):
+@click.option("--latitude", required=True, help="Latitude")
+@click.option("--longitude", required=True, help="Longitude")
+def buoys_firmware_template(name: StationName, address: str, client: str, file: str, latitude: str, longitude: str):
     """
     Fill in firmware template with options passed on
     the command line.
@@ -372,6 +374,9 @@ def buoys_firmware_template(name: StationName, address: str, client: str, file: 
         "STATION_NAME": name.value,
         "PAKBUS_ADDRESS": address,
         "CLIENT_ID": client,
+        "LATITUDE": latitude,
+        "LONGITUDE": longitude
+
     }.items():
         slug = "$" + var
         filedata = filedata.replace(slug, value)

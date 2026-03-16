@@ -50,7 +50,7 @@ Function Haversine(Lat As Float, Lon As Float) As Float
     Dim c As Float
     Dim d As Float
     
-    a = Sin(dLat / 2) * Sin(dLat / 2) + Cos(RadLat1) * Cos(RadLat2) * Sin(dLon / 2) * Sin(dLon / 2)
+    a = Sin(dLat / 2) * Sin(dLat / 2) + Cos(RadLat) * Cos(RadLat) * Sin(dLon / 2) * Sin(dLon / 2)
     c = 2 * Atn(Sqr(a) / Sqr(1 - a))
     d = R * c
 
