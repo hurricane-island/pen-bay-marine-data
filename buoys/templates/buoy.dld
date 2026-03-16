@@ -65,8 +65,6 @@ Const SONDEVALUES_TBL_SIZE As Long = 5000  ' used in YSI headers
 Const PRESSURE_PORT As Long = 3
 Const GPS_PORT As Long = ComC2_Rx ' C2. Serial Rx from GPS
 Const YSIPPORT As Long = ComRS232 ' used in YSI headers
-Public Ai1WipesSonde As Boolean = True
-PreserveOneVariable(Ai1WipesSonde)
 
 
 Public ExternalTemp As Float ' First reading from the sonde, use this instead of External_Temp
@@ -98,7 +96,7 @@ Dim PressureTimeArraySorted(PRESSURE_TIME_AVERAGING) ' To hold the sorted values
 Dim PressureFirstReading As Boolean = True ' First time through, copy the initial value to all elements in array
 Public Current_mA As Long: Units Current_mA = mA ' Use long so that only whole numbers are returned
 Public InternalTemperature As Float: Units InternalTemperature = °C
-Public InternalHumidity As Long: Units InternalHumidity = % ' Report only whole numbers
+Public InternalHumidity As Long: Units InternalHumidity = %
 Public HumidityVoltage As Float: Units HumidityVoltage = mV
 Public ProcessingTime: Units ProcessingTime = µS
 Dim rTime(9)
@@ -129,7 +127,6 @@ EndSub
 
 Dim CommsPowerOnStatus As Boolean = False ' state of the internal cellular modem power when controlled by battery saver and shutdown settings, but does not indicate the state due to window duration and frequency.  IPNetPower overrides all other power control options
 Dim CellBillingDay = 1 ' Day of Month
-Dim SendToHydrosphere As Boolean = False ' initiate data record and transfer.
 Dim ReadNow As Boolean = False
 Const GPS_BAUD As Long = 9600
 Const GPS_BUFFER As Long = 512 ' The uBlox GPS outputs a lot more messages, allow a bigger string.  400
@@ -162,7 +159,7 @@ Sub Communications
       SerialOut(Socket, "DIS" + CHR(13), "OK", 1, HYDROSPHERE_TIMEOUT)
       TCPClose(Socket)
     Else
-      Message += "No connection. "
+      Message = "No connection. "
       SerialOutResult = 0 ' Make sure that the last OK is not still in the status
     EndIf
     If SerialOutResult = 2 Then ' OK
@@ -173,9 +170,9 @@ Sub Communications
       EndIf
       HydrosphereDataBuffer(HydrosphereBufferNextPointer-1) = "" ' clear last message
       HydrosphereBufferNextPointer = HydrosphereBufferNextPointer - 1
-      Message += "Report " + HydrosphereBufferNextPointer + " sent. "
+      Message = "Report " + HydrosphereBufferNextPointer + " sent. "
     Else
-      Message += "No OK (" + SerialOutResult + "). "
+      Message = "No OK (" + SerialOutResult + "). "
       If Attempts = HYDROSPHERE_MAX_RETRIES Then 
         Message += "Failed. " + Attempts + "/" + HYDROSPHERE_MAX_RETRIES + " tries."
       EndIf
@@ -186,6 +183,7 @@ EndSub
 
 Const GPS_PARAMETERS As Long = 9 ' 1=Time(UTC),2=Date,3=Lat(ddmm),4=Lat(.mmmmmm),5=Long(ddmm),6=Long(.mmmmmm),7=Alt,8=Fix,9=#Sat
 Public GPSString As String * GPS_BUFFER: Units GPSString = NMEA 0183 Processed String
+Dim RawGPSString As String * GPS_BUFFER
 Const GPS_HEADER As String = "$GPGGA" ' This is the header of the GPS string
 Public Latitude As Float: Units Latitude = Decimal Degrees (N=+,S=-)
 Public Longitude As Float: Units Longitude = Decimal Degrees (E=+,W=-)
@@ -257,105 +255,94 @@ Sub Initialization
   Call AddDate
 EndSub
 
-
-
 Sub SensorMeasurements
   Dim HydrosphereData As String *(22+PARAMETERS_TO_SEND*10) ' one full record to send
   Dim ParameterToSend(PARAMETERS_TO_SEND) As Long ' points to the address of each variable to send
   
-  If TimeIntoInterval(0, MEASUREMENT_INTERVAL_S, Sec) Then 
-    ReadNow = True
+  ReadNow = True
+  Message = "Powering RS485 adapter for communications"
+  WriteIO(&B01000000, &B01000000)
+  ExciteV(Vx1, 5000, 0) ' Turn on the RS485 adapter
+  Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
+  WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
+  If NOT sondefound Then findSonde(3)                         ' If the sonde hasn't been found, then attempt to find first
+  Message = "Allowing time for sonde wiper."
+  startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
+  getWipeStatus()
+  Message = "Allowing time for sonde wiper (" + 40 + "s)"
+  Delay(0, 40, Sec) ' Wait for sonde power
+  Message = "Reading sonde and updating available parameters. "
+  sondeCheck()
+  getSondeParams() ' Handle any sonde changes and update parameters
+  ReadAttempts = 0
+  Do
+    ReadAttempts += 1
+    Message = "Reading sonde values, attempt " + ReadAttempts
+    Sonde_External_Voltage = NaN
+    External_Temp = NaN
+    Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
+    getSondeValues() ' Populate available parameters
+    sortYSIPData()
+    ExternalTemp = External_Temp ' Map the temperature reading so that Hydrosphere and Satellite naming will work
+    SondeReadFailed = False
+    If (Sonde_External_Voltage = NaN) AND (WiperPosition = NAN) Then SondeReadFailed = True ' NAN's occur if there is no communications to sonde
+    If (Sonde_External_Voltage = 0) AND (WiperPosition = 0)   Then SondeReadFailed = True ' 0's can occur if the sonde has failed to measure sensors yet, but ready to talk
+  Loop While (SondeReadFailed AND (ReadAttempts <= READ_ATTEMPTS_LIMIT)) ' Repeat if the read failed (any non-NaN value will mark success)
+  If SondeReadFailed Then ' Restore the previous values
+    SondeValuesSorted() = WQTemporaryRS485()
+    Message = "No valid Data ("
+    If Sonde_External_Voltage = NaN Then 
+      Message += "NAN returned"
+    ElseIf Sonde_External_Voltage = 0 Then Message += "Zero's returned"
+      Message += "Unspecified response"
+    EndIf
+    Message += "), restoring previous values. "
+    Call AddTime
+    Call AddDate
+    Errors = Message ' Message only, not logged
+  Else
+    Message = "Sonde read completed"
+    getSondeSN()
+    CallTable SondeValues ' Only store if successful
   EndIf
+  CallTable YSISondeMeta
+  Message += ".  Shutting down RS485 adapter"
+  ExciteV(Vx1, 0, 0) ' sonde in lower power state
+  WriteIO(&B01000000, 0)
+  ReadNow = False
+  
+  ParameterToSend(1) = @ExternalTemp
+  ParameterToSend(2) = @SpConductivity_us
+  ParameterToSend(3) = @Pressure_abs
+  ParameterToSend(4) = @Chlorophyll_RFU
+  ParameterToSend(5) = @BGA_PE_RFU
+  ParameterToSend(6) = @BatteryVoltage
+  ParameterToSend(7) = @InternalHumidity
+  ParameterToSend(8) = @Salinity
+  ParameterToSend(9) = @Latitude
+  ParameterToSend(10) = @Longitude
 
-  If (ReadNow) Then
-    Message = "Powering RS485 adapter for communications"
-    WriteIO(&B01000000, &B01000000)
-    ExciteV(Vx1, 5000, 0) ' Turn on the RS485 adapter
-    Delay(0, 200, mSec) ' Short delay to allow sonde to wake up
-    WQTemporaryRS485() = SondeValuesSorted() ' Save previous values
-    If NOT sondefound Then findSonde(3)                         ' If the sonde hasn't been found, then attempt to find first
-    If Ai1WipesSonde Then ' When using Sample&Hold in the sonde, the sonde controls the wiping frequency, no need to duplicate here
-      Message = "Allowing time for sonde wiper."
-      startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
-      getWipeStatus()
-      Delay(0, 40, Sec) ' Wait for sonde power
-      Message = "Allowing time for sonde wiper (" + 40 + "s)"
+  For i = 1 To PARAMETERS_TO_SEND
+    HydrosphereDescription(i) = !(ParameterToSend(i)) ' name of memory location is the canonical vendor name
+    AddressToRead = (ParameterToSend(i)) ' Cannot read the value directly
+    HydrosphereValues(i) = !AddressToRead
+  Next i
+  RealTime(rTime)
+  HydrosphereData = "D=" + FormatFloat(Month,"%02.0f") + "/" + FormatFloat(DayOfMonth,"%02.0f") + "/" + FormatFloat((Year MOD 100),"%02.0f") + "," + FormatFloat(Hour,"%02.0f") + ":" + FormatFloat(Minute,"%02.0f") + ":" + FormatFloat(Second,"%02.0f") + ","
+  HydrosphereNames = "SN="
+  For i = 1 To PARAMETERS_TO_SEND
+    HydrosphereNames += HydrosphereDescription(i)
+    HydrosphereData += HydrosphereValues(i)
+    If i < PARAMETERS_TO_SEND Then 
+      HydrosphereData += ","
+      HydrosphereNames += ","
     EndIf
-    Message = "Reading sonde and updating available parameters. "
-    sondeCheck()
-    getSondeParams() ' Handle any sonde changes and update parameters
-    ReadAttempts = 0
-    Do
-      ReadAttempts += 1
-      Message = "Reading sonde values, attempt " + ReadAttempts
-      Sonde_External_Voltage = NaN
-      External_Temp = NaN
-      Depth = NaN ' Prepare parameters to check with NaN so that a successful read is identified
-      getSondeValues() ' Populate available parameters
-      sortYSIPData()
-      ExternalTemp = External_Temp ' Map the temperature reading so that Hydrosphere and Satellite naming will work
-      SondeReadFailed = False
-      If (Sonde_External_Voltage = NaN) AND (WiperPosition = NAN) Then SondeReadFailed = True ' NAN's occur if there is no communications to sonde
-      If (Sonde_External_Voltage = 0) AND (WiperPosition = 0)   Then SondeReadFailed = True ' 0's can occur if the sonde has failed to measure sensors yet, but ready to talk
-    Loop While (SondeReadFailed AND (ReadAttempts <= READ_ATTEMPTS_LIMIT)) ' Repeat if the read failed (any non-NaN value will mark success)
-    If SondeReadFailed Then ' Restore the previous values
-      SondeValuesSorted() = WQTemporaryRS485()
-      Message = "No valid Data ("
-      If Sonde_External_Voltage = NaN Then 
-        Message += "NAN returned"
-      ElseIf Sonde_External_Voltage = 0 Then Message += "Zero's returned"
-        Message += "Unspecified response"
-      EndIf
-      Message += "), restoring previous values. "
-      Call AddTime
-      Call AddDate
-      Errors = Message ' Message only, not logged
-    Else
-      Message = "Sonde read completed"
-      getSondeSN()
-      CallTable SondeValues ' Only store if successful
-    EndIf
-    CallTable YSISondeMeta
-    Message += ".  Shutting down RS485 adapter"
-    ExciteV(Vx1, 0, 0) ' sonde in lower power state
-    WriteIO(&B01000000, 0)
-    ExciteV(Vx1, 0, 0)
-    
-    ParameterToSend(1) = @ExternalTemp
-    ParameterToSend(2) = @SpConductivity_us
-    ParameterToSend(3) = @Pressure_abs
-    ParameterToSend(4) = @Chlorophyll_RFU
-    ParameterToSend(5) = @BGA_PE_RFU
-    ParameterToSend(6) = @BatteryVoltage
-    ParameterToSend(7) = @InternalHumidity
-    ParameterToSend(8) = @Salinity
-    ParameterToSend(9) = @Latitude
-    ParameterToSend(10) = @Longitude
-
-    For i = 1 To PARAMETERS_TO_SEND
-      HydrosphereDescription(i) = !(ParameterToSend(i)) ' name of memory location is the canonical vendor name
-      AddressToRead = (ParameterToSend(i)) ' Cannot read the value directly
-      HydrosphereValues(i) = !AddressToRead
-    Next i
-    RealTime(rTime)
-    HydrosphereData = "D=" + FormatFloat(Month,"%02.0f") + "/" + FormatFloat(DayOfMonth,"%02.0f") + "/" + FormatFloat((Year MOD 100),"%02.0f") + "," + FormatFloat(Hour,"%02.0f") + ":" + FormatFloat(Minute,"%02.0f") + ":" + FormatFloat(Second,"%02.0f") + ","
-    HydrosphereNames = "SN="
-    For i = 1 To PARAMETERS_TO_SEND
-      HydrosphereNames += HydrosphereDescription(i)
-      HydrosphereData += HydrosphereValues(i)
-      If i < PARAMETERS_TO_SEND Then 
-        HydrosphereData += ","
-        HydrosphereNames += ","
-      EndIf
-    Next i
-    If HydrosphereBufferNextPointer <= HYDROSPHERE_BUFFER_SIZE Then
-      HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CHR(13)
-      HydrosphereBufferNextPointer += 1
-    EndIf
-
-    ReadNow = False
-    SendToHydrosphere = True ' If new data saved, then next time through, send it to Hydrosphere
+  Next i
+  If HydrosphereBufferNextPointer <= HYDROSPHERE_BUFFER_SIZE Then
+    HydrosphereDataBuffer(HydrosphereBufferNextPointer) = HydrosphereData + CHR(13)
+    HydrosphereBufferNextPointer += 1
   EndIf
+  ReadNow = False
 EndSub
 
 
@@ -392,7 +379,6 @@ Sub SystemCheck
   Dim InternalCounter As Long
   Dim GPSStart As Long
   Dim GPSEnd As Long
-  Dim RawGPSString As String * GPS_BUFFER
   Dim GPSReadingsString(GPS_PARAMETERS) As String * 16
   Dim GPSReadings(GPS_PARAMETERS) As Float
   Dim Current_mV As Float
@@ -411,12 +397,12 @@ Sub SystemCheck
 
   SerialIn(RawGPSString, GPS_PORT, 50, 0, GPS_BUFFER) ' Read in the serial data.  Termination is the time when characters stop being received (i.e. a break)
   SerialFlush(GPS_PORT) ' Clear out any data so a fresh reading is taken next cycle
-  GPSStart = InStr(1, RawGPSString, GPS_HEADER, 2) ' Find the position of $GPGGA (start).  Structure of $GPGGA is defined here: http://aprs.gids.nl/nmea/#gga
-  GPSEnd = InStr(GPSStart+1, RawGPSString, "M", 2) ' Find the position of the terminator.  Normally this would be CRLF, but use an M which is the end of the meaningful data.  See http://aprs.gids.nl/nmea/#gga
+  GPSStart = InStr(1, RawGPSString, GPS_HEADER, 2)
+  GPSEnd = InStr(GPSStart+1, RawGPSString, CHR(13) + CHR(10), 2) ' if there is no fix (indoors), needs to use CRLF
   If (GPSStart>0) AND (GPSEnd>0) Then
     GPSString = Mid(RawGPSString,GPSStart,GPSEnd-GPSStart)  ' Get the part between the start and the end
     Comma2 = 1
-    CommaCount = 0 ' Now parse the information and convert to double precision data, starting at the start of the string
+    CommaCount = 0 ' convert to double precision data
     For InternalCounter = 1 To GPS_PARAMETERS
       Comma1 = InStr(Comma2, GPSString, ",", 2)
       Comma2 = InStr(Comma1+1, GPSString, ",", 2) ' Start searching at the position of the last comma
@@ -451,7 +437,7 @@ Sub SystemCheck
     EndIf
   EndIf
 
-  ExciteV(Vx2, 0, 0) ' Turn off the power to the GPS and other internal status sensors
+  ' ExciteV(Vx2, 0, 0)
   ProgramCounter += 1
   ProcessingTime = Status.ProcessTime
   CallTable Ai1
