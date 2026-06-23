@@ -87,6 +87,7 @@ Const hPa_TO_m As Float = 0.0101972
 Const CURRENT_PORT As Long = 5
 Const HUMIDITY_PORT As Long = 6
 Const READ_ATTEMPTS_LIMIT As Long = 4
+Const WIPER_DELAY as Long = 60
 Public ReadAttempts As Long ' Times sensor read was attempted
 Dim ProgramCounter As Long: Units ProgramCounter = Cycles ' Program cycles since power up
 Dim LastProgramCounter As Long: Units LastProgramCounter = Cycles ' Error tracking
@@ -180,7 +181,7 @@ Sub MeasureWaterQuality
     Message = "Allowing time for sonde wiper."
     startWipe() ' full wipe is 2 in each direction, takes approximately 22-25s
     getWipeStatus()
-    For i = 40 To 1 Step -1
+    For i = WIPER_DELAY To 1 Step -1
       Delay(0, 1, Sec) ' Wait for sonde power
       Message = "Allowing time for sonde wiper (" + i + "s remaining)"
     Next i
