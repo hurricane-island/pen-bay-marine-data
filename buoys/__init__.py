@@ -223,7 +223,7 @@ def buoys_file_describe(name: StationName, table: TableName):
     """
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
-    summary = df.describe().T.drop(columns=["25%", "50%", "75%", "std", "mean"])
+    summary = df.describe().T.drop(columns=["25%", "75%", "std"])
     print("\nSamples:\n")
     print(summary)
 
