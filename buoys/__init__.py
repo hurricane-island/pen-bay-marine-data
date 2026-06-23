@@ -75,6 +75,7 @@ class VendoredNames(Enum):
 
     SEA_WATER_TEMPERATURE = "External_Temp"
     SEA_WATER_SALINITY = "Salinity"
+    SEA_WATER_CHLOROPHYLL_RFU = "Chlorophyll_RFU"
 
 class StandardNames(Enum):
     """
@@ -86,6 +87,7 @@ class StandardNames(Enum):
         "mass_concentration_of_oxygen_in_sea_water"
     )
     SEA_WATER_SALINITY = "sea_water_salinity"
+    SEA_WATER_CHLOROPHYLL_RFU = "sea_water_chlorophyll_rfu"
 
 
 # pylint: disable=too-few-public-methods
