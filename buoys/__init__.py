@@ -76,6 +76,8 @@ class VendoredNames(Enum):
     SEA_WATER_TEMPERATURE = "External_Temp"
     SEA_WATER_SALINITY = "Salinity"
     SEA_WATER_CHLOROPHYLL_RFU = "Chlorophyll_RFU"
+    SEA_WATER_PHYCOERYTHRIN_RFU = "BGA_PE_RFU"
+    BAROMETRIC_PRESSURE = "Pressure_abs"
 
 class StandardNames(Enum):
     """
@@ -88,6 +90,8 @@ class StandardNames(Enum):
     )
     SEA_WATER_SALINITY = "sea_water_salinity"
     SEA_WATER_CHLOROPHYLL_RFU = "sea_water_chlorophyll_rfu"
+    SEA_WATER_PHYCOERYTHRIN_RFU = "sea_water_phycocerythrin_rfu"
+    BAROMETRIC_PRESSURE = "barometric_pressure"
 
 
 # pylint: disable=too-few-public-methods
