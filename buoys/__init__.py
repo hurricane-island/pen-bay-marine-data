@@ -80,6 +80,8 @@ class VendoredNames(Enum):
     BAROMETRIC_PRESSURE = "Pressure_abs"
     BATTERY_VOLTAGE = "BatteryVoltage"
     WATER_PRESSURE = "Pressure_mH2O"
+    DISSOLVED_OXYGEN = "ODO"
+    DISSOLVED_OXYGEN_SATURATION = "ODO_Sat"
 
 class StandardNames(Enum):
     """
@@ -96,6 +98,8 @@ class StandardNames(Enum):
     BAROMETRIC_PRESSURE = "barometric_pressure"
     BATTERY_VOLTAGE = "battery_voltage"
     WATER_PRESSURE = "water_pressure"
+    DISSOLVED_OXYGEN = "dissolved_oxygen"
+    DISSOLVED_OXYGEN_SATURATION = "dissolved_oxygen_saturation"
 
 # pylint: disable=too-few-public-methods
 class ObservedProperty:
