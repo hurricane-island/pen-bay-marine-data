@@ -78,6 +78,8 @@ class VendoredNames(Enum):
     SEA_WATER_CHLOROPHYLL_RFU = "Chlorophyll_RFU"
     SEA_WATER_PHYCOERYTHRIN_RFU = "BGA_PE_RFU"
     BAROMETRIC_PRESSURE = "Pressure_abs"
+    BATTERY_VOLTAGE = "BatteryVoltage"
+    WATER_PRESSURE = "Pressure_mH2O"
 
 class StandardNames(Enum):
     """
@@ -92,7 +94,8 @@ class StandardNames(Enum):
     SEA_WATER_CHLOROPHYLL_RFU = "sea_water_chlorophyll_rfu"
     SEA_WATER_PHYCOERYTHRIN_RFU = "sea_water_phycocerythrin_rfu"
     BAROMETRIC_PRESSURE = "barometric_pressure"
-
+    BATTERY_VOLTAGE = "battery_voltage"
+    WATER_PRESSURE = "water_pressure"
 
 # pylint: disable=too-few-public-methods
 class ObservedProperty:
