@@ -592,6 +592,7 @@ EndSub
 
 BeginProg
   Call Initialization
+
   Scan(SCAN_INTERVAL_S, Sec, 0, 0)
     Call SensorMeasurements
   NextScan
