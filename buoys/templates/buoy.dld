@@ -171,10 +171,16 @@ Public WindUV(2)
 Alias WindUV(1) = WindU
 Alias WindUV(2) = WindV
 
+DataTable(WindUltra, True, 3000)
+  DataInterval(0, 1, Hr, 0)
+  Sample(1, WindU, FP2)
+  Sample(1, WindV, FP2)
+EndTable
+
 Sub MeasureWind
   ' Read SDI-12 UV velocity, power is already on
   SDI12Recorder(WindUV, C1, "0", "R1!", 1, 0)
-  CallTable WindSonic
+  CallTable WindUltra
 EndSub
 
 Sub MeasureWaterQuality
@@ -376,11 +382,7 @@ Sub ReadGPS
   EndIf
 EndSub
 
-DataTable(WindSonic, True, -1)
-  DataInterval(0, 1, Hr, 0)
-  Sample(1, WindU, FP2)
-  Sample(1, WindV, FP2)
-EndTable
+
 
 DataTable(Ai1, True, 3000) ' Records status information for remote diagnostics
   DataInterval(0, 1, Hr, 0)
