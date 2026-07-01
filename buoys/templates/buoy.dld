@@ -141,8 +141,6 @@ Public Control_____________ As Boolean = False ' This groups all the program con
 Dim ReadGPSNow As Boolean = False ' Set by setting ReadStatusSensors
 Dim SendToHydrosphere As Boolean = False ' initiate data record and transfer.
 
-
-
 Public ReadNow As Boolean = False: Units ReadNow = True = Trigger A New Sensor Reading
 Public ReadStatusSensors As Boolean = False
 Dim SensorProgramOn As Boolean = False

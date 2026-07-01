@@ -4,15 +4,13 @@ Public WindUV(2)
 Alias WindUV(1) = U
 Alias WindUV(2) = V
 
-Units BattV=Volts
-Units PTemp_C=Deg C
+Units BattV = Volts
+Units PTemp_C = Deg C
 
 BeginProg
-	Scan(10,Sec,1,0)
-		'Default CR300 Datalogger Battery Voltage measurement 'BattV'
-		Battery(BattV)
-		'Default CR300 Datalogger Processor Temperature measurement 'PTemp_C'
-		PanelTemp(PTemp_C, 60)
-		SDI12Recorder(WindUV, C1, "0", "R1!", 1, 0)
-	NextScan
+  Scan(10,Sec,1,0)
+    Battery(BattV)
+    PanelTemp(PTemp_C, 60)
+    SDI12Recorder(WindUV, C1, "0", "R1!", 1, 0)
+  NextScan
 EndProg
