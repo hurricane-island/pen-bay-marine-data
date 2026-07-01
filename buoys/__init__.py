@@ -22,6 +22,7 @@ import gpxpy
 import gpxpy.gpx
 import click
 from lib import Source, influx_options, plot_tail, plot_options, boxplot, influx_host, influx_api_token
+from matplotlib import pyplot as plt
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
@@ -265,6 +266,48 @@ def buoys_plot_tail(
         **kwargs,
     )
 
+@plot.command(name="locations")
+def buoys_plot_locations():
+    """
+    Plot the lat and long of the buoy hourly over the course of the deployment period.
+    This only uses historical data contained in local raw files. Compare it to the
+    deployment location of the anchor and the watch circle predicted by WHOI Cable
+    simulations.
+    """
+    name = StationName.WYNKEN
+    table = TableName.DIAGNOSTIC
+    lat_name = "Latitude"
+    lon_name = "Longitude"
+    files = filter_buoy_flat_files(name, table)
+    # for file in files:
+    #     print(file)
+    df = read_campbell_logger_files(list(files))
+    lat = df[lat_name]
+    lon = df[lon_name]
+
+    print("median lat", lat.median())
+    print("median lon", lon.median())
+
+    planned_y = 44.0435
+    deployed_y = 44.0433
+    planned_x = -68.8925
+    deployed_x = -68.8919
+
+    # How to deal with outliers, print lat, lon as x, y
+    fig, ax = plt.subplots()
+    ax.scatter(lon, lat, alpha=0.1, color="black")
+    ax.scatter([planned_x], [planned_y], alpha=1.0, color="red")
+    ax.scatter([deployed_x], [deployed_y], alpha=1.0, color="blue")
+    ax.set_xlim(-68.893, -68.8915)
+    ax.set_ylim(44.042, 44.0445)
+    ax.set_aspect(1.0)
+    filename = FIGURES_DIR / "locations" / "wynken" / "watch-circle.png"
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(filename)
+
+
+
+     
 
 @plot.command(name=ClickOptions.DAILY.value)
 @source_options
