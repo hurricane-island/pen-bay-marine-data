@@ -51,8 +51,8 @@ EndFunction
 
 ' Factory configuration constants
 Const SCAN_INTERVAL_S As Long = 5 ' Program scan Interval.
-Const MEASUREMENT_INTERVAL_S As Long = 300 ' Sensor measurement interval
-Const SLOW_MEASUREMENT_INTERVAL_S As Long = 300 ' interval for less critical measurements, such as GPS
+Const MEASUREMENT_INTERVAL_S As Long = 3600 ' Sensor measurement interval
+Const SLOW_MEASUREMENT_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' interval for less critical measurements, such as GPS
 Const DATA_STORAGE_INTERVAL_S As Long = MEASUREMENT_INTERVAL_S ' Store data every measurement cycle
 Const LOW_BATTERY_SAVER_V = 12.83
 Const LOW_BATTERY_SHUTDOWN_V = 12.75' V  ' Battery protection thresholds.  SAVER: Slow meas/no night comms.  SHUTDOWN: Slowest meas/No comms
