@@ -21,6 +21,7 @@ from pandas import read_csv, DataFrame, concat
 from influxdb_client_3 import InfluxDBClient3
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle
+from matplotlib.markers import MarkerStyle
 from scipy.io import loadmat
 from math import radians, cos, sin, sqrt, atan2
 from pyproj import Transformer
@@ -276,72 +277,54 @@ def buoys_plot_tail(
 
 
 @plot.command(name="cable")
-def buoys_plot_cable():
+@station_name
+def buoys_plot_cable(name: StationName):
     """
     Plot the mooring tension diagram from the WHOI cable simulation.
     """
-    low = CABLE_DIR / "hurricane-scientific-mooring-low.mat"
-    high = CABLE_DIR / "hurricane-scientific-mooring-high.mat"
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.serif'] = ['Times New Roman']
+    plt.rcParams['font.size'] = 12
+    low = CABLE_DIR / f"{name.value}-low.mat"
+    high = CABLE_DIR / f"{name.value}-high.mat"
     low_data = loadmat(low)
     high_data = loadmat(high)
-    # print(low_data["x"])
-    fig, ax = plt.subplots()
-    max_displacement = [low_data["x"].max() * 3.28084, high_data["x"].max() * 3.28084]
-    water_level = [low_data["depth"] * 3.28084, high_data["depth"] * 3.28084]
-    x = concatenate([low_data["x"], high_data["x"]]) * 3.28084
-    y = concatenate([low_data["z"], high_data["z"]]) * 3.28084
-    z = concatenate([low_data["T"], high_data["T"]]) * 0.224809
-    handle = ax.scatter(x, y, c=z, s=2, cmap="spring")
-    ax.vlines(max_displacement, ymin=y.min(), ymax=y.max(), colors="black", linestyles="dashed")
-    ax.hlines(water_level, xmin=x.min(), xmax=x.max(), colors="black", linestyles="solid")
+    fig, ax = plt.subplots(figsize=(4, 3))
+    x = concatenate([low_data["x"], high_data["x"]])
+    y = concatenate([low_data["z"], high_data["z"]])
+    z = concatenate([low_data["T"], high_data["T"]])
+    handle = ax.scatter(x, y, c=z, s=2, cmap="spring", label="Mooring")
+    ax.vlines(low_data["x"].max(), ymin=0.0, ymax=low_data["z"].max(), colors="black", linestyles="solid", label="Low Tide")
+    ax.vlines(high_data["x"].max(), ymin=0.0, ymax=high_data["z"].max(), colors="black", linestyles="dashed", label="High Tide")
+    ax.hlines(high_data["depth"], xmin=0.0, xmax=high_data["x"].max(), colors="black", linestyles="dashed")
+    ax.hlines(low_data["depth"], xmin=0.0, xmax=low_data["x"].max(), colors="black", linestyles="solid")
     ax.set_aspect(1.0)
-    fig.colorbar(handle, label="Tension (lbf)", shrink=0.8)
+    fig.colorbar(handle, label="Tension (N)", shrink=0.5)
     ax.set_ylim(y.min(), None)
-    ax.set_xlim(x.min(), x.max())
-    ax.set_xlabel("Displacement (ft)")
-    ax.set_ylabel("Depth (ft)")
-    filename = FIGURES_DIR / "cable" / "wynken" / "mooring-tension.png"
+    ax.set_xlim(x.min(), None)
+    ax.set_xlabel("Displacement (m)")
+    ax.set_ylabel("Water Level (m)")
+    ax.legend(loc="best")
+    filename = FIGURES_DIR / "cable" / name.value / "mooring-tension.png"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(filename)
-
-def watch_circle_from_simulation(
-    lon: float,
-    lat: float,
-    file: Path,
-    color: str,
-    scale: float = 1.0,
-    linestyle: str = "dashed",
-    label: str|None = None
-) -> Circle:
-    """
-    Generate a predicted watch circle based on the planned deployment location.
-    """
-    center = transformer.transform(lon, lat)
-    data = loadmat(file)
-    radius = data["x"].max() * scale
-    return Circle(center, radius=radius, color=color, fill=False, linestyle=linestyle, label=label)
+    fig.tight_layout()
+    fig.savefig(filename, bbox_inches="tight", dpi=300)
 
 def predicted_watch_circle(
-    center: tuple[float, float],
+    center_xy: tuple[float, float],
     station: StationName,
     color: str,
     scale: float = 1.0,
-    linestyle: str = "dashed",
     label: str|None = None
 ) -> list[Circle]:
     """
     Generate a predicted watch circle based on the planned deployment location.
     """
     predicted = []
-    for each, label in [("low", label), ("high", None)]:
-        circle = watch_circle_from_simulation(
-            *center,
-            CABLE_DIR / f"{station.value}-{each}.mat",
-            color,
-            scale=scale,
-            linestyle=linestyle,
-            label=label
-        )
+    for each, label, ls in [("low", label, "solid"), ("high", None, "dashed")]:
+        data = loadmat(CABLE_DIR / f"{station.value}-{each}.mat")
+        radius = data["x"].max() * scale
+        circle = Circle(center_xy, radius=radius, color=color, fill=False, linestyle=ls, label=label)
         predicted.append(circle)
     return predicted
 
@@ -368,6 +351,9 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     deployment location of the anchor and the watch circle predicted by WHOI Cable
     simulations.
     """
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.serif'] = ['Times New Roman']
+    plt.rcParams['font.size'] = 12
     table = TableName.DIAGNOSTIC
     lat_name = "Latitude"
     lon_name = "Longitude"
@@ -380,41 +366,56 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     planned_gps = (longitude, latitude)  # original
     def compute_distance(gps):
         return haversine(*planned_gps, *gps)
-    mask = (array(list(map(compute_distance, zip(lon, lat)))) < distance) & (satellite_count >= satellites)
-    time = df.index.to_numpy().flatten()[mask]
-    split_time = datetime(2026, 1, 1)
-    deployment = time > split_time
-    filtered_lon = lon[mask][deployment]
-    filtered_lat = lat[mask][deployment]
-    filtered_sat = satellite_count[mask][deployment]
+    mask = (array(list(map(compute_distance, zip(lon, lat)))) < distance) & \
+           (satellite_count >= satellites) & \
+           (df.index > datetime(2026, 1, 1))  # filter out erroneous GPS points and early data
+    
+    filtered_lon = lon[mask]
+    filtered_lat = lat[mask]
+    cx, cy = transformer.transform(filtered_lon.mean(), filtered_lat.mean())
+    filtered_sat = satellite_count[mask]
     sort_ind = argsort(filtered_sat)
-    xy = transformer.transform(filtered_lon[sort_ind], filtered_lat[sort_ind])
-    planned = predicted_watch_circle(
-        planned_gps,
+
+    fig, ax = plt.subplots(figsize=(3, 4))
+
+    sort_ind = argsort(filtered_sat)  # Sort indices based on satellite count for plotting
+    xx, yy = transformer.transform(filtered_lon[sort_ind], filtered_lat[sort_ind])
+    handle = ax.scatter(
+        xx - cx,
+        yy - cy,
+        alpha=filtered_sat[sort_ind]/filtered_sat[sort_ind].max(),
+        marker=MarkerStyle("o"),
+        s=10,
+        c=filtered_sat[sort_ind],
+        edgecolors='none',
+        cmap="spring",
+        label="Location"
+    )
+    fig.colorbar(handle, label="Satellites", shrink=0.5)
+
+    px, py = transformer.transform(*planned_gps)
+    planned_xy = predicted_watch_circle(
+        (px - cx, py - cy),
+        name,
+        "grey",
+        label="Planned"
+    )
+    corrected_xy = predicted_watch_circle(
+        (0.0, 0.0),
         name,
         "black",
-        linestyle="dashed",
-        label="Predicted (Planned)"
+        label="Deployed"
     )
-    corrected = predicted_watch_circle(
-        (filtered_lon.mean(), filtered_lat.mean()),
-        name,
-        "black",
-        linestyle="solid",
-        label="Predicted (Deployed)"
-    )
-    fig, ax = plt.subplots()
-    handle = ax.scatter(*xy, alpha=1.0, s=8, c=filtered_sat[sort_ind], cmap="spring", label="GPS Fix")
-    fig.colorbar(handle, label="Satellites", shrink=0.8)
-    for patch in planned + corrected:
+    for patch in planned_xy + corrected_xy:
         ax.add_patch(patch)
-    ax.set_ylabel("UTM Northing (m)")
-    ax.set_xlabel("UTM Easting (m)")
+
+    ax.set_ylabel("UTM Northing Δ (m)")
+    ax.set_xlabel("UTM Easting Δ (m)")
     ax.set_aspect(1.0)
     filename = FIGURES_DIR / "locations" / "wynken" / "watch-circle.png"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     ax.ticklabel_format(axis='both', style='plain')
-    ax.legend(loc="best", fontsize="small")
+    ax.legend(loc="best")
     fig.tight_layout()
     fig.savefig(filename, dpi=300, bbox_inches="tight")
 
