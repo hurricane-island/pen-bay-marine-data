@@ -394,30 +394,40 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     fig.colorbar(handle, label="Satellites", shrink=0.5)
 
     px, py = transformer.transform(*planned_gps)
-    planned_xy = predicted_watch_circle(
-        (px - cx, py - cy),
-        name,
-        "grey",
-        label="Planned"
-    )
-    corrected_xy = predicted_watch_circle(
-        (0.0, 0.0),
-        name,
-        "black",
-        label="Deployed"
-    )
+
+    if name == StationName.WYNKEN:
+        planned_xy = predicted_watch_circle(
+            (px - cx, py - cy),
+            name,
+            "grey",
+            label="Planned"
+        )
+        corrected_xy = predicted_watch_circle(
+            (0.0, 0.0),
+            name,
+            "black",
+            label="Deployed"
+        )
+    else:
+        planned_xy = []
+        corrected_xy = []
+
     for patch in planned_xy + corrected_xy:
         ax.add_patch(patch)
 
     ax.set_ylabel("UTM Northing Δ (m)")
     ax.set_xlabel("UTM Easting Δ (m)")
     ax.set_aspect(1.0)
-    filename = FIGURES_DIR / "locations" / "wynken" / "watch-circle.png"
+
+    filename = FIGURES_DIR / "locations" / name.value / "watch-circle.png"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
+
     ax.ticklabel_format(axis='both', style='plain')
     ax.legend(loc="best")
     fig.tight_layout()
     fig.savefig(filename, dpi=300, bbox_inches="tight")
+
+    
 
 
 @plot.command(name=ClickOptions.DAILY.value)
