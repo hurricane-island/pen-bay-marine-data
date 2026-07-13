@@ -22,6 +22,7 @@ import gpxpy
 import gpxpy.gpx
 import click
 from lib import Source, influx_options, plot_tail, plot_options, boxplot, influx_host, influx_api_token
+from scipy.stats import median_abs_deviation
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
@@ -224,6 +225,12 @@ def filter_buoy_flat_files(name: StationName, table: TableName):
 
     return filter(filter_prefix, DATA_DIR.glob("*.dat"))
 
+def mean_absolute_change(series):
+    """
+    Calculate mean absolute change between consecutive observations.
+    """
+    return series.diff().abs().mean()
+
 
 @file_group.command(name=ClickOptions.DESCRIBE.value)
 @station_name
@@ -235,8 +242,19 @@ def buoys_file_describe(name: StationName, table: TableName):
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
     summary = df.describe().T.drop(columns=["25%", "75%", "std"])
+    # Add Median Absolute Deviation
+    mad = df.select_dtypes(include="number").apply(
+         lambda x: median_abs_deviation(x.dropna())
+    )
+    mac = (
+        df.select_dtypes(include="number")
+        .apply(mean_absolute_change)
+    )
+    summary["Mean_Absolute_Change"] = mac
+    summary["MAD"] = mad
     print("\nSamples:\n")
     print(summary)
+
 
 
 @plot.command(name=ClickOptions.TAIL.value)
