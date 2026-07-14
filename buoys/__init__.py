@@ -284,6 +284,10 @@ def buoys_plot_cable(name: StationName):
     """
     low = CABLE_DIR / f"{name.value}-low.mat"
     high = CABLE_DIR / f"{name.value}-high.mat"
+    if not low.exists() or not high.exists():
+        raise click.ClickException(
+            f"Missing cable simulation .mat files for station '{name.value}' (expected {low.name} and {high.name} under {CABLE_DIR})"
+        )
     low_data = loadmat(low)
     high_data = loadmat(high)
     fig, ax = plt.subplots(figsize=(4, 3))
@@ -317,12 +321,16 @@ def predicted_watch_circle(
     """
     Generate a predicted watch circle based on the planned deployment location.
     """
-    predicted = []
-    for each, label, ls in [("low", label, "solid"), ("high", None, "dashed")]:
-        data = loadmat(CABLE_DIR / f"{station.value}-{each}.mat")
-        radius = data["x"].max() * scale
-        circle = Circle(center_xy, radius=radius, color=color, fill=False, linestyle=ls, label=label)
-        predicted.append(circle)
+    predicted: list[Circle] = []
+    for each, circle_label, ls in [("low", label, "solid"), ("high", None, "dashed")]:
+        mat_path = CABLE_DIR / f"{station.value}-{each}.mat"
+        if not mat_path.exists():
+            raise click.ClickException(f"Missing cable simulation file: {mat_path}")
+        data = loadmat(mat_path)
+        radius = float(data["x"].max()) * scale
+        predicted.append(
+            Circle(center_xy, radius=radius, color=color, fill=False, linestyle=ls, label=circle_label)
+        )
     return predicted
 
 def haversine(lon1, lat1, lon2, lat2):
@@ -366,9 +374,12 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     
     filtered_lon = lon[mask]
     filtered_lat = lat[mask]
+    if filtered_lon.size == 0:
+        raise click.ClickException(
+            "No GPS points remain after filtering; try increasing --distance, lowering --satellites, or adjusting the date filter."
+        )
     cx, cy = transformer.transform(filtered_lon.mean(), filtered_lat.mean())
     filtered_sat = satellite_count[mask]
-    sort_ind = argsort(filtered_sat)
 
     fig, ax = plt.subplots(figsize=(3, 4))
 
