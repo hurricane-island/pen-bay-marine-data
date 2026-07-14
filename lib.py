@@ -468,6 +468,12 @@ def apply_qartod_filter(
     flags = PandasStream(df).run(config)
     store = PandasStore(flags)
     result = store.save()
+    gap_flags = gap_test(
+    series,
+    min_gap=3240,   # 54 minutes
+    max_gap=7200,   # 2 hours
+    )
+    result[f"{observed_property}_qartod_gap_test"] = gap_flags.values
     qc_columns = [
         col
         for col in result.columns
@@ -483,3 +489,18 @@ def apply_qartod_filter(
     qc = result[f"{observed_property}_qartod_rollup"]
     qc.index = series.index
     return series[qc != 4]
+
+def gap_test(series: Series, min_gap: int, max_gap: int):
+    """
+    Flag missing time intervals in a time series.
+
+    Returns QARTOD flags:
+    1 = pass
+    3 = suspect
+    4 = fail
+    """
+    series = series.sort_index()
+    gaps = series.index.to_series().diff().dt.total_seconds()
+    flags = Series(1, index=series.index)
+    flags[(gaps < min_gap) | (gaps > max_gap)] = 4
+    return flags

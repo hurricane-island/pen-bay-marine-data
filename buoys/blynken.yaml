@@ -16,6 +16,7 @@ streams:
         tolerance: 0.001
         suspect_threshold: 28800
         fail_threshold: 43200
+    
   
   sea_water_salinity:
     qartod:
@@ -34,6 +35,7 @@ streams:
         tolerance: 0.001
         suspect_threshold: 28800
         fail_threshold: 43200
+
   
   sea_water_chlorophyll_rfu:
     qartod:
@@ -52,6 +54,7 @@ streams:
         tolerance: 0.001
         suspect_threshold: 28800
         fail_threshold: 43200
+
   
   sea_water_phycoerythrin_rfu:
     qartod:
@@ -70,6 +73,7 @@ streams:
         tolerance: 0.001
         suspect_threshold: 28800
         fail_threshold: 43200
+
   
   barometric_pressure:
     qartod:
@@ -88,3 +92,6 @@ streams:
         tolerance: 0.001
         suspect_threshold: 
         fail_threshold:
+      
+      location_test:
+        bbox: [-68.92789, 44.31769, -68.92601, 44.31905]

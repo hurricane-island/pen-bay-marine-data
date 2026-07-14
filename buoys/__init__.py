@@ -631,6 +631,7 @@ def buoys_plot_recent(
     """
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
+    print(df.columns)
     vendor_name = VendoredNames[series.name]
     local = DataFrame(df[vendor_name.value])
     units = local.columns[0][0]
@@ -647,6 +648,6 @@ def buoys_plot_recent(
         series.value,
         prefix="buoys/figures/recent",
         units=units,
-        qartod="buoys/qartod.yaml",
+        qartod=f"buoys/{name.value}.yaml",
         remove_failures=True,
     )
