@@ -360,19 +360,18 @@ def boxplot(
     df: DataFrame,
     thing: str,
     observed_property: str,
-    prefix: str,
+    prefix: Path,
     units: str,
-    image_format: ImageFormat = ImageFormat.PNG,
-    freq: Frequency = Frequency.DAILY,
+    image_format: ImageFormat,
+    freq: Frequency,
     figsize: tuple[float, float] = (12, 6),
     rotation: float = 45,
+    color: str = "black"
 ):
     """
     Create a box plot of a single series grouped
     by time window.
     """
-    filename = f"{prefix}/{thing}/{observed_property}_{freq.name.lower()}.{image_format.value}"
-    Path(filename).parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=figsize)
     bins, positions, years = group_observations_by_time(df, freq=freq.value)
     # hack for buoys...
@@ -388,11 +387,11 @@ def boxplot(
     slots = x_range / spacing
     widths = (x_range - slots * spacing * 0.2) / (slots - 1)
     ax.boxplot(
-        bins,
+        bins, # type: ignore
         notch=False,
         widths=widths,
         positions=positions,
-        medianprops={"color": "black"},
+        medianprops={"color": color},
     )
     display_name = observed_property.replace("_", " ").title()
     title = f"{thing} {freq.name.lower()} {display_name} {years}".title()
@@ -407,4 +406,6 @@ def boxplot(
         display_name += f" ({units})"  # note: overloading display_name
     ax.set_ylabel(display_name)
     fig.tight_layout()
-    fig.savefig(filename)
+    filepath = prefix / thing / f"{observed_property}_{freq.name.lower()}.{image_format.value}"
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(filepath)

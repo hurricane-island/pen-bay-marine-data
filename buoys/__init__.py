@@ -509,16 +509,23 @@ def buoys_plot_locations(
     help="Frequency for aggregation.",
 )
 @click.option(
-    "--start-date",
+    "--start",
     default=None,
     type=click.DateTime(formats=["%Y-%m-%d"]),
     help="Start date for filtering data.",
 )
 @click.option(
-    "--end-date",
+    "--end",
     default=None,
     type=click.DateTime(formats=["%Y-%m-%d"]),
     help="End date for filtering data.",
+)
+@click.option(
+    "--size",
+    nargs=2,
+    default=(7.5, 4),
+    type=(float, float),
+    help="Figure size in inches (width, height).",
 )
 @plot_options
 def buoys_plot_datastream(
@@ -526,8 +533,9 @@ def buoys_plot_datastream(
     table: TableName,
     series: StandardNames,
     aggregate: Frequency,
-    start_date: datetime | None = None,
-    end_date: datetime | None = None,
+    start: datetime | None,
+    end: datetime | None,
+    size: tuple[float, float],
     **kwargs,
 ):
     """
@@ -542,20 +550,20 @@ def buoys_plot_datastream(
     local = DataFrame(df[vendor_name.value])
     units = local.columns[0][0]
     mask = ~df.index.duplicated(keep=False)
-    if start_date is not None:
-        mask &= df.index >= start_date
-    if end_date is not None:
-        mask &= df.index <= end_date
+    if start is not None:
+        mask &= df.index >= start
+    if end is not None:
+        mask &= df.index <= end
     unique = local[mask].sort_index()
     unique.index.rename("time", inplace=True)
     boxplot(
         unique,
         name.value,
         series.value,
-        str(FIGURES_DIR / "datastream"),
+        FIGURES_DIR / "datastream",
         units=units,
         freq=aggregate,
-        figsize=(7.5, 4),
+        figsize=size,
         **kwargs,
     )
 
