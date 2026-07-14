@@ -639,10 +639,6 @@ def buoys_plot_recent(
     as_series = as_series.sort_index() # Keep only the most recent six months
     cutoff = as_series.index.max() - DateOffset(months=6)
     recent = as_series.loc[cutoff:]
-
-    # TODO: Apply QARTOD QC here
-    # qc_flags = run_qartod(recent)
-
     plot_recent(
         recent,
         None,
