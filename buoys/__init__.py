@@ -637,8 +637,14 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
 )
 @plot_options
 def buoys_plot_datastream(
-    name: StationName, table: TableName, series: StandardNames, start=None,
-    end=None, aggregate=Frequency.DAILY, size=(7.5, 4), **kwargs
+    name: StationName,
+    table: TableName,
+    series: StandardNames,
+    start=None,
+    end=None,
+    aggregate=Frequency.DAILY,
+    size=(7.5, 4),
+    **kwargs,
 ):
     """
     Plot a generic `DataStream` aggregated by either daily, weekly, or monthly. This
