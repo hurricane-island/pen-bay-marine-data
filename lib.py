@@ -15,7 +15,6 @@ from ioos_qc.config import Config
 from ioos_qc.streams import PandasStream
 from ioos_qc.stores import PandasStore
 
-
 class ImageFormat(Enum):
     """
     Valid image file formats for writing figures.
@@ -203,7 +202,7 @@ def plot_qartod_flags(
     """
     Add scatter markers for flagged data points.
     """
-    df = series.reset_index()
+    df = series.rename_axis(time_column).reset_index()
     flags = PandasStream(df).run(config)
     store = PandasStore(flags)
     result = store.save().set_index(time_column)
@@ -388,3 +387,107 @@ def boxplot(
     ax.set_ylabel(display_name)
     fig.tight_layout()
     fig.savefig(filename)
+
+def plot_recent( #6 months of most recent data
+    local: Series,
+    remote: Optional[Series],
+    thing: str,
+    observed_property: str,
+    prefix: str,
+    units: Optional[str] = None,
+    image_format: ImageFormat = ImageFormat.PNG,
+    days: int = 180,
+    resample: str = "1h",
+    qartod: Optional[str] = None,
+    remove_failures: bool = False,
+    figsize: tuple[int, int] = (7, 3),
+    time_column: str = "time",
+):
+    end: datetime = datetime.now()
+    start: datetime = end - timedelta(days=days)
+    fig, ax = plt.subplots(figsize=figsize)
+    local_tail = local.loc[local.index > start]
+    local_filtered = local_tail
+    config = None
+    if qartod is not None:
+         print("QARTOD PATH:", qartod)
+         print("EXISTS:", Path(qartod).exists())
+         print("FULL PATH:", Path(qartod).resolve())
+
+         config = Config(qartod)
+
+         print("CONFIG LOADED:", config)
+
+    if config is not None and remove_failures: 
+        local_filtered = apply_qartod_filter(
+            local_tail, 
+            observed_property, 
+            config, 
+            time_column=time_column
+        )    
+
+    if remote is not None:
+        tail = remote.loc[remote.index > start]
+        plot_single_series(
+            tail,
+            ax,
+            resample,
+            label="remote",
+            color="black",
+            linestyle=":",
+        )
+    plot_single_series(local_filtered, ax, resample, label="local", color="grey")
+
+    if config is not None:
+        plot_qartod_flags(
+            ax,
+            local_tail,
+            observed_property,
+            config,
+            time_column=time_column,
+        ) 
+    display_name = observed_property.replace("_", " ").title()
+    if start.year == end.year:
+        year_range = f"{start.year}"
+    else:
+        year_range = f"{start.year}-{end.year}"
+    plt.title(f"{thing} {display_name} {year_range}".title())
+    ax.set_xlabel("Date")
+    plt.xticks(rotation=45)
+    ax.set_xlim(start, end)
+    ax.set_ylim(None, None)
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=(days // 8) + 2))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # Customize format
+    if units is not None:
+        ax.set_ylabel(f"{units}")
+    fig.legend(loc="outside upper right")
+    fig.tight_layout()
+    filename = f"{prefix}/{thing}/{observed_property}.{image_format.value}"
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(filename)
+
+def apply_qartod_filter(
+    series: Series,
+    observed_property: str,
+    config: Config,
+    time_column: str = "time",
+) -> Series:
+    df = series.reset_index()
+    flags = PandasStream(df).run(config)
+    store = PandasStore(flags)
+    result = store.save()
+    qc_columns = [
+        col
+        for col in result.columns
+        if col.startswith(f"{observed_property}_qartod_")
+        and not col.endswith("_rollup")
+    ]
+    result[f"{observed_property}_qartod_rollup"] = result[qc_columns].max(axis=1) #rollup of qartod for observed property
+    print(result.columns)
+    print(result[f"{observed_property}_qartod_rollup"].value_counts())
+    failed = result[result[f"{observed_property}_qartod_rollup"] == 4]
+    print("FAILED QC ROWS:")
+    print(failed)
+    qc = result[f"{observed_property}_qartod_rollup"]
+    qc.index = series.index
+    return series[qc != 4]

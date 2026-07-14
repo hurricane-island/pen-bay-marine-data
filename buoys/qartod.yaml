@@ -2,5 +2,89 @@ streams:
   sea_water_temperature:
     qartod:
       gross_range_test:
-        suspect_span: [273, 305]  # K
-        fail_span: [263, 315] 
+        suspect_span: [0.1, 26]
+        fail_span: [-4, 35]
+
+      rate_of_change_test:
+        threshold: 0.48
+
+      spike_test:
+        suspect_threshold: 0.24
+        fail_threshold: 0.59
+
+      flat_line_test:
+        tolerance: 0.001
+        suspect_threshold: 28800
+        fail_threshold: 43200
+  
+  sea_water_salinity:
+    qartod:
+      gross_range_test:
+        suspect_span: [0.1, 26]
+        fail_span: [-4, 35]
+
+      rate_of_change_test:
+        threshold: 0.48
+
+      spike_test:
+        suspect_threshold: 0.24
+        fail_threshold: 0.59
+
+      flat_line_test:
+        tolerance: 0.001
+        suspect_threshold: 28800
+        fail_threshold: 43200
+  
+  sea_water_chlorophyll_rfu:
+    qartod:
+      gross_range_test:
+        suspect_span: [0.1, 26]
+        fail_span: [-4, 35]
+
+      rate_of_change_test:
+        threshold: 0.48
+
+      spike_test:
+        suspect_threshold: 0.24
+        fail_threshold: 0.59
+
+      flat_line_test:
+        tolerance: 0.001
+        suspect_threshold: 28800
+        fail_threshold: 43200
+  
+  sea_water_phycoerythrin_rfu:
+    qartod:
+      gross_range_test:
+        suspect_span: [0.1, 26]
+        fail_span: [-4, 35]
+
+      rate_of_change_test:
+        threshold: 0.48
+
+      spike_test:
+        suspect_threshold: 0.24
+        fail_threshold: 0.59
+
+      flat_line_test:
+        tolerance: 0.001
+        suspect_threshold: 28800
+        fail_threshold: 43200
+  
+  water_pressure:
+    qartod:
+      gross_range_test:
+        suspect_span: [0.1, 26]
+        fail_span: [-4, 35]
+
+      rate_of_change_test:
+        threshold: 0.48
+
+      spike_test:
+        suspect_threshold: 0.24
+        fail_threshold: 0.59
+
+      flat_line_test:
+        tolerance: 0.001
+        suspect_threshold: 
+        fail_threshold: 

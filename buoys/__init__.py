@@ -29,6 +29,8 @@ import gpxpy
 import gpxpy.gpx
 import click
 from lib import Source, influx_options, plot_tail, plot_options, boxplot, influx_host, influx_api_token
+from pandas import DateOffset
+from lib import plot_recent
 
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -617,3 +619,37 @@ def buoys_db_describe(name: StationName, table: TableName, host: str, measuremen
         mode="pandas",
     )
     print(read_back.head())
+
+@plot.command(name="recent")
+@source_options
+@plot_options
+def buoys_plot_recent(
+    name: StationName, table: TableName, series: StandardNames, **kwargs
+):
+    """
+    Plot the last six months of data from a buoy for a single data stream.
+    """
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(list(files))
+    vendor_name = VendoredNames[series.name]
+    local = DataFrame(df[vendor_name.value])
+    units = local.columns[0][0]
+    as_series = local.squeeze()
+    as_series.name = series.value
+    as_series = as_series.sort_index() # Keep only the most recent six months
+    cutoff = as_series.index.max() - DateOffset(months=6)
+    recent = as_series.loc[cutoff:]
+
+    # TODO: Apply QARTOD QC here
+    # qc_flags = run_qartod(recent)
+
+    plot_recent(
+        recent,
+        None,
+        name.value,
+        series.value,
+        prefix="buoys/figures/recent",
+        units=units,
+        qartod="buoys/qartod.yaml",
+        remove_failures=True,
+    )
