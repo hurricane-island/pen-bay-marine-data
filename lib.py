@@ -11,6 +11,8 @@ from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.axes import Axes
 from click import Choice, option
 from pandas import DataFrame, Grouper, Series, concat
+from numpy import array, float32, diff
+from numpy.typing import NDArray
 from ioos_qc.config import Config
 from ioos_qc.streams import PandasStream
 from ioos_qc.stores import PandasStore
@@ -306,16 +308,20 @@ def plot_tail(
 
 def group_observations_by_time(
     df: DataFrame, freq: str = "D"
-) -> tuple[list[DataFrame], list[int]]:
+) -> tuple[list[DataFrame], NDArray[float32], str]:
     """
     Group observations by a specified frequency. Used in creating
     box plots of time series data that aggregate by day, week, month, etc.
+
+    The positions are always calculated in timedelta days, used to slice
+    the DataFrame into segments for plotting. Bins will always been equally
+    spaced when there is data, but may have gaps when there are missing values.
     """
     grouper = Grouper(freq=freq)
     gb = df.groupby(grouper, sort=True)
     groups: list[datetime] = list(gb.groups.keys())
     epoch = datetime(1970, 1, 1)
-    positions = [(group - epoch).days for group in groups]
+    positions = array([(group - epoch).days for group in groups], dtype=float32)
     bins = []
     previous = 0
     for each in gb.groups.values():
@@ -341,50 +347,65 @@ def describe_data_frame(df: DataFrame, config_path: str):
     group_summary = gb.describe().T
     print(group_summary)
 
+class Frequency(Enum):
+    """
+    Supported aggregation frequencies for plotting.
+    """
+
+    DAILY = "D"
+    WEEKLY = "W"
+    MONTHLY = "ME"
 
 def boxplot(
     df: DataFrame,
     thing: str,
     observed_property: str,
-    prefix: str,
+    prefix: Path,
     units: str,
-    image_format: ImageFormat = ImageFormat.PNG,
-    freq: str = "D",
-    figsize: tuple[int, int] = (12, 6),
-    tick_interval: int = 5,
+    image_format: ImageFormat,
+    freq: Frequency,
+    figsize: tuple[float, float] = (12, 6),
     rotation: float = 45,
+    color: str = "black"
 ):
     """
     Create a box plot of a single series grouped
     by time window.
     """
-    filename = f"{prefix}/{thing}/{observed_property}.{image_format.value}"
-    Path(filename).parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=figsize)
-    bins, positions, years = group_observations_by_time(df, freq=freq)
+    bins, positions, years = group_observations_by_time(df, freq=freq.value)
     # hack for buoys...
     if isinstance(bins[0], DataFrame):
         col = bins[0].columns[0]
-        bins = [b[col].values for b in bins ]
+        bins = [b[col].values for b in bins]
     # end hack for buoys...
+
+    # Calculate spacing between bins
+    spacing = diff(positions).min()
+    pad = 0.5 * spacing
+    x_range = positions[-1] - positions[0] + 2 * pad
+    slots = x_range / spacing
+    widths = (x_range - slots * spacing * 0.2) / (slots - 1)
     ax.boxplot(
-        bins,
+        bins, # type: ignore
         notch=False,
-        widths=0.8,
+        widths=widths,
         positions=positions,
-        medianprops={"color": "black"},
+        medianprops={"color": color},
     )
     display_name = observed_property.replace("_", " ").title()
-    title = f"{thing} {display_name} {years}".title()
+    title = f"{thing} {freq.name.lower()} {display_name} {years}".title()
     ax.set_title(title)
     ax.set_xlabel("Date")
-    ax.set_xlim((positions[0] - 0.5, positions[-1] + 0.5))
-    ax.set_ylim((None, None))
-    ax.xaxis.set_major_locator(mdates.DayLocator(interval=tick_interval))
-    plt.xticks(rotation=rotation)
+    ax.set_xlim(positions[0] - pad, positions[-1] + pad)
+    ax.set_ylim(None, None)
+    ax.xaxis.set_major_locator(mdates.DayLocator(bymonthday=[1]))
+    ax.xaxis.set_tick_params(rotation=rotation)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # e.g. Dec 10
     if units is not None:
         display_name += f" ({units})"  # note: overloading display_name
     ax.set_ylabel(display_name)
     fig.tight_layout()
-    fig.savefig(filename)
+    filepath = prefix / thing / f"{observed_property}_{freq.name.lower()}.{image_format.value}"
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(filepath)
