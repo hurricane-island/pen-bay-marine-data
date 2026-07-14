@@ -423,3 +423,29 @@ def boxplot(
     ax.set_ylabel(display_name)
     fig.tight_layout()
     fig.savefig(filename)
+
+def apply_qartod_filter(
+    series: Series,
+    observed_property: str,
+    config: Config,
+    time_column: str = "time",
+) -> Series:
+    df = series.reset_index()
+    flags = PandasStream(df).run(config)
+    store = PandasStore(flags)
+    result = store.save()
+    qc_columns = [
+        col
+        for col in result.columns
+        if col.startswith(f"{observed_property}_qartod_")
+        and not col.endswith("_rollup")
+    ]
+    result[f"{observed_property}_qartod_rollup"] = result[qc_columns].max(axis=1) #rollup of qartod for observed property
+    print(result.columns)
+    print(result[f"{observed_property}_qartod_rollup"].value_counts())
+    failed = result[result[f"{observed_property}_qartod_rollup"] == 4]
+    print("FAILED QC ROWS:")
+    print(failed)
+    qc = result[f"{observed_property}_qartod_rollup"]
+    qc.index = series.index
+    return series[qc != 4]
