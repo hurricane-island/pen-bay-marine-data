@@ -66,7 +66,7 @@ class ClickOptions(Enum):
     DB = "db"
     # plotting commands
     TAIL = "tail"
-    DAILY = "daily"
+    DATASTREAM = "datastream"
 
 
 class StationName(Enum):
@@ -499,7 +499,7 @@ def buoys_plot_locations(
 
 
 
-@plot.command(name="datastream")
+@plot.command(name=ClickOptions.DATASTREAM.value)
 @source_options
 @click.option(
     "--aggregate",
