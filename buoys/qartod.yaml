@@ -18,17 +18,17 @@ streams:
         zinp: []  # required, but empty
 
       rate_of_change_test:
-        threshold: 0.00013  # units per second, C or K
+        threshold: 0.00029  # units per second, C or K
 
       spike_test:
-        suspect_threshold: 0.24  # dimensionless
-        fail_threshold: 0.59  # dimensionless
-        method: differential
+        suspect_threshold: 0.4  # dimensionless
+        fail_threshold: 0.5  # dimensionless
+        method: differential  # will not catch tails, only values with neighbors
 
       flat_line_test:
         tolerance: 0.001
-        suspect_threshold: 28800
-        fail_threshold: 43200
+        suspect_threshold: 28800 # seconds, 8 hours
+        fail_threshold: 43200 # seconds, 12 hours
   
   # sea_water_salinity:
   #   qartod:
