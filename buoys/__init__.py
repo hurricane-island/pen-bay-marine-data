@@ -31,8 +31,17 @@ from pyproj import Transformer
 import gpxpy
 import gpxpy.gpx
 import click
-from lib import Source, influx_options, plot_tail, plot_options, boxplot, influx_host, influx_api_token
-
+from lib import (
+    Source,
+    influx_options,
+    plot_options,
+    boxplot,
+    influx_host,
+    influx_api_token,
+    test_observed_property,
+    Frequency,
+    ImageFormat,
+)
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
@@ -262,6 +271,7 @@ def buoys_file_describe(name: StationName, table: TableName):
     print("\nSamples:\n")
     print(summary)
 
+
 class TestTypes(Enum):
     """
     Supported QARTOD test types.
@@ -274,12 +284,18 @@ class TestTypes(Enum):
     FLAT_LINE = "flat_line"
     ROLLUP = "rollup"
 
+
 @plot.command(name=ClickOptions.TAIL.value)
 @source_options
 @plot_options
 @click.option("--qartod", default="qartod.yaml", help="QARTOD configuration file")
 @click.option("--days", default=30, help="Number of days to plot")
-@click.option("--test", default=TestTypes.ROLLUP, type=click.Choice(TestTypes, case_sensitive=False), help="QARTOD test to plot")
+@click.option(
+    "--test",
+    default=TestTypes.ROLLUP,
+    type=click.Choice(TestTypes, case_sensitive=False),
+    help="QARTOD test to plot",
+)
 def buoys_plot_tail(
     name: StationName,
     table: TableName,
@@ -299,7 +315,7 @@ def buoys_plot_tail(
     mask = df.index > start
     df = df[mask].sort_values("TimeRecovered").sort_index(kind="stable")
     df = df[~df.index.duplicated(keep="first")]
-    df = df.asfreq('h')
+    df = df.asfreq("h")
     renamed = []
     units = {}
     for col in df.columns:
@@ -314,14 +330,24 @@ def buoys_plot_tail(
 
     fig, ax = plt.subplots(figsize=(7.5, 3))
 
-    ax.plot(df.index, df[series.value], color="grey", linestyle="dashed", linewidth=1, zorder=1, label="raw")
+    ax.plot(
+        df.index,
+        df[series.value],
+        color="grey",
+        linestyle="dashed",
+        linewidth=1,
+        zorder=1,
+        label="raw",
+    )
     ylim = (None, None)
     if qartod is not None:
         qa_path = Path(__file__).parent / "qartod.yaml"
         if qa_path.exists():
             config = Config(qa_path)
         else:
-            raise click.ClickException(f"QARTOD configuration file not found: {qa_path}")
+            raise click.ClickException(
+                f"QARTOD configuration file not found: {qa_path}"
+            )
         flags = PandasStream(df.reset_index(names="time"), time="time").run(config)
         store = PandasStore(flags)
         result = store.save().set_index("time")
@@ -334,19 +360,36 @@ def buoys_plot_tail(
         by_observed_property = []
         for items in frames.items():
             by_observed_property.append(test_observed_property(result, *items))
-        qa = concat(by_observed_property, axis=0).groupby("observed_property").get_group(series.value)[test.value]
+        qa = (
+            concat(by_observed_property, axis=0)
+            .groupby("observed_property")
+            .get_group(series.value)[test.value]
+        )
         suspect = df[qa == 3][series.value]
         failed = df[qa == 4][series.value]
-        remaining = df[qa < 3][series.value].asfreq('h')
+        remaining = df[qa < 3][series.value].asfreq("h")
         ax.scatter(
-            suspect.index, suspect, label="suspect", color="orange", marker="x", zorder=0
+            suspect.index,
+            suspect,
+            label="suspect",
+            color="orange",
+            marker="x",
+            zorder=0,
         )
         ax.scatter(
             failed.index, failed, label="failed", color="red", marker="x", zorder=0
         )
-        ax.plot(remaining.index, remaining, color="black", linestyle="solid", linewidth=1, zorder=2, label="filtered")
+        ax.plot(
+            remaining.index,
+            remaining,
+            color="black",
+            linestyle="solid",
+            linewidth=1,
+            zorder=2,
+            label="filtered",
+        )
         # ylim = (remaining.min(), remaining.max())
- 
+
     display_name = series.value.replace("_", " ").title()
     if start.year == end.year:
         year_range = f"{start.year}"
@@ -363,7 +406,12 @@ def buoys_plot_tail(
         ax.set_ylabel(f"{units[series.value]}")
     ax.legend(loc="best")
     fig.tight_layout()
-    filepath = FIGURES_DIR / ClickOptions.TAIL.value / name.value / f"{series.value}.{image_format.value}"
+    filepath = (
+        FIGURES_DIR
+        / ClickOptions.TAIL.value
+        / name.value
+        / f"{series.value}.{image_format.value}"
+    )
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath, dpi=300, bbox_inches="tight")
 
@@ -475,8 +523,15 @@ def haversine(lon1, lat1, lon2, lat2):
 @station_name
 @click.option("--latitude", required=True, type=float)
 @click.option("--longitude", required=True, type=float)
-@click.option("--distance", required=True, type=float, help="filter erroneous GPS points by distance from planned deployment location (meters)")
-@click.option("--satellites", required=True, type=int, help="minimum number of satellites")
+@click.option(
+    "--distance",
+    required=True,
+    type=float,
+    help="filter erroneous GPS points by distance from planned deployment location (meters)",
+)
+@click.option(
+    "--satellites", required=True, type=int, help="minimum number of satellites"
+)
 def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4):
     """
     Plot the lat and long of the buoy hourly over the course of the deployment period.
@@ -534,17 +589,9 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
 
     px, py = transformer.transform(*planned_gps)
     planned_xy = predicted_watch_circle(
-        (px - cx, py - cy),
-        name,
-        "grey",
-        label="Planned"
+        (px - cx, py - cy), name, "grey", label="Planned"
     )
-    corrected_xy = predicted_watch_circle(
-        (0.0, 0.0),
-        name,
-        "black",
-        label="Deployed"
-    )
+    corrected_xy = predicted_watch_circle((0.0, 0.0), name, "black", label="Deployed")
     for patch in planned_xy + corrected_xy:
         ax.add_patch(patch)
 
@@ -554,11 +601,10 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
 
     filename = FIGURES_DIR / "locations" / name.value / "watch-circle.png"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
-    ax.ticklabel_format(axis='both', style='plain')
+    ax.ticklabel_format(axis="both", style="plain")
     ax.legend(loc="best")
     fig.tight_layout()
     fig.savefig(filename, dpi=300, bbox_inches="tight")
-
 
 
 @plot.command(name=ClickOptions.DATASTREAM.value)
@@ -590,10 +636,13 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     help="Figure size in inches (width, height).",
 )
 @plot_options
-def buoys_plot_daily(name: StationName, table: TableName, series: StandardNames, **kwargs):
+def buoys_plot_datastream(
+    name: StationName, table: TableName, series: StandardNames, start=None,
+    end=None, aggregate=Frequency.DAILY, size=(7.5, 4), **kwargs
+):
     """
     Plot a generic `DataStream` aggregated by either daily, weekly, or monthly. This
-    will read in and concatenate all available data files for the station and table, 
+    will read in and concatenate all available data files for the station and table,
     then extract a deduplicated series for the data stream. The output
     is an image file formatted for a report or presentation.
     """
