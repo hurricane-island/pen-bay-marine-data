@@ -31,16 +31,8 @@ from pyproj import Transformer
 import gpxpy
 import gpxpy.gpx
 import click
-from lib import (
-    ImageFormat,
-    Source,
-    influx_options,
-    plot_options,
-    boxplot,
-    influx_host,
-    influx_api_token,
-    test_observed_property,
-)
+from lib import Source, influx_options, plot_tail, plot_options, boxplot, influx_host, influx_api_token
+
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
@@ -69,7 +61,7 @@ class ClickOptions(Enum):
     DB = "db"
     # plotting commands
     TAIL = "tail"
-    DAILY = "daily"
+    DATASTREAM = "datastream"
 
 
 class StationName(Enum):
@@ -483,15 +475,8 @@ def haversine(lon1, lat1, lon2, lat2):
 @station_name
 @click.option("--latitude", required=True, type=float)
 @click.option("--longitude", required=True, type=float)
-@click.option(
-    "--distance",
-    required=True,
-    type=float,
-    help="filter erroneous GPS points by distance from planned deployment location (meters)",
-)
-@click.option(
-    "--satellites", required=True, type=int, help="minimum number of satellites"
-)
+@click.option("--distance", required=True, type=float, help="filter erroneous GPS points by distance from planned deployment location (meters)")
+@click.option("--satellites", required=True, type=int, help="minimum number of satellites")
 def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4):
     """
     Plot the lat and long of the buoy hourly over the course of the deployment period.
@@ -549,31 +534,68 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
 
     px, py = transformer.transform(*planned_gps)
     planned_xy = predicted_watch_circle(
-        (px - cx, py - cy), name, "grey", label="Planned"
+        (px - cx, py - cy),
+        name,
+        "grey",
+        label="Planned"
     )
-    corrected_xy = predicted_watch_circle((0.0, 0.0), name, "black", label="Deployed")
+    corrected_xy = predicted_watch_circle(
+        (0.0, 0.0),
+        name,
+        "black",
+        label="Deployed"
+    )
     for patch in planned_xy + corrected_xy:
         ax.add_patch(patch)
 
     ax.set_ylabel("UTM Northing Δ (m)")
     ax.set_xlabel("UTM Easting Δ (m)")
     ax.set_aspect(1.0)
+
     filename = FIGURES_DIR / "locations" / name.value / "watch-circle.png"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
-    ax.ticklabel_format(axis="both", style="plain")
+    ax.ticklabel_format(axis='both', style='plain')
     ax.legend(loc="best")
     fig.tight_layout()
     fig.savefig(filename, dpi=300, bbox_inches="tight")
 
 
-@plot.command(name=ClickOptions.DAILY.value)
+
+@plot.command(name=ClickOptions.DATASTREAM.value)
 @source_options
+@click.option(
+    "--aggregate",
+    default=Frequency.DAILY,
+    type=click.Choice(Frequency, case_sensitive=False),
+    required=True,
+    help="Frequency for aggregation.",
+)
+@click.option(
+    "--start",
+    default=None,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="Start date for filtering data.",
+)
+@click.option(
+    "--end",
+    default=None,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="End date for filtering data.",
+)
+@click.option(
+    "--size",
+    nargs=2,
+    default=(7.5, 4),
+    type=(float, float),
+    help="Figure size in inches (width, height).",
+)
 @plot_options
-def buoys_plot_daily(
-    name: StationName, table: TableName, series: StandardNames, **kwargs
-):
+def buoys_plot_daily(name: StationName, table: TableName, series: StandardNames, **kwargs):
     """
-    Plot a single `DataStream` aggregated by day.
+    Plot a generic `DataStream` aggregated by either daily, weekly, or monthly. This
+    will read in and concatenate all available data files for the station and table, 
+    then extract a deduplicated series for the data stream. The output
+    is an image file formatted for a report or presentation.
     """
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
@@ -581,10 +603,22 @@ def buoys_plot_daily(
     local = DataFrame(df[vendor_name.value])
     units = local.columns[0][0]
     mask = ~df.index.duplicated(keep=False)
+    if start is not None:
+        mask &= df.index >= start
+    if end is not None:
+        mask &= df.index <= end
     unique = local[mask].sort_index()
     unique.index.rename("time", inplace=True)
-    prefix = FIGURES_DIR / ClickOptions.DAILY.value
-    boxplot(unique, name.value, series.value, str(prefix), units=units, **kwargs)
+    boxplot(
+        unique,
+        name.value,
+        series.value,
+        FIGURES_DIR / "datastream",
+        units=units,
+        freq=aggregate,
+        figsize=size,
+        **kwargs,
+    )
 
 
 @file_group.command(name=ClickOptions.EXPORT.value)
