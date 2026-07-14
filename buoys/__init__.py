@@ -284,6 +284,10 @@ def buoys_plot_cable(name: StationName):
     """
     low = CABLE_DIR / f"{name.value}-low.mat"
     high = CABLE_DIR / f"{name.value}-high.mat"
+    if not low.exists() or not high.exists():
+        raise click.ClickException(
+            f"Missing cable simulation .mat files for station '{name.value}' (expected {low.name} and {high.name} under {CABLE_DIR})"
+        )
     low_data = loadmat(low)
     high_data = loadmat(high)
     fig, ax = plt.subplots(figsize=(4, 3))
