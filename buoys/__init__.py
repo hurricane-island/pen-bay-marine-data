@@ -16,18 +16,28 @@ from pathlib import Path
 from enum import Enum
 from datetime import datetime
 from hashlib import md5
+from numpy import concatenate, array, argsort
 from pandas import read_csv, DataFrame, concat
 from influxdb_client_3 import InfluxDBClient3
+from matplotlib import pyplot as plt
+from matplotlib.patches import Circle
+from matplotlib.markers import MarkerStyle
+from scipy.io import loadmat
+from math import radians, cos, sin, sqrt, atan2
+from pyproj import Transformer
 import gpxpy
 import gpxpy.gpx
 import click
 from lib import Source, influx_options, plot_tail, plot_options, boxplot, influx_host, influx_api_token
+
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
 EXPORT_DIR = Path(__file__).parent / "export"
 FIRMWARE_DIR = Path(__file__).parent / "firmware"
 TEMPLATE_DIR = Path(__file__).parent / "templates"
+CABLE_DIR = Path(__file__).parent / "cable"
+transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
 
 class ClickOptions(Enum):
     """
@@ -264,6 +274,155 @@ def buoys_plot_tail(
         units=units,
         **kwargs,
     )
+
+
+@plot.command(name="cable")
+@station_name
+def buoys_plot_cable(name: StationName):
+    """
+    Plot the mooring tension diagram from the WHOI cable simulation.
+    """
+    low = CABLE_DIR / f"{name.value}-low.mat"
+    high = CABLE_DIR / f"{name.value}-high.mat"
+    if not low.exists() or not high.exists():
+        raise click.ClickException(
+            f"Missing cable simulation .mat files for station '{name.value}' (expected {low.name} and {high.name} under {CABLE_DIR})"
+        )
+    low_data = loadmat(low)
+    high_data = loadmat(high)
+    fig, ax = plt.subplots(figsize=(4, 3))
+    x = concatenate([low_data["x"], high_data["x"]])
+    y = concatenate([low_data["z"], high_data["z"]])
+    z = concatenate([low_data["T"], high_data["T"]])
+    handle = ax.scatter(x, y, c=z, s=2, cmap="spring", label="Mooring")
+    ax.vlines(low_data["x"].max(), ymin=0.0, ymax=low_data["z"].max(), colors="black", linestyles="solid", label="Low Tide")
+    ax.vlines(high_data["x"].max(), ymin=0.0, ymax=high_data["z"].max(), colors="black", linestyles="dashed", label="High Tide")
+    ax.hlines(high_data["depth"], xmin=0.0, xmax=high_data["x"].max(), colors="black", linestyles="dashed")
+    ax.hlines(low_data["depth"], xmin=0.0, xmax=low_data["x"].max(), colors="black", linestyles="solid")
+    ax.set_aspect(1.0)
+    fig.colorbar(handle, label="Tension (N)", shrink=0.5)
+    ax.set_ylim(y.min(), None)
+    ax.set_xlim(x.min(), None)
+    ax.set_xlabel("Displacement (m)")
+    ax.set_ylabel("Water Level (m)")
+    ax.legend(loc="best")
+    filename = FIGURES_DIR / "cable" / name.value / "mooring-tension.png"
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(filename, bbox_inches="tight", dpi=300)
+
+def predicted_watch_circle(
+    center_xy: tuple[float, float],
+    station: StationName,
+    color: str,
+    scale: float = 1.0,
+    label: str|None = None
+) -> list[Circle]:
+    """
+    Generate a predicted watch circle based on the planned deployment location.
+    """
+    predicted: list[Circle] = []
+    for each, circle_label, ls in [("low", label, "solid"), ("high", None, "dashed")]:
+        mat_path = CABLE_DIR / f"{station.value}-{each}.mat"
+        if not mat_path.exists():
+            raise click.ClickException(f"Missing cable simulation file: {mat_path}")
+        data = loadmat(mat_path)
+        radius = float(data["x"].max()) * scale
+        predicted.append(
+            Circle(center_xy, radius=radius, color=color, fill=False, linestyle=ls, label=circle_label)
+        )
+    return predicted
+
+def haversine(lon1, lat1, lon2, lat2):
+    R = 6371000.0 # Earth radius in meters
+    
+    phi1, phi2 = radians(lat1), radians(lat2)
+    delta_phi = radians(lat2 - lat1)
+    delta_lambda = radians(lon2 - lon1)
+    a = sin(delta_phi / 2)**2 + cos(phi1) * cos(phi2) * sin(delta_lambda / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c # Distance in meters
+
+@plot.command(name="locations")
+@station_name
+@click.option("--latitude", required=True, type=float)
+@click.option("--longitude", required=True, type=float)
+@click.option("--distance", required=True, type=float, help="filter erroneous GPS points by distance from planned deployment location (meters)")
+@click.option("--satellites", required=True, type=int, help="minimum number of satellites")
+def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4):
+    """
+    Plot the lat and long of the buoy hourly over the course of the deployment period.
+    This only uses historical data contained in local raw files. Compare it to the
+    deployment location of the anchor and the watch circle predicted by WHOI Cable
+    simulations.
+    """
+    table = TableName.DIAGNOSTIC
+    lat_name = "Latitude"
+    lon_name = "Longitude"
+    sat_name = "GPSSatellitesInView"
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(list(files))
+    lat = df[lat_name].to_numpy().flatten()
+    lon = df[lon_name].to_numpy().flatten()
+    satellite_count = df[sat_name].to_numpy().flatten()
+    planned_gps = (longitude, latitude)  # original
+    def compute_distance(gps):
+        return haversine(*planned_gps, *gps)
+    mask = (array(list(map(compute_distance, zip(lon, lat)))) < distance) & \
+           (satellite_count >= satellites) & \
+           (df.index > datetime(2026, 1, 1))  # filter out erroneous GPS points and early data
+    
+    filtered_lon = lon[mask]
+    filtered_lat = lat[mask]
+    if filtered_lon.size == 0:
+        raise click.ClickException(
+            "No GPS points remain after filtering; try increasing --distance, lowering --satellites, or adjusting the date filter."
+        )
+    cx, cy = transformer.transform(filtered_lon.mean(), filtered_lat.mean())
+    filtered_sat = satellite_count[mask]
+
+    fig, ax = plt.subplots(figsize=(3, 4))
+
+    sort_ind = argsort(filtered_sat)  # Sort indices based on satellite count for plotting
+    xx, yy = transformer.transform(filtered_lon[sort_ind], filtered_lat[sort_ind])
+    handle = ax.scatter(
+        xx - cx,
+        yy - cy,
+        alpha=filtered_sat[sort_ind]/filtered_sat[sort_ind].max(),
+        marker=MarkerStyle("o"),
+        s=10,
+        c=filtered_sat[sort_ind],
+        edgecolors='none',
+        cmap="spring",
+        label="Location"
+    )
+    fig.colorbar(handle, label="Satellites", shrink=0.5)
+
+    px, py = transformer.transform(*planned_gps)
+    planned_xy = predicted_watch_circle(
+        (px - cx, py - cy),
+        name,
+        "grey",
+        label="Planned"
+    )
+    corrected_xy = predicted_watch_circle(
+        (0.0, 0.0),
+        name,
+        "black",
+        label="Deployed"
+    )
+    for patch in planned_xy + corrected_xy:
+        ax.add_patch(patch)
+
+    ax.set_ylabel("UTM Northing Δ (m)")
+    ax.set_xlabel("UTM Easting Δ (m)")
+    ax.set_aspect(1.0)
+    filename = FIGURES_DIR / "locations" / name.value / "watch-circle.png"
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+    ax.ticklabel_format(axis='both', style='plain')
+    ax.legend(loc="best")
+    fig.tight_layout()
+    fig.savefig(filename, dpi=300, bbox_inches="tight")
 
 
 @plot.command(name=ClickOptions.DAILY.value)
