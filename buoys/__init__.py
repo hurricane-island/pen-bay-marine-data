@@ -372,7 +372,6 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     filtered_lat = lat[mask]
     cx, cy = transformer.transform(filtered_lon.mean(), filtered_lat.mean())
     filtered_sat = satellite_count[mask]
-    sort_ind = argsort(filtered_sat)
 
     fig, ax = plt.subplots(figsize=(3, 4))
 
