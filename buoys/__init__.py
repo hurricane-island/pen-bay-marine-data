@@ -636,6 +636,7 @@ def buoys_plot_recent(
     units = local.columns[0][0]
     as_series = local.squeeze()
     as_series.name = series.value
+    as_series.index.name = "time"
     as_series = as_series.sort_index() # Keep only the most recent six months
     cutoff = as_series.index.max() - DateOffset(months=6)
     recent = as_series.loc[cutoff:]

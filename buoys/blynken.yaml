@@ -3,10 +3,10 @@ streams:
     qartod:
       gross_range_test:
         suspect_span: [0.1, 26]
-        fail_span: [-4, 35]
+        fail_span: [-4, 40]
 
       rate_of_change_test:
-        threshold: 0.48
+        threshold: 0.000133
 
       spike_test:
         suspect_threshold: 0.24
@@ -71,7 +71,7 @@ streams:
         suspect_threshold: 28800
         fail_threshold: 43200
   
-  water_pressure:
+  barometric_pressure:
     qartod:
       gross_range_test:
         suspect_span: [0.1, 26]
@@ -87,4 +87,4 @@ streams:
       flat_line_test:
         tolerance: 0.001
         suspect_threshold: 
-        fail_threshold: 
+        fail_threshold:

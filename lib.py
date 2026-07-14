@@ -463,6 +463,7 @@ def apply_qartod_filter(
     config: Config,
     time_column: str = "time",
 ) -> Series:
+    series.index.name = time_column
     df = series.reset_index()
     flags = PandasStream(df).run(config)
     store = PandasStore(flags)
