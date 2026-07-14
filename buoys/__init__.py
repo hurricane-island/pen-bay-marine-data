@@ -14,29 +14,33 @@ Features:
 import re
 from pathlib import Path
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timedelta
+from math import radians, cos, sin, sqrt, atan2
 from hashlib import md5
 from numpy import concatenate, array, argsort
 from pandas import read_csv, DataFrame, concat
 from influxdb_client_3 import InfluxDBClient3
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.patches import Circle
 from matplotlib.markers import MarkerStyle
+from ioos_qc.config import Config
+from ioos_qc.streams import PandasStream
+from ioos_qc.stores import PandasStore
 from scipy.io import loadmat
-from math import radians, cos, sin, sqrt, atan2
 from pyproj import Transformer
 import gpxpy
 import gpxpy.gpx
 import click
 from lib import (
     Source,
-    Frequency,
     influx_options,
-    plot_tail,
     plot_options,
     boxplot,
     influx_host,
     influx_api_token,
+    test_observed_property,
+    Frequency,
+    ImageFormat,
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -268,31 +272,148 @@ def buoys_file_describe(name: StationName, table: TableName):
     print(summary)
 
 
+class TestTypes(Enum):
+    """
+    Supported QARTOD test types.
+    """
+
+    GROSS_RANGE = "gross_range"
+    RATE_OF_CHANGE = "rate_of_change"
+    SPIKE = "spike"
+    CLIMATOLOGY = "climatology"
+    FLAT_LINE = "flat_line"
+    ROLLUP = "rollup"
+
+
 @plot.command(name=ClickOptions.TAIL.value)
 @source_options
 @plot_options
+@click.option("--qartod", default="qartod.yaml", help="QARTOD configuration file")
+@click.option("--days", default=30, help="Number of days to plot")
+@click.option(
+    "--test",
+    default=TestTypes.ROLLUP,
+    type=click.Choice(TestTypes, case_sensitive=False),
+    help="QARTOD test to plot",
+)
 def buoys_plot_tail(
-    name: StationName, table: TableName, series: StandardNames, **kwargs
+    name: StationName,
+    table: TableName,
+    series: StandardNames,
+    qartod: str,
+    days: int,
+    test: TestTypes,
+    image_format: ImageFormat = ImageFormat.PNG,
 ):
     """
     Plot the most recent data from a buoy for a single data stream.
     """
+    end: datetime = datetime.now()
+    start: datetime = end - timedelta(days=days)
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
-    vendor_name = VendoredNames[series.name]
-    local = DataFrame(df[vendor_name.value])
-    units = local.columns[0][0]
-    as_series = local.squeeze()
-    as_series.name = "local"
-    plot_tail(
-        as_series,
-        None,
-        name.value,
-        series.value,
-        prefix=f"buoys/figures/{ClickOptions.TAIL.value}",
-        units=units,
-        **kwargs,
+    mask = df.index > start
+    df = df[mask].sort_values("TimeRecovered").sort_index(kind="stable")
+    df = df[~df.index.duplicated(keep="first")]
+    df = df.asfreq("h")
+    renamed = []
+    units = {}
+    for col in df.columns:
+        try:
+            vendor_name = VendoredNames(col[0])
+            std_name = StandardNames[vendor_name.name]
+            renamed.append(std_name.value)
+        except (KeyError, ValueError):
+            renamed.append(col[0])
+        units[renamed[-1]] = col[1]
+    df.columns = renamed
+
+    fig, ax = plt.subplots(figsize=(7.5, 3))
+
+    ax.plot(
+        df.index,
+        df[series.value],
+        color="grey",
+        linestyle="dashed",
+        linewidth=1,
+        zorder=1,
+        label="raw",
     )
+    ylim = (None, None)
+    if qartod is not None:
+        qa_path = Path(__file__).parent / "qartod.yaml"
+        if qa_path.exists():
+            config = Config(qa_path)
+        else:
+            raise click.ClickException(
+                f"QARTOD configuration file not found: {qa_path}"
+            )
+        flags = PandasStream(df.reset_index(names="time"), time="time").run(config)
+        store = PandasStore(flags)
+        result = store.save().set_index("time")
+        frames: dict[str, list[str]] = {}
+        for each in result.columns:
+            _series, _name = each.split("_qartod_")
+            if _series not in frames:
+                frames[_series] = []
+            frames[_series].append(_name)
+        by_observed_property = []
+        for items in frames.items():
+            by_observed_property.append(test_observed_property(result, *items))
+        qa = (
+            concat(by_observed_property, axis=0)
+            .groupby("observed_property")
+            .get_group(series.value)[test.value]
+        )
+        suspect = df[qa == 3][series.value]
+        failed = df[qa == 4][series.value]
+        remaining = df[qa < 3][series.value].asfreq("h")
+        ax.scatter(
+            suspect.index,
+            suspect,
+            label="suspect",
+            color="orange",
+            marker="x",
+            zorder=0,
+        )
+        ax.scatter(
+            failed.index, failed, label="failed", color="red", marker="x", zorder=0
+        )
+        ax.plot(
+            remaining.index,
+            remaining,
+            color="black",
+            linestyle="solid",
+            linewidth=1,
+            zorder=2,
+            label="filtered",
+        )
+        # ylim = (remaining.min(), remaining.max())
+
+    display_name = series.value.replace("_", " ").title()
+    if start.year == end.year:
+        year_range = f"{start.year}"
+    else:
+        year_range = f"{start.year}-{end.year}"
+    plt.title(f"{name.value} {display_name} {year_range}".title())
+    ax.set_xlabel("Date")
+    ax.xaxis.set_tick_params(rotation=45)
+    ax.set_xlim(max(start, df.index.min()), end)
+    ax.set_ylim(*ylim)
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=(days // 8) + 2))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # Customize format
+    if units is not None:
+        ax.set_ylabel(f"{units[series.value]}")
+    ax.legend(loc="best")
+    fig.tight_layout()
+    filepath = (
+        FIGURES_DIR
+        / ClickOptions.TAIL.value
+        / name.value
+        / f"{series.value}.{image_format.value}"
+    )
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(filepath, dpi=300, bbox_inches="tight")
 
 
 @plot.command(name="cable")
@@ -498,7 +619,6 @@ def buoys_plot_locations(
     fig.savefig(filename, dpi=300, bbox_inches="tight")
 
 
-
 @plot.command(name=ClickOptions.DATASTREAM.value)
 @source_options
 @click.option(
@@ -532,15 +652,15 @@ def buoys_plot_datastream(
     name: StationName,
     table: TableName,
     series: StandardNames,
-    aggregate: Frequency,
-    start: datetime | None,
-    end: datetime | None,
-    size: tuple[float, float],
+    start=None,
+    end=None,
+    aggregate=Frequency.DAILY,
+    size=(7.5, 4),
     **kwargs,
 ):
     """
     Plot a generic `DataStream` aggregated by either daily, weekly, or monthly. This
-    will read in and concatenate all available data files for the station and table, 
+    will read in and concatenate all available data files for the station and table,
     then extract a deduplicated series for the data stream. The output
     is an image file formatted for a report or presentation.
     """
