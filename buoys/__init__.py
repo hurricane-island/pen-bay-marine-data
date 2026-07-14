@@ -277,7 +277,7 @@ def buoys_file_describe(name: StationName, table: TableName):
     summary = df.describe().T.drop(columns=["25%", "75%", "std"])
     # Add Median Absolute Deviation
     mad = df.select_dtypes(include="number").apply(
-         lambda x: median_abs_deviation(x.dropna())
+         lambda x: median_abs_deviation(x, nan_policy="omit")
     )
     mac = (
         df.select_dtypes(include="number")
