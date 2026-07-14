@@ -282,9 +282,6 @@ def buoys_plot_cable(name: StationName):
     """
     Plot the mooring tension diagram from the WHOI cable simulation.
     """
-    plt.rcParams['font.family'] = 'serif'
-    plt.rcParams['font.serif'] = ['Times New Roman']
-    plt.rcParams['font.size'] = 12
     low = CABLE_DIR / f"{name.value}-low.mat"
     high = CABLE_DIR / f"{name.value}-high.mat"
     low_data = loadmat(low)
@@ -351,9 +348,6 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     deployment location of the anchor and the watch circle predicted by WHOI Cable
     simulations.
     """
-    plt.rcParams['font.family'] = 'serif'
-    plt.rcParams['font.serif'] = ['Times New Roman']
-    plt.rcParams['font.size'] = 12
     table = TableName.DIAGNOSTIC
     lat_name = "Latitude"
     lon_name = "Longitude"
