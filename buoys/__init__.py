@@ -374,6 +374,10 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     
     filtered_lon = lon[mask]
     filtered_lat = lat[mask]
+    if filtered_lon.size == 0:
+        raise click.ClickException(
+            "No GPS points remain after filtering; try increasing --distance, lowering --satellites, or adjusting the date filter."
+        )
     cx, cy = transformer.transform(filtered_lon.mean(), filtered_lat.mean())
     filtered_sat = satellite_count[mask]
 
