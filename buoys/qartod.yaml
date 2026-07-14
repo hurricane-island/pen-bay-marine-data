@@ -2,89 +2,102 @@ streams:
   sea_water_temperature:
     qartod:
       gross_range_test:
-        suspect_span: [0.1, 26]
-        fail_span: [-4, 35]
+        suspect_span: [0.1, 26.0]
+        fail_span: [-4.0, 35.0]
+
+      climatology_test:
+        config:  # list of objects, each with a tspan, and vspan
+          - tspan: ["1-1", "3-31"]
+            vspan: [0.1, 15.0]
+          - tspan: ["4-1", "6-30"]
+            vspan: [0.1, 15.0]
+          - tspan: ["7-1", "9-30"]
+            vspan: [0.1, 15.0]
+          - tspan: ["10-1", "12-31"]
+            vspan: [0.1, 15.0]
+        zinp: []  # required, but empty
 
       rate_of_change_test:
-        threshold: 0.48
+        threshold: 0.00013  # units per second, C or K
 
       spike_test:
-        suspect_threshold: 0.24
-        fail_threshold: 0.59
+        suspect_threshold: 0.24  # dimensionless
+        fail_threshold: 0.59  # dimensionless
+        method: differential
 
       flat_line_test:
         tolerance: 0.001
         suspect_threshold: 28800
         fail_threshold: 43200
   
-  sea_water_salinity:
-    qartod:
-      gross_range_test:
-        suspect_span: [0.1, 26]
-        fail_span: [-4, 35]
+  # sea_water_salinity:
+  #   qartod:
+  #     gross_range_test:
+  #       suspect_span: [0.1, 26]
+  #       fail_span: [-4, 35]
 
-      rate_of_change_test:
-        threshold: 0.48
+  #     rate_of_change_test:
+  #       threshold: 0.48
 
-      spike_test:
-        suspect_threshold: 0.24
-        fail_threshold: 0.59
+  #     spike_test:
+  #       suspect_threshold: 0.24
+  #       fail_threshold: 0.59
 
-      flat_line_test:
-        tolerance: 0.001
-        suspect_threshold: 28800
-        fail_threshold: 43200
+  #     flat_line_test:
+  #       tolerance: 0.001
+  #       suspect_threshold: 28800
+  #       fail_threshold: 43200
   
-  sea_water_chlorophyll_rfu:
-    qartod:
-      gross_range_test:
-        suspect_span: [0.1, 26]
-        fail_span: [-4, 35]
+  # sea_water_chlorophyll_rfu:
+  #   qartod:
+  #     gross_range_test:
+  #       suspect_span: [0.1, 26]
+  #       fail_span: [-4, 35]
 
-      rate_of_change_test:
-        threshold: 0.48
+  #     rate_of_change_test:
+  #       threshold: 0.48
 
-      spike_test:
-        suspect_threshold: 0.24
-        fail_threshold: 0.59
+  #     spike_test:
+  #       suspect_threshold: 0.24
+  #       fail_threshold: 0.59
 
-      flat_line_test:
-        tolerance: 0.001
-        suspect_threshold: 28800
-        fail_threshold: 43200
+  #     flat_line_test:
+  #       tolerance: 0.001
+  #       suspect_threshold: 28800
+  #       fail_threshold: 43200
   
-  sea_water_phycoerythrin_rfu:
-    qartod:
-      gross_range_test:
-        suspect_span: [0.1, 26]
-        fail_span: [-4, 35]
+  # sea_water_phycoerythrin_rfu:
+  #   qartod:
+  #     gross_range_test:
+  #       suspect_span: [0.1, 26]
+  #       fail_span: [-4, 35]
 
-      rate_of_change_test:
-        threshold: 0.48
+  #     rate_of_change_test:
+  #       threshold: 0.48
 
-      spike_test:
-        suspect_threshold: 0.24
-        fail_threshold: 0.59
+  #     spike_test:
+  #       suspect_threshold: 0.24
+  #       fail_threshold: 0.59
 
-      flat_line_test:
-        tolerance: 0.001
-        suspect_threshold: 28800
-        fail_threshold: 43200
+  #     flat_line_test:
+  #       tolerance: 0.001
+  #       suspect_threshold: 28800
+  #       fail_threshold: 43200
   
-  water_pressure:
-    qartod:
-      gross_range_test:
-        suspect_span: [0.1, 26]
-        fail_span: [-4, 35]
+  # water_pressure:
+  #   qartod:
+  #     gross_range_test:
+  #       suspect_span: [0.1, 26]
+  #       fail_span: [-4, 35]
 
-      rate_of_change_test:
-        threshold: 0.48
+  #     rate_of_change_test:
+  #       threshold: 0.48
 
-      spike_test:
-        suspect_threshold: 0.24
-        fail_threshold: 0.59
+  #     spike_test:
+  #       suspect_threshold: 0.24
+  #       fail_threshold: 0.59
 
-      flat_line_test:
-        tolerance: 0.001
-        suspect_threshold: 
-        fail_threshold: 
+  #     flat_line_test:
+  #       tolerance: 0.001
+  #       suspect_threshold: 
+  #       fail_threshold: 

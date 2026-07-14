@@ -14,24 +14,38 @@ Features:
 import re
 from pathlib import Path
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timedelta
+from math import radians, cos, sin, sqrt, atan2
 from hashlib import md5
+from typing import Optional
 from numpy import concatenate, array, argsort
-from pandas import read_csv, DataFrame, concat
+from pandas import read_csv, DataFrame, concat, DateOffset
 from influxdb_client_3 import InfluxDBClient3
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.patches import Circle
 from matplotlib.markers import MarkerStyle
+from ioos_qc.config import Config
+from ioos_qc.streams import PandasStream
+from ioos_qc.stores import PandasStore
 from scipy.io import loadmat
-from math import radians, cos, sin, sqrt, atan2
 from pyproj import Transformer
 import gpxpy
 import gpxpy.gpx
 import click
-from lib import Source, influx_options, plot_tail, plot_options, boxplot, influx_host, influx_api_token
-from pandas import DateOffset
-from lib import plot_recent
-
+from lib import (
+    ImageFormat,
+    Source,
+    influx_options,
+    plot_qartod_flags,
+    plot_single_series,
+    plot_tail,
+    plot_options,
+    boxplot,
+    influx_host,
+    influx_api_token,
+    run_qartod_tests,
+    test_observed_property,
+)
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
@@ -40,6 +54,7 @@ FIRMWARE_DIR = Path(__file__).parent / "firmware"
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 CABLE_DIR = Path(__file__).parent / "cable"
 transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
+
 
 class ClickOptions(Enum):
     """
@@ -79,6 +94,7 @@ class TableName(Enum):
     DIAGNOSTIC = "Ai1"
     SONDE = "SondeValues"
 
+
 class VendoredNames(Enum):
     """
     Names that are used in the raw data but don't conform to CF Metadata standards.
@@ -94,6 +110,7 @@ class VendoredNames(Enum):
     WATER_PRESSURE = "Pressure_mH2O"
     DISSOLVED_OXYGEN = "ODO"
     DISSOLVED_OXYGEN_SATURATION = "ODO_Sat"
+
 
 class StandardNames(Enum):
     """
@@ -112,6 +129,7 @@ class StandardNames(Enum):
     WATER_PRESSURE = "water_pressure"
     DISSOLVED_OXYGEN = "dissolved_oxygen"
     DISSOLVED_OXYGEN_SATURATION = "dissolved_oxygen_saturation"
+
 
 # pylint: disable=too-few-public-methods
 class ObservedProperty:
@@ -137,6 +155,7 @@ def buoys():
     Command line interface for working with buoy data and firmware.
     """
 
+
 @click.group(name=ClickOptions.FIRMWARE.value)
 def firmware():
     """
@@ -157,14 +176,19 @@ def file_group():
     Commands that interact with the buoy data file system.
     """
 
+
 @click.group(name=ClickOptions.DB.value)
 def database():
     """
     Commands that interact with the buoy database.
     """
 
-station_name = click.argument("name", type=click.Choice(StationName, case_sensitive=False))
+
+station_name = click.argument(
+    "name", type=click.Choice(StationName, case_sensitive=False)
+)
 data_table = click.argument("table", type=click.Choice(TableName, case_sensitive=False))
+
 
 def source_options(function):
     """
@@ -228,6 +252,7 @@ def filter_buoy_flat_files(name: StationName, table: TableName):
     """
     Filter buoy flat files based on command line options.
     """
+
     def filter_prefix(f: Path) -> bool:
         lower_name = f.stem.lower()
         station_match = name.value.lower() in lower_name
@@ -254,28 +279,89 @@ def buoys_file_describe(name: StationName, table: TableName):
 @plot.command(name=ClickOptions.TAIL.value)
 @source_options
 @plot_options
+@click.option("--qartod", required=True, help="QARTOD configuration file")
 def buoys_plot_tail(
-    name: StationName, table: TableName, series: StandardNames, **kwargs
+    name: StationName,
+    table: TableName,
+    series: StandardNames,
+    qartod: str,
+    image_format: ImageFormat = ImageFormat.PNG,
 ):
     """
     Plot the most recent data from a buoy for a single data stream.
     """
+    end: datetime = datetime.now()
+    days = 365
+    start: datetime = end - timedelta(days=days)
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
-    vendor_name = VendoredNames[series.name]
-    local = DataFrame(df[vendor_name.value])
-    units = local.columns[0][0]
-    as_series = local.squeeze()
-    as_series.name = "local"
-    plot_tail(
-        as_series,
-        None,
-        name.value,
-        series.value,
-        prefix=f"buoys/figures/{ClickOptions.TAIL.value}",
-        units=units,
-        **kwargs,
-    )
+    mask = df.index > start
+    df = df[mask].sort_index()
+    renamed = []
+    for col in df.columns:
+        try:
+            vendor_name = VendoredNames(col[0])
+            std_name = StandardNames[vendor_name.name]
+            renamed.append(std_name.value)
+        except (KeyError, ValueError):
+            renamed.append(col[0])
+    df.columns = renamed
+
+    fig, ax = plt.subplots(figsize=(7.5, 3))
+
+    ax.plot(df.index, df[series.value], color="grey", zorder=1)
+    ylim = (None, None)
+    if qartod is not None:
+        test_key = "rollup"
+        qa_path = Path(__file__).parent / "qartod.yaml"
+        if qa_path.exists():
+            config = Config(qa_path)
+        else:
+            raise click.ClickException(f"QARTOD configuration file not found: {qa_path}")
+        flags = PandasStream(df.reset_index(names="time"), time="time").run(config)
+        store = PandasStore(flags)
+        result = store.save().set_index("time")
+        frames: dict[str, list[str]] = {}
+        for test in result.columns:
+            _series, _name = test.split("_qartod_")
+            if _series not in frames:
+                frames[_series] = []
+            frames[_series].append(_name)
+        by_observed_property = []
+        for items in frames.items():
+            by_observed_property.append(test_observed_property(result, *items))
+        qa = concat(by_observed_property, axis=0).groupby("observed_property").get_group(series.value)[test_key]
+        suspect = df[qa == 3][series.value]
+        failed = df[qa == 4][series.value]
+        remaining = df[qa < 3][series.value]
+        ax.scatter(
+            suspect.index, suspect, label="suspect", color="orange", marker="x", zorder=0
+        )
+        ax.scatter(
+            failed.index, failed, label="failed", color="red", marker="x", zorder=0
+        )
+        ax.plot(remaining.index, remaining, color="black", zorder=2)
+        ylim = (remaining.min(), remaining.max())
+ 
+    display_name = series.name.replace("_", " ").title()
+    if start.year == end.year:
+        year_range = f"{start.year}"
+    else:
+        year_range = f"{start.year}-{end.year}"
+    plt.title(f"{name} {display_name} {year_range}".title())
+    ax.set_xlabel("Date")
+    ax.xaxis.set_tick_params(rotation=45)
+    ax.set_xlim(start, end)
+    ax.set_ylim(*ylim)
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=(days // 8) + 2))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # Customize format
+    # if units is not None:
+    #     ax.set_ylabel(f"{units}")
+    fig.legend(loc="outside upper right")
+    fig.tight_layout()
+    filepath = FIGURES_DIR / ClickOptions.TAIL.value / name.value / f"{series.value}.{image_format.value}"
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(filepath)
 
 
 @plot.command(name="cable")
@@ -297,10 +383,36 @@ def buoys_plot_cable(name: StationName):
     y = concatenate([low_data["z"], high_data["z"]])
     z = concatenate([low_data["T"], high_data["T"]])
     handle = ax.scatter(x, y, c=z, s=2, cmap="spring", label="Mooring")
-    ax.vlines(low_data["x"].max(), ymin=0.0, ymax=low_data["z"].max(), colors="black", linestyles="solid", label="Low Tide")
-    ax.vlines(high_data["x"].max(), ymin=0.0, ymax=high_data["z"].max(), colors="black", linestyles="dashed", label="High Tide")
-    ax.hlines(high_data["depth"], xmin=0.0, xmax=high_data["x"].max(), colors="black", linestyles="dashed")
-    ax.hlines(low_data["depth"], xmin=0.0, xmax=low_data["x"].max(), colors="black", linestyles="solid")
+    ax.vlines(
+        low_data["x"].max(),
+        ymin=0.0,
+        ymax=low_data["z"].max(),
+        colors="black",
+        linestyles="solid",
+        label="Low Tide",
+    )
+    ax.vlines(
+        high_data["x"].max(),
+        ymin=0.0,
+        ymax=high_data["z"].max(),
+        colors="black",
+        linestyles="dashed",
+        label="High Tide",
+    )
+    ax.hlines(
+        high_data["depth"],
+        xmin=0.0,
+        xmax=high_data["x"].max(),
+        colors="black",
+        linestyles="dashed",
+    )
+    ax.hlines(
+        low_data["depth"],
+        xmin=0.0,
+        xmax=low_data["x"].max(),
+        colors="black",
+        linestyles="solid",
+    )
     ax.set_aspect(1.0)
     fig.colorbar(handle, label="Tension (N)", shrink=0.5)
     ax.set_ylim(y.min(), None)
@@ -313,12 +425,13 @@ def buoys_plot_cable(name: StationName):
     fig.tight_layout()
     fig.savefig(filename, bbox_inches="tight", dpi=300)
 
+
 def predicted_watch_circle(
     center_xy: tuple[float, float],
     station: StationName,
     color: str,
     scale: float = 1.0,
-    label: str|None = None
+    label: str | None = None,
 ) -> list[Circle]:
     """
     Generate a predicted watch circle based on the planned deployment location.
@@ -331,26 +444,42 @@ def predicted_watch_circle(
         data = loadmat(mat_path)
         radius = float(data["x"].max()) * scale
         predicted.append(
-            Circle(center_xy, radius=radius, color=color, fill=False, linestyle=ls, label=circle_label)
+            Circle(
+                center_xy,
+                radius=radius,
+                color=color,
+                fill=False,
+                linestyle=ls,
+                label=circle_label,
+            )
         )
     return predicted
 
+
 def haversine(lon1, lat1, lon2, lat2):
-    R = 6371000.0 # Earth radius in meters
-    
+    R = 6371000.0  # Earth radius in meters
+
     phi1, phi2 = radians(lat1), radians(lat2)
     delta_phi = radians(lat2 - lat1)
     delta_lambda = radians(lon2 - lon1)
-    a = sin(delta_phi / 2)**2 + cos(phi1) * cos(phi2) * sin(delta_lambda / 2)**2
+    a = sin(delta_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(delta_lambda / 2) ** 2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    return R * c # Distance in meters
+    return R * c  # Distance in meters
+
 
 @plot.command(name="locations")
 @station_name
 @click.option("--latitude", required=True, type=float)
 @click.option("--longitude", required=True, type=float)
-@click.option("--distance", required=True, type=float, help="filter erroneous GPS points by distance from planned deployment location (meters)")
-@click.option("--satellites", required=True, type=int, help="minimum number of satellites")
+@click.option(
+    "--distance",
+    required=True,
+    type=float,
+    help="filter erroneous GPS points by distance from planned deployment location (meters)",
+)
+@click.option(
+    "--satellites", required=True, type=int, help="minimum number of satellites"
+)
 def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4):
     """
     Plot the lat and long of the buoy hourly over the course of the deployment period.
@@ -368,12 +497,16 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     lon = df[lon_name].to_numpy().flatten()
     satellite_count = df[sat_name].to_numpy().flatten()
     planned_gps = (longitude, latitude)  # original
+
     def compute_distance(gps):
         return haversine(*planned_gps, *gps)
-    mask = (array(list(map(compute_distance, zip(lon, lat)))) < distance) & \
-           (satellite_count >= satellites) & \
-           (df.index > datetime(2026, 1, 1))  # filter out erroneous GPS points and early data
-    
+
+    mask = (
+        (array(list(map(compute_distance, zip(lon, lat)))) < distance)
+        & (satellite_count >= satellites)
+        & (df.index > datetime(2026, 1, 1))
+    )  # filter out erroneous GPS points and early data
+
     filtered_lon = lon[mask]
     filtered_lat = lat[mask]
     if filtered_lon.size == 0:
@@ -385,34 +518,28 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
 
     fig, ax = plt.subplots(figsize=(3, 4))
 
-    sort_ind = argsort(filtered_sat)  # Sort indices based on satellite count for plotting
+    sort_ind = argsort(
+        filtered_sat
+    )  # Sort indices based on satellite count for plotting
     xx, yy = transformer.transform(filtered_lon[sort_ind], filtered_lat[sort_ind])
     handle = ax.scatter(
         xx - cx,
         yy - cy,
-        alpha=filtered_sat[sort_ind]/filtered_sat[sort_ind].max(),
+        alpha=filtered_sat[sort_ind] / filtered_sat[sort_ind].max(),
         marker=MarkerStyle("o"),
         s=10,
         c=filtered_sat[sort_ind],
-        edgecolors='none',
+        edgecolors="none",
         cmap="spring",
-        label="Location"
+        label="Location",
     )
     fig.colorbar(handle, label="Satellites", shrink=0.5)
 
     px, py = transformer.transform(*planned_gps)
     planned_xy = predicted_watch_circle(
-        (px - cx, py - cy),
-        name,
-        "grey",
-        label="Planned"
+        (px - cx, py - cy), name, "grey", label="Planned"
     )
-    corrected_xy = predicted_watch_circle(
-        (0.0, 0.0),
-        name,
-        "black",
-        label="Deployed"
-    )
+    corrected_xy = predicted_watch_circle((0.0, 0.0), name, "black", label="Deployed")
     for patch in planned_xy + corrected_xy:
         ax.add_patch(patch)
 
@@ -421,7 +548,7 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     ax.set_aspect(1.0)
     filename = FIGURES_DIR / "locations" / name.value / "watch-circle.png"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
-    ax.ticklabel_format(axis='both', style='plain')
+    ax.ticklabel_format(axis="both", style="plain")
     ax.legend(loc="best")
     fig.tight_layout()
     fig.savefig(filename, dpi=300, bbox_inches="tight")
@@ -430,7 +557,9 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
 @plot.command(name=ClickOptions.DAILY.value)
 @source_options
 @plot_options
-def buoys_plot_daily(name: StationName, table: TableName, series: StandardNames, **kwargs):
+def buoys_plot_daily(
+    name: StationName, table: TableName, series: StandardNames, **kwargs
+):
     """
     Plot a single `DataStream` aggregated by day.
     """
@@ -455,7 +584,7 @@ def buoys_file_export(name: StationName, table: TableName):
     """
     files = filter_buoy_flat_files(name, table)
     drop_columns = [
-        "RECORD", 
+        "RECORD",
         "WiperPosition",
         "Sonde_External_Voltage",
         "Sonde_Battery",
@@ -464,12 +593,17 @@ def buoys_file_export(name: StationName, table: TableName):
         ("Chlorophyll", "cells/mL"),
         "BGA_PE_cellsmL",
         "Pressure_Vert_Pos",
-        "Depth"
+        "Depth",
     ]
-    df = read_campbell_logger_files(list(files)).drop(columns=drop_columns, errors='ignore')
-    mask = ~df.index.duplicated(keep=False)  # TODO: This approach drops all duplicate index entries. Consider implementing a more nuanced duplicate handling strategy if needed.
+    df = read_campbell_logger_files(list(files)).drop(
+        columns=drop_columns, errors="ignore"
+    )
+    mask = ~df.index.duplicated(
+        keep=False
+    )  # TODO: This approach drops all duplicate index entries. Consider implementing a more nuanced duplicate handling strategy if needed.
     unique = df[mask].sort_index()
     unique.index.rename("time", inplace=True)
+
     def format_column(col) -> str:
         # Handle columns that are not 3-tuples gracefully
         if isinstance(col, tuple) and len(col) == 3:
@@ -477,14 +611,16 @@ def buoys_file_export(name: StationName, table: TableName):
             return f"{name} ({unit})"
         # Fallback: just return string representation
         return str(col)
+
     headers = list(map(format_column, unique.columns))
-    parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
+    parts = list(filter(None, re.split(r"([A-Z][^A-Z]*)", table.value)))
     parts.insert(0, name.value)
     filename = "-".join(parts).lower() + ".csv"
     path = EXPORT_DIR / filename
     unique.to_csv(path, header=headers)
 
-@file_group.command(name='gpx')
+
+@file_group.command(name="gpx")
 @station_name
 def buoys_file_gpx(name: StationName):
     """
@@ -507,17 +643,20 @@ def buoys_file_gpx(name: StationName):
     gpx_track.segments.append(gpx_segment)
 
     for time, row in unique.tail(24).iterrows():
-        latitude = row[('Latitude', 'Decimal Degrees (N=+,S=-)', "Smp")]
-        longitude = row[('Longitude', 'Decimal Degrees (E=+,W=-)', "Smp")]
-        gpx_segment.points.append(gpxpy.gpx.GPXTrackPoint(latitude, longitude, elevation=0, time=time))
+        latitude = row[("Latitude", "Decimal Degrees (N=+,S=-)", "Smp")]
+        longitude = row[("Longitude", "Decimal Degrees (E=+,W=-)", "Smp")]
+        gpx_segment.points.append(
+            gpxpy.gpx.GPXTrackPoint(latitude, longitude, elevation=0, time=time)
+        )
 
     # You can add routes and waypoints, too...
 
-    parts = list(filter(None, re.split(r'([A-Z][^A-Z]*)', table.value)))
+    parts = list(filter(None, re.split(r"([A-Z][^A-Z]*)", table.value)))
     parts.insert(0, name.value)
     path = EXPORT_DIR / ("-".join(parts).lower() + ".gpx")
     with open(path, "w", encoding="utf-8") as fid:
         fid.write(gpx.to_xml())
+
 
 def checksum(contents: str) -> str:
     """
@@ -529,6 +668,7 @@ def checksum(contents: str) -> str:
     hasher.update(encoded_data)
     return hasher.hexdigest()
 
+
 @firmware.command(name=ClickOptions.TEMPLATE.value)
 @station_name
 @click.option("--address", required=True, help="Pakbus address")
@@ -536,7 +676,14 @@ def checksum(contents: str) -> str:
 @click.option("--file", default="buoy.dld", help="Template file")
 @click.option("--latitude", required=True, help="Latitude")
 @click.option("--longitude", required=True, help="Longitude")
-def buoys_firmware_template(name: StationName, address: str, client: str, file: str, latitude: str, longitude: str):
+def buoys_firmware_template(
+    name: StationName,
+    address: str,
+    client: str,
+    file: str,
+    latitude: str,
+    longitude: str,
+):
     """
     Fill in firmware template with options passed on
     the command line.
@@ -549,8 +696,7 @@ def buoys_firmware_template(name: StationName, address: str, client: str, file: 
         "PAKBUS_ADDRESS": address,
         "CLIENT_ID": client,
         "LATITUDE": latitude,
-        "LONGITUDE": longitude
-
+        "LONGITUDE": longitude,
     }.items():
         slug = "$" + var
         filedata = filedata.replace(slug, value)
@@ -584,7 +730,7 @@ def buoys_firmware_library(file: str):
 @influx_api_token
 def buoys_db_upload(name: StationName, table: TableName, host: str, token: str):
     """
-    Upload buoy data to the database. 
+    Upload buoy data to the database.
     """
     files = list(filter_buoy_flat_files(name, table))
     client = InfluxDBClient3(host=host, database="buoy-test-3", token=token)
@@ -604,52 +750,21 @@ def buoys_db_upload(name: StationName, table: TableName, host: str, token: str):
         client.write(
             subset,
             data_frame_measurement_name=table.value,
-            data_frame_tag_columns=["location", "thing", "firmware"]
+            data_frame_tag_columns=["location", "thing", "firmware"],
         )
+
 
 @database.command(name="describe")
 @station_name
 @data_table
 @influx_options
-def buoys_db_describe(name: StationName, table: TableName, host: str, measurement: str, token: str):
-    time ="time"
+def buoys_db_describe(
+    name: StationName, table: TableName, host: str, measurement: str, token: str
+):
+    time = "time"
     client = InfluxDBClient3(host=host, database="buoy-test", token=token)
     read_back: DataFrame = client.query(
         f"SELECT * FROM {measurement} ORDER BY {time} LIMIT 10",
         mode="pandas",
     )
     print(read_back.head())
-
-@plot.command(name="recent")
-@source_options
-@plot_options
-def buoys_plot_recent(
-    name: StationName, table: TableName, series: StandardNames, **kwargs
-):
-    """
-    Plot the last six months of data from a buoy for a single data stream.
-    """
-    files = filter_buoy_flat_files(name, table)
-    df = read_campbell_logger_files(list(files))
-    vendor_name = VendoredNames[series.name]
-    local = DataFrame(df[vendor_name.value])
-    units = local.columns[0][0]
-    as_series = local.squeeze()
-    as_series.name = series.value
-    as_series = as_series.sort_index() # Keep only the most recent six months
-    cutoff = as_series.index.max() - DateOffset(months=6)
-    recent = as_series.loc[cutoff:]
-
-    # TODO: Apply QARTOD QC here
-    # qc_flags = run_qartod(recent)
-
-    plot_recent(
-        recent,
-        None,
-        name.value,
-        series.value,
-        prefix="buoys/figures/recent",
-        units=units,
-        qartod="buoys/qartod.yaml",
-        remove_failures=True,
-    )
