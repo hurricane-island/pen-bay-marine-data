@@ -409,7 +409,7 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     ax.set_ylabel("UTM Northing Δ (m)")
     ax.set_xlabel("UTM Easting Δ (m)")
     ax.set_aspect(1.0)
-    filename = FIGURES_DIR / "locations" / "wynken" / "watch-circle.png"
+    filename = FIGURES_DIR / "locations" / name.value / "watch-circle.png"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     ax.ticklabel_format(axis='both', style='plain')
     ax.legend(loc="best")
