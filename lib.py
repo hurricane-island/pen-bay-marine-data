@@ -410,14 +410,7 @@ def plot_recent( #6 months of most recent data
     local_filtered = local_tail
     config = None
     if qartod is not None:
-         print("QARTOD PATH:", qartod)
-         print("EXISTS:", Path(qartod).exists())
-         print("FULL PATH:", Path(qartod).resolve())
-
          config = Config(qartod)
-
-         print("CONFIG LOADED:", config)
-
     if config is not None and remove_failures: 
         local_filtered = apply_qartod_filter(
             local_tail, 
@@ -425,7 +418,6 @@ def plot_recent( #6 months of most recent data
             config, 
             time_column=time_column
         )    
-
     if remote is not None:
         tail = remote.loc[remote.index > start]
         plot_single_series(
@@ -437,7 +429,6 @@ def plot_recent( #6 months of most recent data
             linestyle=":",
         )
     plot_single_series(local_filtered, ax, resample, label="local", color="grey")
-
     if config is not None:
         plot_qartod_flags(
             ax,
