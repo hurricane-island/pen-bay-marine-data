@@ -527,12 +527,19 @@ def haversine(lon1, lat1, lon2, lat2):
     "--distance",
     required=True,
     type=float,
-    help="filter erroneous GPS points by distance from planned deployment location (meters)",
+    help="filter GPS points by distance from planned deployment location (meters)",
 )
 @click.option(
     "--satellites", required=True, type=int, help="minimum number of satellites"
 )
-def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4):
+@click.option(
+    "--cable",
+    is_flag=True,
+    help="include predicted watch circle from WHOI cable simulation",
+)
+def buoys_plot_locations(
+    name, latitude, longitude, distance=100.0, satellites=4, cable=False
+):
     """
     Plot the lat and long of the buoy hourly over the course of the deployment period.
     This only uses historical data contained in local raw files. Compare it to the
@@ -588,12 +595,16 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
     fig.colorbar(handle, label="Satellites", shrink=0.5)
 
     px, py = transformer.transform(*planned_gps)
-    planned_xy = predicted_watch_circle(
-        (px - cx, py - cy), name, "grey", label="Planned"
-    )
-    corrected_xy = predicted_watch_circle((0.0, 0.0), name, "black", label="Deployed")
-    for patch in planned_xy + corrected_xy:
-        ax.add_patch(patch)
+
+    if cable:
+        planned_xy = predicted_watch_circle(
+            (px - cx, py - cy), name, "grey", label="Planned"
+        )
+        corrected_xy = predicted_watch_circle(
+            (0.0, 0.0), name, "black", label="Deployed"
+        )
+        for patch in planned_xy + corrected_xy:
+            ax.add_patch(patch)
 
     ax.set_ylabel("UTM Northing Δ (m)")
     ax.set_xlabel("UTM Easting Δ (m)")
@@ -601,6 +612,7 @@ def buoys_plot_locations(name, latitude, longitude, distance=100.0, satellites=4
 
     filename = FIGURES_DIR / "locations" / name.value / "watch-circle.png"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
+
     ax.ticklabel_format(axis="both", style="plain")
     ax.legend(loc="best")
     fig.tight_layout()
