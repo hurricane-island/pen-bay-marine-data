@@ -42,6 +42,10 @@ from lib import (
     test_observed_property,
     Frequency,
     ImageFormat,
+    calculate_rate_of_change,
+    determine_rate_threshold, 
+    determine_spike_threshold, 
+    calculate_spike_change
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -120,7 +124,7 @@ class StandardNames(Enum):
     )
     SEA_WATER_SALINITY = "sea_water_salinity"
     SEA_WATER_CHLOROPHYLL_RFU = "sea_water_chlorophyll_rfu"
-    SEA_WATER_PHYCOERYTHRIN_RFU = "sea_water_phycocerythrin_rfu"
+    SEA_WATER_PHYCOERYTHRIN_RFU = "sea_water_phycoerythrin_rfu"
     BAROMETRIC_PRESSURE = "barometric_pressure"
     BATTERY_VOLTAGE = "battery_voltage"
     WATER_PRESSURE = "water_pressure"
@@ -264,6 +268,8 @@ def mean_absolute_change(series):
     """
     return series.diff().abs().mean()
 
+def absolute_change(series):
+    return series.diff().abs()
 
 @file_group.command(name=ClickOptions.DESCRIBE.value)
 @station_name
@@ -287,6 +293,26 @@ def buoys_file_describe(name: StationName, table: TableName):
     summary["MAD"] = mad
     print("\nSamples:\n")
     print(summary)
+    print("\nRate of Change Thresholds:\n")
+    for column in df.columns:
+        try:
+            threshold = determine_rate_threshold(df[column])
+            print(f"{column}: {threshold}")
+        except Exception as e:
+            print(f"Skipping {column}: {e}")
+    print("\nSpike Thresholds:\n")
+    for column in df.columns:
+        try:
+            threshold = determine_spike_threshold(df[column])
+            print(f"{column}: {threshold}")
+        except Exception as e:
+            print(f"Skipping {column}: {e}")
+    changes = (
+        df.select_dtypes(include="number")
+        .apply(absolute_change)
+        )
+    mac_99 = changes.quantile(0.99)
+    print(mac_99)
 
 
 class TestTypes(Enum):
@@ -898,3 +924,32 @@ def buoys_db_describe(
         mode="pandas",
     )
     print(read_back.head())
+
+@file_group.command(name="rate")
+@station_name
+@data_table
+@click.argument(
+    "series",
+    type=click.Choice(StandardNames, case_sensitive=False),
+)
+def buoys_file_rate(name: StationName, table: TableName, series: StandardNames): # Analyze the rate of change for one observed property.
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(list(files))
+    vendor_name = VendoredNames[series.name]
+    data = df[vendor_name.value].copy()
+    slope = calculate_rate_of_change(data)
+    abs_slope = slope.abs().dropna()
+    print(abs_slope.describe(percentiles=[0.90, 0.95, 0.99]))
+    threshold = abs_slope.quantile(0.99)
+    print(f"\nSuggested threshold (99th percentile): {threshold:.4f}")
+
+def buoys_file_secondderivative(name: StationName, table: TableName, series: StandardNames): # Analyze the second derivative for one observed property.
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(list(files))
+    vendor_name = VendoredNames[series.name]
+    data = df[vendor_name.value].copy()
+    second_derivative = calculate_spike_change(data)
+    abs_second_derivative = second_derivative.abs().dropna()
+    print(abs_second_derivative.describe(percentiles=[0.90, 0.95, 0.99]))
+    threshold = abs_second_derivative.quantile(0.99)
+    print(f"\nSuggested threshold (99th percentile): {threshold:.4f}")

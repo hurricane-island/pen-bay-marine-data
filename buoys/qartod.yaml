@@ -2,8 +2,8 @@ streams:
   sea_water_temperature:
     qartod:
       gross_range_test:
-        suspect_span: [0.1, 26.0]
-        fail_span: [-4.0, 35.0]
+        suspect_span: [-1, 26.0]
+        fail_span: [-5.0, 50.0]
 
       climatology_test:
         config:  # list of objects, each with a tspan, and vspan
@@ -18,11 +18,11 @@ streams:
         zinp: []  # required, but empty
 
       rate_of_change_test:
-        threshold: 0.00029  # units per second, C or K
+        threshold: 0.000156  # units per second, C or K 99% of slope change. 
 
       spike_test:
         suspect_threshold: 0.4  # dimensionless
-        fail_threshold: 0.5  # dimensionless
+        fail_threshold: 0.567605 # dimensionless
         method: differential  # will not catch tails, only values with neighbors
 
       flat_line_test:
@@ -30,74 +30,94 @@ streams:
         suspect_threshold: 28800 # seconds, 8 hours
         fail_threshold: 43200 # seconds, 12 hours
   
-  # sea_water_salinity:
-  #   qartod:
-  #     gross_range_test:
-  #       suspect_span: [0.1, 26]
-  #       fail_span: [-4, 35]
+  sea_water_salinity:
+    qartod:
+      gross_range_test:
+         suspect_span: [27, 35]
+         fail_span: [0, 70]
+      
+      climatology_test:
+        config:  # list of objects, each with a tspan, and vspan
+          - tspan: ["1-1", "3-31"]
+            vspan: [25,35 ] # 
+          - tspan: ["4-1", "6-30"]
+            vspan: [29,32 ]
+          - tspan: ["7-1", "9-30"] 
+            vspan: [29,32 ]
+          - tspan: ["10-1", "12-31"]
+            vspan: [25,35 ] # 
+        zinp: []  # required, but empty
 
-  #     rate_of_change_test:
-  #       threshold: 0.48
+      rate_of_change_test:
+         threshold: 0.0190 
 
-  #     spike_test:
-  #       suspect_threshold: 0.24
-  #       fail_threshold: 0.59
+      spike_test:
+         suspect_threshold: 
+         fail_threshold: 21.741370
 
-  #     flat_line_test:
-  #       tolerance: 0.001
-  #       suspect_threshold: 28800
-  #       fail_threshold: 43200
+      flat_line_test:
+         tolerance: 0.001
+         suspect_threshold: 28800
+         fail_threshold: 43200
   
-  # sea_water_chlorophyll_rfu:
-  #   qartod:
-  #     gross_range_test:
-  #       suspect_span: [0.1, 26]
-  #       fail_span: [-4, 35]
+  sea_water_chlorophyll_rfu:
+    qartod:
+      gross_range_test:
+         suspect_span: [0.1, 1.5]
+         fail_span: [0, 100]
+      
+      climatology_test:
+        config:  # list of objects, each with a tspan, and vspan
+          - tspan: ["1-1", "3-31"]
+            vspan: [0, 0.8]
+          - tspan: ["4-1", "6-30"]
+            vspan: [0.1, 1.5]
+          - tspan: ["7-1", "9-30"]
+            vspan: [0.1, 3]
+          - tspan: ["10-1", "12-31"]
+            vspan: [0.1, 2]
+        zinp: []  # required, but empty
 
-  #     rate_of_change_test:
-  #       threshold: 0.48
+      rate_of_change_test:
+         threshold: 0.000335 # RFU/sec
 
-  #     spike_test:
-  #       suspect_threshold: 0.24
-  #       fail_threshold: 0.59
+      spike_test:
+         suspect_threshold: 0.24
+         fail_threshold: 3.900062
 
-  #     flat_line_test:
-  #       tolerance: 0.001
-  #       suspect_threshold: 28800
-  #       fail_threshold: 43200
+      flat_line_test:
+         tolerance: 0.001
+         suspect_threshold: 28800
+         fail_threshold: 43200
   
-  # sea_water_phycoerythrin_rfu:
-  #   qartod:
-  #     gross_range_test:
-  #       suspect_span: [0.1, 26]
-  #       fail_span: [-4, 35]
+  sea_water_phycoerythrin_rfu:
+    qartod:
+      gross_range_test:
+         suspect_span: [0.1, 4]
+         fail_span: [0, 100]
+      
+      climatology_test:
+        config:  # list of objects, each with a tspan, and vspan
+          - tspan: ["1-1", "3-31"]
+            vspan: [0, 3]
+          - tspan: ["4-1", "6-30"]
+            vspan: [0.1, 3]
+          - tspan: ["7-1", "9-30"]
+            vspan: [0.1, 4] #
+          - tspan: ["10-1", "12-31"]
+            vspan: [0, 3 ]
+        zinp: []  # required, but empty
 
-  #     rate_of_change_test:
-  #       threshold: 0.48
+      rate_of_change_test:
+         threshold: 0.000945
 
-  #     spike_test:
-  #       suspect_threshold: 0.24
-  #       fail_threshold: 0.59
+      spike_test:
+         suspect_threshold: 20
+         fail_threshold: 25.357321
 
-  #     flat_line_test:
-  #       tolerance: 0.001
-  #       suspect_threshold: 28800
-  #       fail_threshold: 43200
-  
-  # water_pressure:
-  #   qartod:
-  #     gross_range_test:
-  #       suspect_span: [0.1, 26]
-  #       fail_span: [-4, 35]
+      flat_line_test:
+         tolerance: 0.001
+         suspect_threshold: 28800
+         fail_threshold: 43200
 
-  #     rate_of_change_test:
-  #       threshold: 0.48
-
-  #     spike_test:
-  #       suspect_threshold: 0.24
-  #       fail_threshold: 0.59
-
-  #     flat_line_test:
-  #       tolerance: 0.001
-  #       suspect_threshold: 
-  #       fail_threshold: 
+#still need gap test and location test. 

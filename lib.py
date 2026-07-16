@@ -16,6 +16,7 @@ from numpy.typing import NDArray
 from ioos_qc.config import Config
 from ioos_qc.streams import PandasStream
 from ioos_qc.stores import PandasStore
+import pandas as pd
 
 class ImageFormat(Enum):
     """
@@ -444,6 +445,72 @@ def boxplot(
     filepath = prefix / thing / f"{observed_property}_{freq.name.lower()}.{image_format.value}"
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath)
+
+def calculate_rate_of_change(series: Series) -> Series:
+    series = series.sort_index()
+    series = series[~series.index.duplicated(keep="first")]
+    # Time difference in hours
+    dt = (
+        series.index.to_series()
+        .diff()
+        .dt.total_seconds()
+        / 3600
+    )
+    dt = dt.replace(0, float("nan"))  # Avoid division by zero
+    slope = series.diff() / dt
+    slope = slope.replace(
+        [float("inf"), float("-inf")],
+        float("nan")
+    )
+    return slope
+
+def determine_rate_threshold(series: Series, percentile: float = 0.99):
+    # Calculate a suggested rate-of-change threshold from historical data.
+    slope = calculate_rate_of_change(series)
+    abs_slope = slope.abs().dropna()
+    if len(abs_slope) == 0:
+        print("No valid slope data available to determine threshold")
+        return None
+    if abs_slope.max() == 0:
+        print("No variability detected")
+        return None
+
+    print(abs_slope.describe(percentiles=[0.90, 0.95, 0.99]))
+    threshold = abs_slope.quantile(percentile)
+    print(f"Suggested threshold: {threshold:.4f}")
+    return threshold
+
+def calculate_spike_change(series: Series) -> Series:
+    # Calculate second derivative (change in rate of change) for spike detection.  Units are value change per hour squared.
+    series = series.sort_index()
+    # Time difference in hours
+    dt = (
+        series.index.to_series()
+        .diff()
+        .dt.total_seconds()
+        / 3600
+    )
+    dt = dt.replace(0, pd.NA)
+    # First derivative
+    first_derivative = series.diff() / dt
+    # Second derivative
+    second_derivative = first_derivative.diff() / dt
+    return second_derivative.abs()
+
+def determine_spike_threshold(series: Series, percentile: float = 0.99):
+    # Determine spike threshold from second derivative. Uses percentile of observed changes.
+    spike_change = calculate_spike_change(series)
+    spike_change = spike_change.replace(
+        [float("inf"), -float("inf")],
+        pd.NA
+    ).dropna()
+    if spike_change.empty:
+        print("No variability detected")
+        return None
+    threshold = spike_change.quantile(percentile)
+    print(spike_change.describe())
+    print(f"Suggested spike threshold: {threshold:.4f}")
+    return threshold
 
 def apply_qartod_filter(
     series: Series,
