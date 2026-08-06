@@ -135,8 +135,8 @@ def parse_uplink_message(data):
     del metadata["gateway_ids"]
     latitude = payload.get("latitude")
     longitude = payload.get("longitude")
-    altitude = payload.pop("altitude")
-    corrected = to_altitude(latitude, longitude, altitude)
+    altitude = payload.pop("altitude", None)
+    corrected = to_altitude(latitude, longitude, altitude) if altitude is not None else None
     return  {
         "id": message_id,
         "altitude": corrected,
@@ -175,7 +175,7 @@ def signal(zoom):
     df = df[["latitude", "longitude", "altitude", "sats", "rssi", "snr"]]
     print(df)
 
-    metric = SignalMetric.SNR
+    metric = SignalMetric.RSSI
     extent, lon_span = padded_extent(df["longitude"], df["latitude"])
     fig, ax = subplots(figsize=(10, 8), subplot_kw={"projection": BASEMAP.crs})
     ax.set_extent(extent, crs=GEODETIC)
