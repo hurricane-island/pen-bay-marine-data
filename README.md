@@ -107,4 +107,4 @@ Signal mapping and sensor data is stored in Influx, where it can be easily explo
 
 ## Use of Generative AI
 
-Some code in this repository was suggested, written and/or edited by Generative AI products including Github Copilot and Warp Terminal.
+Some code in this repository was suggested, written and/or edited by Generative AI products including GitHub Copilot and Warp Terminal.
