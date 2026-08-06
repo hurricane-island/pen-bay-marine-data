@@ -5,6 +5,8 @@ from enum import Enum
 from os import getenv
 from pathlib import Path
 from math import log2
+from random import uniform, randint
+from datetime import datetime, timedelta, timezone
 import json
 import requests
 import click
@@ -110,13 +112,21 @@ def label_degrees(ax, extent, nbins=6):
 @click.group()
 def lorawan():
     """LoRaWAN CLI commands."""
-    pass
 
 
 @lorawan.group()
 def plot():
     """Plot CLI commands."""
-    pass
+
+
+@lorawan.group()
+def db():
+    """Cloud database CLI commands."""
+
+@lorawan.group()
+def describe():
+    """Describe LoRaWAN devices and messages."""
+
 
 def to_altitude(lat, lon, ellipsoidal_height):
     """Convert ellipsoidal height to altitude above sea level."""
@@ -197,3 +207,80 @@ def signal(zoom):
     filepath = FIGURES_DIR / f"signal_{metric.name.lower()}.png"
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath, dpi=200, bbox_inches="tight")
+
+@describe.command("tail")
+@click.argument("application_id", default="hurricane-test-app")
+@click.argument("device_id", default="field-tester-hurricane-rak10701-p")
+def lorawan_describe_tail(application_id, device_id):
+    """
+    Describe the latest uplink message from the field-tester device.
+    """
+    click.echo("Retrieving latest uplink message from TTN API...")
+    api_key = getenv("TTN_API_KEY")
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Accept": "text/event-stream",
+    }
+    url = f"https://neracoos.nam1.cloud.thethings.industries/api/v3/as/applications/{application_id}/devices/{device_id}/packages/storage/uplink_message"
+    result = requests.get(url, headers=headers, timeout=10)
+    if result.status_code != 200:
+        click.echo(f"Failed to retrieve data from TTN API. Status code: {result.status_code}")
+        return
+    all_data = result.text.split("\n\n")
+    data = json.loads(all_data[0])  # Get the first event
+    click.echo(json.dumps(data, indent=4))
+
+@db.command(name="mock")
+@click.argument("device_id", default="mock-device")
+def lorawan_db_mock(device_id):
+    """
+    Send a test message to the Cloudflare Worker that writes to InfluxDB.
+    This is useful for testing the integration without sending real data from a device.
+    """
+    click.echo("Sending test message to Cloudflare Worker...")
+    now = datetime.now(timezone.utc)
+    rx_time = now + timedelta(seconds=uniform(0, 5))
+    rssi = uniform(-120, -30)
+    message = {
+        "result": {
+            "end_device_ids": {
+                "device_id": device_id,
+            },
+            "uplink_message": {
+                "decoded_payload": {
+                    "accuracy": uniform(1, 3),
+                    "altitude": uniform(-50, 50),
+                    "hdop": uniform(0, 2),
+                    "latitude": 44.1039545,
+                    "longitude": -69.1044722,
+                    "sats": randint(4, 10)
+                },
+                "rx_metadata": [
+                    {
+                        "gateway_ids": {
+                            "gateway_id": "packetbroker"
+                        },
+                        "packet_broker": {
+                            "message_id": "test",
+                        },
+                        "time": now.replace(tzinfo=None).isoformat() + "Z",
+                        "rssi": rssi,
+                        "channel_rssi": rssi,
+                        "snr": uniform(-12, 10),
+                        "received_at": rx_time.replace(tzinfo=None).isoformat() + "000Z"
+                    }
+                ],
+            }
+        }
+    }
+    # print(json.dumps(message, indent=4))
+    response = requests.post(
+        "https://ttn-to-influx.nkeeney.workers.dev/",
+        json=message["result"],
+        timeout=10
+    )
+    if response.status_code == 200:
+        click.echo("Test message sent successfully.")
+    else:
+        click.echo(f"Failed to send test message. Status code: {response.status_code}")
+        click.echo(f"Response: {response.text}")
