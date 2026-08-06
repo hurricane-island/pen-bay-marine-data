@@ -241,15 +241,10 @@ def lorawan_db_secret():
     click.echo("Add this secret to your TTN Webhook and Cloudflare Worker:")
     click.echo(f"{secret}")
 
-@db.command(name="mock")
-@click.argument("device_id", default="mock-device")
-@click.option("--secret", default=None, help="Webhook secret to use. If not provided, will use WEBHOOK_SECRET from environment.")
-def lorawan_db_mock(device_id: str, secret: Optional[str]):
+def create_mock_message(device_id: str):
     """
-    Send a test message to the Cloudflare Worker that writes to InfluxDB.
-    This is useful for testing the integration without sending real data from a device.
+    Create a mock uplink message for testing. The top-level key is result, which matches the structure of the TTN API response. The message includes a decoded payload with random values for accuracy, altitude, hdop, latitude, longitude, and number of satellites. The rx_metadata includes a random RSSI value and a random SNR value. The time and received_at fields are set to the current time plus a random offset.
     """
-    click.echo("Sending test message to Cloudflare Worker...")
     now = datetime.now(timezone.utc)
     rx_time = now + timedelta(seconds=uniform(0, 5))
     rssi = uniform(-120, -30)
@@ -285,11 +280,23 @@ def lorawan_db_mock(device_id: str, secret: Optional[str]):
             }
         }
     }
+    return message
+
+@db.command(name="mock")
+@click.argument("device_id", default="mock-device")
+@click.option("--secret", default=None, help="Webhook secret to use. If not provided, will use WEBHOOK_SECRET from environment.")
+def lorawan_db_mock(device_id: str, secret: Optional[str]):
+    """
+    Send a test message to the Cloudflare Worker that writes to InfluxDB.
+    This is useful for testing the integration without sending real data from a device.
+    """
+    click.echo("Sending test message to Cloudflare Worker...")
+    message = create_mock_message(device_id)
     headers = {
         "X-TTN-Secret": secret or getenv("WEBHOOK_SECRET", "")
     }
     response = requests.post(
-        "https://ttn-to-influx.nkeeney.workers.dev/",
+        "https://ttn-to-influx.hurricane-island.workers.dev/",
         json=message["result"],
         headers=headers,
         timeout=10
