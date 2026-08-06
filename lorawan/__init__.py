@@ -17,6 +17,7 @@ from pandas import json_normalize, to_datetime
 import cartopy.crs as ccrs
 from cartopy.io.img_tiles import OSM
 from uuid import uuid4
+from typing import Optional
 
 
 # Create a transformer from WGS84 3D Ellipsoidal to WGS84 + EGM96 Sea Level Altitude
@@ -242,7 +243,8 @@ def lorawan_db_secret():
 
 @db.command(name="mock")
 @click.argument("device_id", default="mock-device")
-def lorawan_db_mock(device_id):
+@click.option("--secret", default=None, help="Webhook secret to use. If not provided, will use WEBHOOK_SECRET from environment.")
+def lorawan_db_mock(device_id: str, secret: Optional[str]):
     """
     Send a test message to the Cloudflare Worker that writes to InfluxDB.
     This is useful for testing the integration without sending real data from a device.
@@ -284,7 +286,7 @@ def lorawan_db_mock(device_id):
         }
     }
     headers = {
-        "X-TTN-Secret": getenv("WEBHOOK_SECRET", "")
+        "X-TTN-Secret": secret or getenv("WEBHOOK_SECRET", "")
     }
     response = requests.post(
         "https://ttn-to-influx.nkeeney.workers.dev/",

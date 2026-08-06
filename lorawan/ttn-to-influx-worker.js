@@ -54,10 +54,7 @@ export default {
     try {
       const body = await request.json();
       const line = parseTTNMessage(body);
-    } catch (err) {
-      return new Response("Bad Request", { status: 400 });
-    }
-    return await fetch(influxUrl, {
+      return await fetch(influxUrl, {
       method: "POST",
       headers: {
         "Authorization": `Token ${env.INFLUX_WRITE}`,
@@ -65,5 +62,9 @@ export default {
       },
       body: line
     });
+    } catch (err) {
+      return new Response("Bad Request", { status: 400 });
+    }
+
   }
 };
