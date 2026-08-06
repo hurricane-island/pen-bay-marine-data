@@ -89,12 +89,22 @@ https://docs.balena.io/learn/manage/device-logs/
 
 Use the `Purge Data` option in the Actions menu for the device or fleet. This is needed to get rid of the sqlite db. 
 
-### LoRaWAN
+## LoRaWAN
 
-You'll need to get the Gateway EUI to register on The Things Network.
+The tools include methods for working with LoRaWAN networks. This includes both Docker recipes for running gateways, and commands for moving data between The Things Network and InfluxDB.
 
-This can be done by opening a shell into `basicstation` and running the `gateway_eui` script. This will be used in TTN interface when creating the gateway. Choose to authenticate with LNS and download the access key. Copy this into the device level override of the `TC_KEY` environment variable.
+### The Things Network
+
+We use TTN for managing gateways, applications, and devices. This is a shared service owned by NERACOOS and GMRI. The storage integration is enabled to retain messages for up to 30 days. Ultimately, long-term archival is in InfluxDB.
+
+### Cloudflare
+
+Because TTN used Webhooks and InfluxDB requires specific formatting, we need to use a intermediary. In this case there is a Cloudflare worker that transforms the data to Line Protocol and performs simple authentication. The worker code is stored in this repo, and automatically deploys when changes are merged into main. Branch changes will publish a new worker, which must be promoted for it to accept traffic.
+
+### Influx
+
+Signal mapping and sensor data is stored in Influx, where it can be easily explored, or queried from another program or platform. For us, that means pulling data from the database using Python, or hooking it up to Grafana for web visualizations.
 
 ## Use of Generative AI
 
-Some code in this repository was suggested or written by Generative AI products including Github Copilot and Warp Terminal.
+Some code in this repository was suggested, written and/or edited by Generative AI products including Github Copilot and Warp Terminal.

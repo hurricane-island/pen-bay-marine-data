@@ -26,7 +26,6 @@ pytest = ">=9.1.1,<10"
 scipy = ">=1.18.0,<2"
 pyproj = ">=3.7.2,<4"
 requests = ">=2.34.2,<3"
-cartopy = ">=0.25.0,<0.26"
 
 [pypi-dependencies]
 "influxdb3-python" = "~=0.20.0"
