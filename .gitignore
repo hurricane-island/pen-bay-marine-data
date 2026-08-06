@@ -12,6 +12,3 @@ weather/weewx.conf
 # sphinx build
 www/
 github-pages/
-
-# cached basemap tiles
-*/.tile-cache/

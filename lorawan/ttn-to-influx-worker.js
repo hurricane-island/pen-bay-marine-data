@@ -65,6 +65,5 @@ export default {
     } catch (err) {
       return new Response("Bad Request", { status: 400 });
     }
-
   }
 };
