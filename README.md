@@ -99,7 +99,7 @@ We use TTN for managing gateways, applications, and devices. This is a shared se
 
 ### Cloudflare
 
-Because TTN used Webhooks and InfluxDB requires specific formatting, we need to use a intermediary. In this case there is a Cloudflare worker that transforms the data to Line Protocol and performs simple authentication. The worker code is stored in this repo, and automatically deploys when changes are merged into main. Branch changes will publish a new worker, which must be promoted for it to accept traffic.
+Because TTN uses Webhooks and InfluxDB requires specific formatting, we need to use an intermediary. In this case there is a Cloudflare worker that transforms the data to Line Protocol and performs simple authentication. The worker code is stored in this repo, and automatically deploys when changes are merged into main. Branch changes will publish a new worker, which must be promoted for it to accept traffic.
 
 ### Influx
 
