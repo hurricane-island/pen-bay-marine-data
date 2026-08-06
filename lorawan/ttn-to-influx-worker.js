@@ -34,7 +34,7 @@ export default {
       }
     }
 
-    const line = `lora,device=${device} ${fields.join(",")} ${time}`;
+    const line = `signal,device=${device} ${fields.join(",")} ${time}`;
 
     const influxUrl =
       "https://us-east-1-1.aws.cloud2.influxdata.com/api/v2/write?orgId=500b0cdd30526848&bucket=lorawan&precision=ms";
