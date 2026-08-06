@@ -16,6 +16,7 @@ from pyproj import Transformer
 from pandas import json_normalize, to_datetime
 import cartopy.crs as ccrs
 from cartopy.io.img_tiles import OSM
+from uuid import uuid4
 
 
 # Create a transformer from WGS84 3D Ellipsoidal to WGS84 + EGM96 Sea Level Altitude
@@ -230,6 +231,15 @@ def lorawan_describe_tail(application_id, device_id):
     data = json.loads(all_data[0])  # Get the first event
     click.echo(json.dumps(data, indent=4))
 
+@db.command(name="secret")
+def lorawan_db_secret():
+    """
+    Create a secret to add to TTN and Cloudflare Workers.
+    """
+    secret = uuid4().hex
+    click.echo("Add this secret to your TTN Webhook and Cloudflare Worker:")
+    click.echo(f"{secret}")
+
 @db.command(name="mock")
 @click.argument("device_id", default="mock-device")
 def lorawan_db_mock(device_id):
@@ -273,14 +283,17 @@ def lorawan_db_mock(device_id):
             }
         }
     }
-    # print(json.dumps(message, indent=4))
+    headers = {
+        "X-TTN-Secret": getenv("WEBHOOK_SECRET", "")
+    }
     response = requests.post(
         "https://ttn-to-influx.nkeeney.workers.dev/",
         json=message["result"],
+        headers=headers,
         timeout=10
     )
-    if response.status_code == 200:
+    if response.status_code == 204:
         click.echo("Test message sent successfully.")
     else:
-        click.echo(f"Failed to send test message. Status code: {response.status_code}")
+        click.echo(f"Failed to send test message: {response.status_code}")
         click.echo(f"Response: {response.text}")
