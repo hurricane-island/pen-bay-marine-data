@@ -7,6 +7,21 @@ from sys import argv
 from pandas import DataFrame, read_csv, to_datetime, concat
 from matplotlib.pyplot import subplots, title
 from matplotlib.axes import Axes
+import click
+
+@click.group()
+def island() -> None:
+    """Island CLI group."""
+
+@island.group()
+def plot() -> None:
+    """Plot data from Govee or Sol Ark devices."""
+
+@plot.command("grid")
+def island_plot_grid() -> None:
+    """Plot grid data from Sol Ark devices."""
+    click.echo("Plotting grid data from solar devices...")
+    
 
 class TimeSeries:
     """
