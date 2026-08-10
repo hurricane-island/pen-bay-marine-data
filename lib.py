@@ -456,12 +456,7 @@ def calculate_rate_of_change(series: Series) -> Series:
         .dt.total_seconds()
         / 3600
     )
-    dt = dt.replace(0, float("nan"))  # Avoid division by zero
     slope = series.diff() / dt
-    slope = slope.replace(
-        [float("inf"), float("-inf")],
-        float("nan")
-    )
     return slope
 
 def determine_rate_threshold(series: Series, percentile: float = 0.99):
@@ -481,8 +476,9 @@ def determine_rate_threshold(series: Series, percentile: float = 0.99):
     return threshold
 
 def calculate_spike_change(series: Series) -> Series:
-    # Calculate second derivative (change in rate of change) for spike detection.  Units are value change per hour squared.
     series = series.sort_index()
+series = series[~series.index.duplicated(keep="first")]
+    # Calculate second derivative (change in rate of change) for spike detection.  Units are value change per hour squared.
     # Time difference in hours
     dt = (
         series.index.to_series()
@@ -490,7 +486,6 @@ def calculate_spike_change(series: Series) -> Series:
         .dt.total_seconds()
         / 3600
     )
-    dt = dt.replace(0, pd.NA)
     # First derivative
     first_derivative = series.diff() / dt
     # Second derivative
@@ -499,11 +494,7 @@ def calculate_spike_change(series: Series) -> Series:
 
 def determine_spike_threshold(series: Series, percentile: float = 0.99):
     # Determine spike threshold from second derivative. Uses percentile of observed changes.
-    spike_change = calculate_spike_change(series)
-    spike_change = spike_change.replace(
-        [float("inf"), -float("inf")],
-        pd.NA
-    ).dropna()
+    spike_change = calculate_spike_change(series).dropna()
     if spike_change.empty:
         print("No variability detected")
         return None
