@@ -294,25 +294,7 @@ def buoys_file_describe(name: StationName, table: TableName):
     print("\nSamples:\n")
     print(summary)
     print("\nRate of Change Thresholds:\n")
-    for column in df.columns:
-        try:
-            threshold = determine_rate_threshold(df[column])
-            print(f"{column}: {threshold}")
-        except Exception as e:
-            print(f"Skipping {column}: {e}")
-    print("\nSpike Thresholds:\n")
-    for column in df.columns:
-        try:
-            threshold = determine_spike_threshold(df[column])
-            print(f"{column}: {threshold}")
-        except Exception as e:
-            print(f"Skipping {column}: {e}")
-    changes = (
-        df.select_dtypes(include="number")
-        .apply(absolute_change)
-        )
-    mac_99 = changes.quantile(0.99)
-    print(mac_99)
+  
 
 
 class TestTypes(Enum):
@@ -925,7 +907,7 @@ def buoys_db_describe(
     )
     print(read_back.head())
 
-@file_group.command(name="rate")
+@file_group.command(name="rate-of-change")
 @station_name
 @data_table
 @click.argument(
@@ -943,7 +925,18 @@ def buoys_file_rate(name: StationName, table: TableName, series: StandardNames):
     threshold = abs_slope.quantile(0.99)
     print(f"\nSuggested threshold (99th percentile): {threshold:.4f}")
 
-def buoys_file_secondderivative(name: StationName, table: TableName, series: StandardNames): # Analyze the second derivative for one observed property.
+@file_group.command(name="second-derivative")
+@station_name
+@data_table
+@click.argument(
+    "series",
+    type=click.Choice(StandardNames, case_sensitive=False),
+)
+def buoys_file_secondderivative(
+    name: StationName,
+    table: TableName,
+    series: StandardNames,
+):
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
     vendor_name = VendoredNames[series.name]
