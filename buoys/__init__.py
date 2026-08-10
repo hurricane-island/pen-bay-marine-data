@@ -31,6 +31,7 @@ from pyproj import Transformer
 import gpxpy
 import gpxpy.gpx
 import click
+from dateutil.relativedelta import relativedelta
 from scipy.stats import median_abs_deviation
 from lib import (
     Source,
@@ -301,36 +302,80 @@ class TestTypes(Enum):
     FLAT_LINE = "flat_line"
     ROLLUP = "rollup"
 
-
 @plot.command(name=ClickOptions.TAIL.value)
 @source_options
 @plot_options
-@click.option("--qartod", default="qartod.yaml", help="QARTOD configuration file")
-@click.option("--days", default=30, help="Number of days to plot")
+@click.option(
+    "--qartod/--no-qartod",
+    default=True,
+    help="Apply QARTOD quality control.",
+)
+@click.option(
+    "--end",
+    default=None,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="End date for the plot. The plot will start --months before this date.",
+)
+@click.option(
+    "--months",
+    default=3,
+    type=int,
+    help="Number of calendar months to plot before --end.",
+)
+@click.option(
+    "--days",
+    default=30,
+    type=int,
+    help="Number of days to plot when --end is not specified.",
+)
 @click.option(
     "--test",
     default=TestTypes.ROLLUP,
     type=click.Choice(TestTypes, case_sensitive=False),
-    help="QARTOD test to plot",
+    help="QARTOD test to plot.",
 )
 def buoys_plot_tail(
     name: StationName,
     table: TableName,
     series: StandardNames,
-    qartod: str,
+    qartod: bool,
+    end: datetime | None,
+    months: int,
     days: int,
     test: TestTypes,
     image_format: ImageFormat = ImageFormat.PNG,
 ):
     """
-    Plot the most recent data from a buoy for a single data stream.
+    Plot data from a buoy for a single data stream.
+
+    By default, plot the most recent --days of data.
+
+    If --end is supplied, plot the preceding --months calendar
+    months ending at that date.
+
+    QARTOD can be enabled or disabled with --qartod/--no-qartod.
     """
-    end: datetime = datetime.now()
-    start: datetime = end - timedelta(days=days)
+    
+    if end is not None:
+        if months <= 0:
+            raise click.ClickException(
+                "--months must be greater than zero."
+            )
+        plot_end = end
+        plot_start = end - relativedelta(months=months)
+    else:
+        if days <= 0:
+            raise click.ClickException(
+                "--days must be greater than zero."
+            )
+        plot_end = datetime.now()
+        plot_start = plot_end - timedelta(days=days)
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
-    mask = df.index > start
-    df = df[mask].sort_values("TimeRecovered").sort_index(kind="stable")
+    df = (
+        df.sort_values("TimeRecovered")
+        .sort_index(kind="stable")
+    )
     df = df[~df.index.duplicated(keep="first")]
     df = df.asfreq("h")
     renamed = []
@@ -344,57 +389,98 @@ def buoys_plot_tail(
             renamed.append(col[0])
         units[renamed[-1]] = col[1]
     df.columns = renamed
-
+    if series.value not in df.columns:
+        raise click.ClickException(
+            f"Data series '{series.value}' not found."
+        )
+    plot_df = df[
+        (df.index >= plot_start)
+        & (df.index < plot_end)
+    ]
+    if plot_df.empty:
+        raise click.ClickException(
+            f"No data found between "
+            f"{plot_start:%Y-%m-%d} and "
+            f"{plot_end:%Y-%m-%d}."
+        )
     fig, ax = plt.subplots(figsize=(7.5, 3))
-
     ax.plot(
-        df.index,
-        df[series.value],
+        plot_df.index,
+        plot_df[series.value],
         color="grey",
         linestyle="dashed",
         linewidth=1,
         zorder=1,
         label="raw",
     )
-    ylim = (None, None)
-    if qartod is not None:
+    if qartod:
         qa_path = Path(__file__).parent / "qartod.yaml"
-        if qa_path.exists():
-            config = Config(qa_path)
-        else:
+        if not qa_path.exists():
             raise click.ClickException(
                 f"QARTOD configuration file not found: {qa_path}"
             )
-        flags = PandasStream(df.reset_index(names="time"), time="time").run(config)
+        config = Config(qa_path)
+        flags = PandasStream(
+            df.reset_index(names="time"),
+            time="time",
+        ).run(config)
         store = PandasStore(flags)
-        result = store.save().set_index("time")
+        result = store.save()
+        if result.empty or "time" not in result.columns:
+            raise click.ClickException(
+                "QARTOD did not produce any results."
+            )
+        result = result.set_index("time")
         frames: dict[str, list[str]] = {}
         for each in result.columns:
             _series, _name = each.split("_qartod_")
+
             if _series not in frames:
                 frames[_series] = []
+
             frames[_series].append(_name)
         by_observed_property = []
         for items in frames.items():
-            by_observed_property.append(test_observed_property(result, *items))
+            by_observed_property.append(
+                test_observed_property(result, *items)
+            )
         qa = (
             concat(by_observed_property, axis=0)
             .groupby("observed_property")
             .get_group(series.value)[test.value]
         )
-        suspect = df[qa == 3][series.value]
-        failed = df[qa == 4][series.value]
-        remaining = df[qa < 3][series.value].asfreq("h")
+        qa = qa[
+            (qa.index >= plot_start)
+            & (qa.index < plot_end)
+        ]
+        qa = qa.reindex(plot_df.index)
+        suspect = plot_df.loc[
+            qa == 3,
+            series.value,
+        ]
+        failed = plot_df.loc[
+            qa == 4,
+            series.value,
+        ]
+        remaining = plot_df.loc[
+            qa < 3,
+            series.value,
+        ]
         ax.scatter(
             suspect.index,
             suspect,
             label="suspect",
             color="orange",
             marker="x",
-            zorder=0,
+            zorder=3,
         )
         ax.scatter(
-            failed.index, failed, label="failed", color="red", marker="x", zorder=0
+            failed.index,
+            failed,
+            label="failed",
+            color="red",
+            marker="x",
+            zorder=3,
         )
         ax.plot(
             remaining.index,
@@ -405,32 +491,63 @@ def buoys_plot_tail(
             zorder=2,
             label="filtered",
         )
-        # ylim = (remaining.min(), remaining.max())
-
-    display_name = series.value.replace("_", " ").title()
-    if start.year == end.year:
-        year_range = f"{start.year}"
-    else:
-        year_range = f"{start.year}-{end.year}"
-    plt.title(f"{name.value} {display_name} {year_range}".title())
+    display_name = series.value.replace(
+        "_", " "
+    ).title()
+    qartod_label = "QARTOD" if qartod else "Raw"
+    ax.set_title(
+        f"{name.value} {display_name} "
+        f"{plot_start:%Y-%m-%d} to "
+        f"{plot_end:%Y-%m-%d} "
+        f"({qartod_label})".title()
+    )
     ax.set_xlabel("Date")
     ax.xaxis.set_tick_params(rotation=45)
-    ax.set_xlim(max(start, df.index.min()), end)
-    ax.set_ylim(*ylim)
-    ax.xaxis.set_major_locator(mdates.DayLocator(interval=(days // 8) + 2))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # Customize format
-    if units is not None:
-        ax.set_ylabel(f"{units[series.value]}")
+    ax.set_xlim(plot_start, plot_end)
+    if units:
+        ax.set_ylabel(units[series.value])
+    if end is not None:
+        ax.xaxis.set_major_locator(
+            mdates.MonthLocator()
+        )
+
+        ax.xaxis.set_major_formatter(
+            mdates.DateFormatter("%b %Y")
+        )
+    else:
+        ax.xaxis.set_major_locator(
+            mdates.DayLocator(
+                interval=max(days // 8, 1)
+            )
+        )
+        ax.xaxis.set_major_formatter(
+            mdates.DateFormatter("%b %d")
+        )
     ax.legend(loc="best")
     fig.tight_layout()
+    qartod_suffix = "qartod" if qartod else "raw"
     filepath = (
         FIGURES_DIR
         / ClickOptions.TAIL.value
         / name.value
-        / f"{series.value}.{image_format.value}"
+        / (
+            f"{series.value}_"
+            f"{plot_start:%Y-%m-%d}_"
+            f"{plot_end:%Y-%m-%d}_"
+            f"{qartod_suffix}."
+            f"{image_format.value}"
+        )
     )
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(filepath, dpi=300, bbox_inches="tight")
+    filepath.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    fig.savefig(
+        filepath,
+        dpi=300,
+        bbox_inches="tight",
+    )
+    click.echo(f"Saved plot to {filepath}")
 
 
 @plot.command(name="cable")
