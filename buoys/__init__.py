@@ -550,12 +550,24 @@ def haversine(lon1, lat1, lon2, lat2):
     "--satellites", required=True, type=int, help="minimum number of satellites"
 )
 @click.option(
+    "--start",
+    default=None,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="Start date for filtering GPS points.",
+)
+@click.option(
+    "--end",
+    default=None,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="End date for filtering GPS points.",
+)
+@click.option(
     "--cable",
     is_flag=True,
     help="include predicted watch circle from WHOI cable simulation",
 )
 def buoys_plot_locations(
-    name, latitude, longitude, distance=100.0, satellites=4, cable=False
+    name, latitude, longitude, distance=100.0, satellites=4, start=None, end=None, cable=False,
 ):
     """
     Plot the lat and long of the buoy hourly over the course of the deployment period.
@@ -580,9 +592,11 @@ def buoys_plot_locations(
     mask = (
         (array(list(map(compute_distance, zip(lon, lat)))) < distance)
         & (satellite_count >= satellites)
-        & (df.index > datetime(2026, 1, 1))
-    )  # filter out erroneous GPS points and early data
-
+    )
+    if start is not None:
+        mask &= df.index >= start
+    if end is not None:
+        mask &= df.index <= end
     filtered_lon = lon[mask]
     filtered_lat = lat[mask]
     if filtered_lon.size == 0:
