@@ -18,11 +18,11 @@ streams:
         zinp: []  # required, but empty
 
       rate_of_change_test:
-        threshold: 0.000156  # units per second, C or K 99% of slope change. 
+        threshold: 0.000356  # units per second, C or K. 0.000156 was 99% of slope change used initially but to restrictive. 
 
       spike_test:
-        suspect_threshold: 0.4  # dimensionless
-        fail_threshold: 0.567605 # dimensionless
+        suspect_threshold: 0.8 # 0.4 used initially based on derivations but to restrictive, dimensionless
+        fail_threshold: 1.1 # ""0.567605
         method: differential  # will not catch tails, only values with neighbors
 
       flat_line_test:
@@ -60,10 +60,10 @@ streams:
          suspect_threshold: 28800
          fail_threshold: 43200
   
-  sea_water_chlorophyll_rfu:
+  sea_water_chlorophyll_rfu: #need to adjust spike test. 
     qartod:
       gross_range_test:
-         suspect_span: [0.1, 1.5]
+         suspect_span: [0.05, 4.0] 
          fail_span: [0, 100]
       
       climatology_test:
@@ -82,7 +82,7 @@ streams:
          threshold: 0.000335 # RFU/sec
 
       spike_test:
-         suspect_threshold: 0.24
+         suspect_threshold: 0.24 #need to change this also. 
          fail_threshold: 3.900062
 
       flat_line_test:
@@ -93,7 +93,7 @@ streams:
   sea_water_phycoerythrin_rfu:
     qartod:
       gross_range_test:
-         suspect_span: [0.1, 4]
+         suspect_span: [0.05, 5]
          fail_span: [0, 100]
       
       climatology_test:
