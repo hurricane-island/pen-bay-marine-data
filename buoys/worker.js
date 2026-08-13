@@ -1,5 +1,14 @@
+const EXAMPLE_CSI_PAYLOAD = `
+message: Received body: ----CSIBoundary--
+Content-Disposition: form-data; name="NULL";filename=Diagnostics3.dat
+Content-Type: application/octet-stream
+
+{"head": {"transaction": 0,"signature": 30374,"environment":  {"station_name":  "bench_test","table_name":  "Diagnostics","model":  "CR300","serial_no":  "36592","os_version":  "CR300-CELL210.11.3.0","prog_name":  "CPU:wynken.3b650ccf572b3cea8b6c3e238ea7078c.dld"},"fields":  [{"name":  "BatteryVoltage","type":  "xsd:float","units":  "Volts","process":  "Smp","settable":  false},{"name":  "RSSI","type":  "xsd:float","process":  "Smp","settable":  false}]},"data": [{"time":  "2026-08-13T16:31:00","vals": [13.48,"NAN"]}]}
+----CSIBoundary----
+`
+
 const influxUrl =
-      "https://us-east-1-1.aws.cloud2.influxdata.com/api/v2/write?orgId=500b0cdd30526848&bucket=buoys&precision=ms";
+      "https://us-east-1-1.aws.cloud2.influxdata.com/api/v2/write?orgId=500b0cdd30526848&bucket=test&precision=ms";
 
 function timingSafeEqual(a, b) {
   if (a.length !== b.length) return false;
@@ -12,35 +21,30 @@ function timingSafeEqual(a, b) {
 
 function parseRecord(record, fields) {
   const time = new Date(record.time).getTime(); // Convert to milliseconds
-  parts = record.vals.map((val, index) => {
-    const fieldName = fields[index];
-    return `${fieldName}=${val}`;
+  const parts = record.vals.filter(val => val !== "NAN").map((val, index) => {
+    return `${fields[index]}=${val}`;
   });
   return `${parts.join(",")} ${time}`;
 }
 
 function parseCRMessage(body) {
-    const startMarker = "application/octet-stream\r\n\r\n";
-    const endMarker = "\r\n----CSIBoundary----";
+    const startMarker = "application/octet-stream";
+    const endMarker = "----CSIBoundary----";
     const startIndex = body.indexOf(startMarker);
     const endIndex = body.indexOf(endMarker, startIndex);
     
     if (startIndex === -1 || endIndex === -1) {
       const message = "Invalid format: CSI payload not found.";
-      console.log(message);
       throw new Error(message);
     }
     
-    const jsonString = body.substring(startIndex + startMarker.length, endIndex);
+    const jsonString = body.substring(startIndex + startMarker.length, endIndex).trim();
     const csiData = JSON.parse(jsonString);
-
-    console.log('Data received:', csiData);
     const environment = csiData.head.environment;
     const station_name = environment.station_name.toLowerCase();
     const measurement = environment.table_name.toLowerCase();
     const fields = csiData.head.fields.map(field => field.name);
     const lines = csiData.data.map(record => `${measurement},device=${station_name} ` + parseRecord(record, fields)).join("\n");
-    console.log('Parsed lines:', lines);
     return lines;
 }
 
@@ -56,18 +60,19 @@ export default {
     try {
       const body = await request.text();
       const line = parseCRMessage(body);
-      // return await fetch(influxUrl, {
-      //   method: "POST",
-      //   headers: {
-      //     "Authorization": `Token ${env.INFLUX_WRITE}`,
-      //     "Content-Type": "text/plain"
-      //   },
-      //   body: line
-      // });
-      return new Response("Ok", { status: 200 });
+      return await fetch(influxUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Token ${env.INFLUX_WRITE}`,
+          "Content-Type": "text/plain"
+        },
+        body: line
+      });
     } catch (err) {
       console.error("Error processing request:", err);
       return new Response("Bad Request", { status: 400 });
     }
   }
 };
+
+// parseCRMessage(EXAMPLE_CSI_PAYLOAD);
