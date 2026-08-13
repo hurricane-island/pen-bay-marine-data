@@ -1,5 +1,5 @@
 name = "ttn-to-influx"
-main = "lorawan/worker.js"
+main = "worker.js"
 compatibility_date = "2026-08-06"
 
 [observability.logs]
