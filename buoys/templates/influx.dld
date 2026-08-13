@@ -4,11 +4,9 @@ Const SCAN_INTERVAL_S As Long = 60 ' Diagnostic scan Interval
 Dim BatteryVoltage As Float: Units BatteryVoltage = Volts
 Dim InternalTemperature As Float: Units InternalTemperature = °C
 Dim RSSI = NAN
-Public DiagnosticsStringBuffer As String * 256
 Public http_header_content As String * 100
 Public http_post_response As String * 256
 Public http_post_tx As Long
-Public http_body As String * 512
 Dim server_url As String * 256 = "http://cr-to-influx.hurricane-island.workers.dev"
 
 DataTable(Diagnostics, True, 3000)
@@ -37,10 +35,7 @@ BeginProg
 
   SlowSequence
     Scan(30, Sec, 0, 0)
-        GetRecord(DiagnosticsStringBuffer, Diagnostics, 1)
         http_header_content = "" ' gets rewritten by response
-        http_body = "diagnostics,wynken," + DiagnosticsStringBuffer
-        ' http_post_tx = HttpPost(server_url, http_body, http_post_response, http_header_content)
         http_post_tx = HttpPost(server_url, "Diagnostics", http_post_response, http_header_content, 0, 0, Sec, 33, 1000)
     NextScan
   EndSequence

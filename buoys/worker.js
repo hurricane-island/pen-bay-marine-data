@@ -11,35 +11,37 @@ function timingSafeEqual(a, b) {
 }
 
 function parseCRMessage(body) {
-    const device = body.end_device_ids.device_id;
-    const decoded = body.uplink_message.decoded_payload;
-    const metadata = body.uplink_message.rx_metadata[0]
-    const message_id = metadata.packet_broker.message_id
+    console.log('Body received:', body);
+    // const device = body.end_device_ids.device_id;
+    // const decoded = body.uplink_message.decoded_payload;
+    // const metadata = body.uplink_message.rx_metadata[0]
+    // const message_id = metadata.packet_broker.message_id
 
-    const time = new Date(metadata.time).getTime(); // Convert to milliseconds
-    const received_at = new Date(metadata.received_at).getTime(); // Convert to milliseconds
+    // const time = new Date(metadata.time).getTime(); // Convert to milliseconds
+    // const received_at = new Date(metadata.received_at).getTime(); // Convert to milliseconds
 
-    delete metadata.gateway_ids
-    delete metadata.packet_broker
-    delete metadata.uplink_token
-    delete metadata.time
-    delete metadata.received_at
+    // delete metadata.gateway_ids
+    // delete metadata.packet_broker
+    // delete metadata.uplink_token
+    // delete metadata.time
+    // delete metadata.received_at
 
-    const all_data = {...decoded, ...metadata, message_id, received_at}
+    // const all_data = {...decoded, ...metadata, message_id, received_at}
     
-    // Build Influx line protocol
-    let fields = [];
-    for (const [key, value] of Object.entries(all_data)) {
-      if (typeof value === "number") {
-        fields.push(`${key}=${value}`);
-      } else if (typeof value === "boolean") {
-        fields.push(`${key}=${value}`);
-      } else {
-        fields.push(`${key}="${String(value).replace(/"/g, '\\"')}"`);
-      }
-    }
-    const line = `signal,device=${device} ${fields.join(",")} ${time}`;
-    return line
+    // // Build Influx line protocol
+    // let fields = [];
+    // for (const [key, value] of Object.entries(all_data)) {
+    //   if (typeof value === "number") {
+    //     fields.push(`${key}=${value}`);
+    //   } else if (typeof value === "boolean") {
+    //     fields.push(`${key}=${value}`);
+    //   } else {
+    //     fields.push(`${key}="${String(value).replace(/"/g, '\\"')}"`);
+    //   }
+    // }
+    // const line = `signal,device=${device} ${fields.join(",")} ${time}`;
+    // return line
+    return ""
 }
 
 export default {
@@ -52,9 +54,16 @@ export default {
     //   return new Response("Unauthorized", { status: 401 });
     // }
     try {
-      const body = await request.text();
-      console.log("Received body:", body);
-      // const line = parseCRMessage(JSON.parse(body));
+      const formData = await request.formData();
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          const filename = value.name; // This grabs the dynamic filename automatically!
+          const cleanBlob = value;     // This is your clean file without metadata
+          console.log(`Found file: ${filename} (${cleanBlob.size} bytes)`);
+          break;
+        }
+      }
+      const line = parseCRMessage(cleanBlob);
       // return await fetch(influxUrl, {
       //   method: "POST",
       //   headers: {
