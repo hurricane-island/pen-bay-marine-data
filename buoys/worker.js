@@ -54,16 +54,8 @@ export default {
     //   return new Response("Unauthorized", { status: 401 });
     // }
     try {
-      const formData = await request.formData();
-      for (const [key, value] of formData.entries()) {
-        if (value instanceof File) {
-          const filename = value.name; // This grabs the dynamic filename automatically!
-          const cleanBlob = value;     // This is your clean file without metadata
-          console.log(`Found file: ${filename} (${cleanBlob.size} bytes)`);
-          break;
-        }
-      }
-      const line = parseCRMessage(cleanBlob);
+      const body = await request.text();
+      const line = parseCRMessage(body);
       // return await fetch(influxUrl, {
       //   method: "POST",
       //   headers: {
