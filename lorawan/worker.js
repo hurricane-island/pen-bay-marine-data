@@ -1,6 +1,11 @@
 const influxUrl =
       "https://us-east-1-1.aws.cloud2.influxdata.com/api/v2/write?orgId=500b0cdd30526848&bucket=lorawan&precision=ms";
 
+
+/**
+ * Prevent timing attacks by comparing two strings in constant time,
+ * no information about the length of the strings is leaked.
+ */
 function timingSafeEqual(a, b) {
   if (a.length !== b.length) return false;
   let result = 0;
@@ -10,6 +15,9 @@ function timingSafeEqual(a, b) {
   return result === 0;
 }
 
+/**
+ * Convert a Things Network v3 webhook message to Influx line protocol.
+ */
 function parseTTNMessage(body) {
     const device = body.end_device_ids.device_id;
     const decoded = body.uplink_message.decoded_payload;
