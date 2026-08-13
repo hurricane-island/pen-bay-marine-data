@@ -12,6 +12,7 @@ Features:
 """
 
 import re
+import requests
 from pathlib import Path
 from enum import Enum
 from datetime import datetime, timedelta
@@ -912,3 +913,19 @@ def buoys_db_describe(
         mode="pandas",
     )
     print(read_back.head())
+
+@firmware.command(name="mock")
+@station_name
+def buoys_firmware_mock(name: StationName):
+    """
+    Generate a mock message from a buoy logger for testing cloud 
+    integrations, including databases, location alerts, and missing
+    data detection.
+    """
+    # comma separate list, with each up to 26 characters
+    head = f"SL({name.value.lower()})\r"
+    names = "SN=ExternalTemp,SpConductivity_us,Pressure_abs,Chlorophyll_RFU,BGA_PE_RFU,BatteryVoltage,InternalHumidity,Salinity,Latitude,Longitude"
+    values = "D=08/11/26,17:15:00,13.42,41200,10.15,2.87,0.41,13.06,38,44.04203,-68.89106\r"
+    tail = "DIS\r"
+
+    click.echo(head + names + values + tail)
