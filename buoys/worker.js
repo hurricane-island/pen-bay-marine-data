@@ -11,7 +11,19 @@ function timingSafeEqual(a, b) {
 }
 
 function parseCRMessage(body) {
-    console.log('Body received:', body);
+    const startMarker = "application/octet-stream\r\n\r\n";
+    const endMarker = "\r\n----CSIBoundary----";
+    
+    const startIndex = requestText.indexOf(startMarker);
+    const endIndex = requestText.indexOf(endMarker, startIndex);
+    
+    if (startIndex === -1 || endIndex === -1) {
+      throw new Error("Invalid format: CSI payload not found.");
+    }
+    
+    const jsonString = requestText.substring(startIndex + startMarker.length, endIndex);
+    const csiData = JSON.parse(jsonString);
+    console.log('Data received:', csiData);
     // const device = body.end_device_ids.device_id;
     // const decoded = body.uplink_message.decoded_payload;
     // const metadata = body.uplink_message.rx_metadata[0]
