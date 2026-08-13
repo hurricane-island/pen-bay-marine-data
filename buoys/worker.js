@@ -52,7 +52,7 @@ export default {
     //   return new Response("Unauthorized", { status: 401 });
     // }
     try {
-      const body = await request.json();
+      const body = await request.text();
       console.log("Received body:", body);
       // const line = parseCRMessage(JSON.parse(body));
       // return await fetch(influxUrl, {

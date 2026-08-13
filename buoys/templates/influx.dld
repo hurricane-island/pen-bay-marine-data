@@ -36,9 +36,9 @@ BeginProg
   NextScan
 
   SlowSequence
-    Scan(15, Sec, 0, 0)
+    Scan(30, Sec, 0, 0)
         GetRecord(DiagnosticsStringBuffer, Diagnostics, 1)
-        http_header_content = "Content-Type:application/json; charset=utf-8" ' gets rewritten by response
+        http_header_content = "" ' gets rewritten by response
         http_body = "diagnostics,wynken," + DiagnosticsStringBuffer
         ' http_post_tx = HttpPost(server_url, http_body, http_post_response, http_header_content)
         http_post_tx = HttpPost(server_url, "Diagnostics", http_post_response, http_header_content, 0, 0, Sec, 33, 1000)
