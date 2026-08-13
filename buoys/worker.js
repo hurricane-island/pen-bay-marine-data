@@ -14,20 +14,22 @@ function parseCRMessage(body) {
     const startMarker = "application/octet-stream\r\n\r\n";
     const endMarker = "\r\n----CSIBoundary----";
     
-    const startIndex = requestText.indexOf(startMarker);
-    const endIndex = requestText.indexOf(endMarker, startIndex);
+    const startIndex = body.indexOf(startMarker);
+    const endIndex = body.indexOf(endMarker, startIndex);
     
     if (startIndex === -1 || endIndex === -1) {
-      throw new Error("Invalid format: CSI payload not found.");
+      const message = "Invalid format: CSI payload not found.";
+      console.log(message);
+      throw new Error(message);
     }
     
-    const jsonString = requestText.substring(startIndex + startMarker.length, endIndex);
+    const jsonString = body.substring(startIndex + startMarker.length, endIndex);
     const csiData = JSON.parse(jsonString);
     console.log('Data received:', csiData);
-    // const device = body.end_device_ids.device_id;
-    // const decoded = body.uplink_message.decoded_payload;
-    // const metadata = body.uplink_message.rx_metadata[0]
-    // const message_id = metadata.packet_broker.message_id
+    const environment = csiData.head.environment;
+    const fields = csiData.head.fields.map(field => field.name);
+    const data = csiData.data;
+    const observations = data.length;
 
     // const time = new Date(metadata.time).getTime(); // Convert to milliseconds
     // const received_at = new Date(metadata.received_at).getTime(); // Convert to milliseconds
