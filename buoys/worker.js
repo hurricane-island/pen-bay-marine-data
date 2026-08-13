@@ -66,6 +66,7 @@ export default {
       // });
       return new Response("Ok", { status: 200 });
     } catch (err) {
+      console.error("Error processing request:", err);
       return new Response("Bad Request", { status: 400 });
     }
   }
