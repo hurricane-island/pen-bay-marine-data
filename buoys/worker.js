@@ -10,10 +10,18 @@ function timingSafeEqual(a, b) {
   return result === 0;
 }
 
+function parseRecord(record, fields) {
+  const time = new Date(record.time).getTime(); // Convert to milliseconds
+  parts = record.vals.map((val, index) => {
+    const fieldName = fields[index];
+    return `${fieldName}=${val}`;
+  });
+  return `${parts.join(",")} ${time}`;
+}
+
 function parseCRMessage(body) {
     const startMarker = "application/octet-stream\r\n\r\n";
     const endMarker = "\r\n----CSIBoundary----";
-    
     const startIndex = body.indexOf(startMarker);
     const endIndex = body.indexOf(endMarker, startIndex);
     
@@ -25,13 +33,13 @@ function parseCRMessage(body) {
     
     const jsonString = body.substring(startIndex + startMarker.length, endIndex);
     const csiData = JSON.parse(jsonString);
+
     console.log('Data received:', csiData);
     const environment = csiData.head.environment;
     const fields = csiData.head.fields.map(field => field.name);
-    const data = csiData.data;
-    const observations = data.length;
+    const lines = csiData.data.map(record => parseRecord(record, fields));
+    console.log('Parsed lines:', lines);
 
-    // const time = new Date(metadata.time).getTime(); // Convert to milliseconds
     // const received_at = new Date(metadata.received_at).getTime(); // Convert to milliseconds
 
     // delete metadata.gateway_ids
