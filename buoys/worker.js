@@ -47,21 +47,23 @@ export default {
     if (request.method !== "POST") {
       return new Response("POST only", { status: 405 });
     }
-    const ttnAuthHeader = request.headers.get("X-TTN-Secret");
-    if (!ttnAuthHeader || !timingSafeEqual(ttnAuthHeader, env.WEBHOOK_SECRET)) {
-      return new Response("Unauthorized", { status: 401 });
-    }
+    // const ttnAuthHeader = request.headers.get("X-TTN-Secret");
+    // if (!ttnAuthHeader || !timingSafeEqual(ttnAuthHeader, env.WEBHOOK_SECRET)) {
+    //   return new Response("Unauthorized", { status: 401 });
+    // }
     try {
-      const body = await request.json();
-      const line = parseCRMessage(body);
-      return await fetch(influxUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": `Token ${env.INFLUX_WRITE}`,
-        "Content-Type": "text/plain"
-      },
-      body: line
-    });
+      const body = await request.text();
+      console.log("Received body:", body);
+      // const line = parseCRMessage(JSON.parse(body));
+      // return await fetch(influxUrl, {
+      //   method: "POST",
+      //   headers: {
+      //     "Authorization": `Token ${env.INFLUX_WRITE}`,
+      //     "Content-Type": "text/plain"
+      //   },
+      //   body: line
+      // });
+      return new Response("Ok", { status: 200 });
     } catch (err) {
       return new Response("Bad Request", { status: 400 });
     }
