@@ -60,7 +60,7 @@ export default {
     try {
       const body = await request.text();
       const line = parseCRMessage(body);
-      return await fetch(influxUrl, {
+      const result = await fetch(influxUrl, {
         method: "POST",
         headers: {
           "Authorization": `Token ${env.INFLUX_WRITE}`,
@@ -68,6 +68,7 @@ export default {
         },
         body: line
       });
+      return new Response("Ok", { status: 200 });
     } catch (err) {
       console.error("Error processing request:", err);
       return new Response("Bad Request", { status: 400 });
