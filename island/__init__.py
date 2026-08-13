@@ -3,10 +3,80 @@ Read data from either the exported CSV files from Govee or Sol Ark devices,
 or query the API for each. Visualize the data.
 """
 from os import listdir, path
+from datetime import datetime
+from pathlib import Path
 from sys import argv
 from pandas import DataFrame, read_csv, to_datetime, concat
 from matplotlib.pyplot import subplots, title
+from matplotlib.dates import DateFormatter, DayLocator
 from matplotlib.axes import Axes
+import click
+
+FIGURES = Path(__file__).parent / "figures"
+DATA = Path(__file__).parent / "data"
+
+@click.group()
+def island() -> None:
+    """Island CLI group."""
+
+@island.group()
+def plot() -> None:
+    """Plot data from Govee or Sol Ark devices."""
+
+@plot.command("grid")
+def island_plot_grid() -> None:
+    """Plot grid data from Sol Ark devices."""
+    click.echo("Plotting grid data from solar devices...")
+    interval = "72h"
+    df = read_csv(
+        DATA / "outback.csv",
+        index_col="Date",
+        parse_dates=True,
+    )
+    df = df.sort_index()[0:-1]
+    # mask = df.index > datetime(2026, 1, 1)
+    # df = df[mask]
+
+    earliest = df.index.min()
+    latest = df.index.max()
+    last_year = (earliest, latest.replace(year=2025))
+    this_year = (earliest.replace(year=2026), latest)
+    df_last_year = df[last_year[0]:last_year[1]].mean()
+    df_this_year = df[this_year[0]:this_year[1]].mean()
+
+    print(f"2026 vs 2025 ({earliest.date()} to {latest.date()}):")
+    print(
+        f"Power Out: {df_this_year['Out kWh']:.2f} vs {df_last_year['Out kWh']:.2f} ({(df_this_year['Out kWh']) / df_last_year['Out kWh'] * 100:.2f}%)")
+    print(
+        f"Continuous Power: {(df_this_year['Out kWh']-df_last_year['Out kWh'])/24*1000:.2f}")
+    print(
+        f"Power In: {df_this_year['In kWh']:.2f} vs {df_last_year['In kWh']:.2f} ({(df_this_year['In kWh'] / df_last_year['In kWh']) * 100:.2f}%)")
+
+
+
+    fig, ax = subplots(figsize=(10, 3))
+    rsmp_load = df["Out kWh"].resample(interval).sum()
+    ax.plot(rsmp_load.index, rsmp_load, color="black", label="Out kWh", linewidth=0.5)
+    rsmp_power = df["In kWh"].resample(interval).sum()
+    ax.plot(rsmp_power.index, rsmp_power, color="black", label="In kWh", linewidth=0.5)
+
+    ax.fill_between(rsmp_load.index, rsmp_load, rsmp_power, where=rsmp_load <= rsmp_power, color="green", alpha=0.5, interpolate=True, linewidth=0)
+    ax.fill_between(rsmp_load.index, rsmp_load, rsmp_power, where=rsmp_load >= rsmp_power, color="red", alpha=0.5, interpolate=True, linewidth=0)
+
+    ax.set_title(f"Power and State of Charge ({interval} window)")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Total Power In/Out (kWh)", color="black")
+    ax.xaxis.set_major_locator(DayLocator(bymonthday=1))
+    ax.xaxis.set_major_formatter(DateFormatter("%b"))  # Customize format
+
+    ax2 = ax.twinx()
+    weekly_soc = df["Min SOC"].resample(interval).min()
+    ax2.plot(weekly_soc.index, weekly_soc, color="black", linewidth=2.0)
+    ax2.set_ylabel("Min State of Charge (%)", color="black")
+    ax2.set_ylim(0, 100)  # Set y-axis limits for SOC
+    ax2.tick_params(axis='y', colors='black')  # Set tick color for SOC axis
+    fig.tight_layout()
+    fig.savefig(FIGURES / "outback.png", dpi=300, bbox_inches="tight")
 
 class TimeSeries:
     """
