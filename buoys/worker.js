@@ -36,34 +36,12 @@ function parseCRMessage(body) {
 
     console.log('Data received:', csiData);
     const environment = csiData.head.environment;
+    const station_name = environment.station_name.toLowerCase();
+    const measurement = environment.table_name.toLowerCase();
     const fields = csiData.head.fields.map(field => field.name);
-    const lines = csiData.data.map(record => parseRecord(record, fields));
+    const lines = csiData.data.map(record => `${measurement},device=${station_name} ` + parseRecord(record, fields)).join("\n");
     console.log('Parsed lines:', lines);
-
-    // const received_at = new Date(metadata.received_at).getTime(); // Convert to milliseconds
-
-    // delete metadata.gateway_ids
-    // delete metadata.packet_broker
-    // delete metadata.uplink_token
-    // delete metadata.time
-    // delete metadata.received_at
-
-    // const all_data = {...decoded, ...metadata, message_id, received_at}
-    
-    // // Build Influx line protocol
-    // let fields = [];
-    // for (const [key, value] of Object.entries(all_data)) {
-    //   if (typeof value === "number") {
-    //     fields.push(`${key}=${value}`);
-    //   } else if (typeof value === "boolean") {
-    //     fields.push(`${key}=${value}`);
-    //   } else {
-    //     fields.push(`${key}="${String(value).replace(/"/g, '\\"')}"`);
-    //   }
-    // }
-    // const line = `signal,device=${device} ${fields.join(",")} ${time}`;
-    // return line
-    return ""
+    return lines;
 }
 
 export default {
