@@ -611,7 +611,7 @@ def buoys_plot_tail(
     table: TableName,
     series: StandardNames,
     qartod: bool,
-    end: datetime | None,
+    end: Optional [datetime]
     days: int,
     test: TestTypes,
     image_format: ImageFormat = ImageFormat.PNG,
