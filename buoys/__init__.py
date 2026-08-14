@@ -218,12 +218,6 @@ import Optional from typingReactWrite a replyResolve comment
         "_", " "
     ).title()
     qartod_label = "QARTOD" if qartod else "Raw"
-    ax.set_title(Collapse commentComment on line R498oceanicsdotio commented on Aug 11, 2026 oceanicsdotioon Aug 11, 2026MemberMore actionsNo title, title is in text normally, not attached to the image. Exception is subplots.ReactWrite a replyResolve comment
-        f"{name.value} {display_name} "
-        f"{plot_start:%Y-%m-%d} to "
-        f"{plot_end:%Y-%m-%d} "
-        f"({qartod_label})".title()
-    )
     ax.set_xlabel("Date")
     ax.xaxis.set_tick_params(rotation=45)
     ax.set_xlim(max(start, df.index.min()), end)
