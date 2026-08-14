@@ -765,12 +765,6 @@ def buoys_plot_tail(
         "_", " "
     ).title()
     qartod_label = "QARTOD" if qartod else "Raw"
-    ax.set_title(
-        f"{name.value} {display_name} "
-        f"{plot_start:%Y-%m-%d} to "
-        f"{plot_end:%Y-%m-%d} "
-        f"({qartod_label})".title()
-    )
     ax.set_xlabel("Date")
     ax.xaxis.set_tick_params(rotation=45)
     ax.set_xlim(plot_start, plot_end)
