@@ -638,7 +638,7 @@ def buoys_plot_tail(
                 "--days must be greater than zero."
             )
         plot_end = end
-        plot_start = end - relativedelta(months=months)
+        plot_start = end - relativedelta(days=days)
     else:
         if days <= 0:
             raise click.ClickException(
@@ -782,23 +782,12 @@ def buoys_plot_tail(
     ax.set_xlim(plot_start, plot_end)
     if units:
         ax.set_ylabel(units[series.value])
-    if end is not None:
-        ax.xaxis.set_major_locator(
-            mdates.MonthLocator()
-        )
-
-        ax.xaxis.set_major_formatter(
-            mdates.DateFormatter("%b %Y")
-        )
-    else:
-        ax.xaxis.set_major_locator(
-            mdates.DayLocator(
-                interval=max(days // 8, 1)
-            )
-        )
-        ax.xaxis.set_major_formatter(
-            mdates.DateFormatter("%b %d")
-        )
+    ax.xaxis.set_major_locator(
+    mdates.DayLocator(interval=max(days // 8, 1))
+    )
+    ax.xaxis.set_major_formatter(
+    mdates.DateFormatter("%b %d")
+    )
     ax.legend(loc="best")
     fig.tight_layout()
     qartod_suffix = "qartod" if qartod else "raw"
