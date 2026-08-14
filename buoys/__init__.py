@@ -45,7 +45,7 @@ def buoys_plot_tail(
     series: StandardNames,
     qartod: str,
     qartod: bool,
-    end: datetime | None,Collapse commentComment on line R342oceanicsdotio commented on Aug 11, 2026 oceanicsdotioon Aug 11, 2026MemberMore actionsOptional[datetime]
+    end: Optional[datetime],Collapse commentComment on line R342oceanicsdotio commented on Aug 11, 2026 oceanicsdotioon Aug 11, 2026MemberMore actionsOptional[datetime]
 import Optional from typingReactWrite a replyResolve comment
     days: int,
     test: TestTypes,
