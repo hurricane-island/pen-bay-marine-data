@@ -23,7 +23,7 @@ from lib import (
     "--end",
     default=None,
     type=click.DateTime(formats=["%Y-%m-%d"]),
-    help="End date for the plot. The plot will start --months before this date.",
+    help="End date for the plot. The plot will start --days before this date.",
 )
 @click.option(
     "--days",
@@ -56,8 +56,7 @@ import Optional from typingReactWrite a replyResolve comment
 
     By default, plot the most recent --days of data.
 
-    If --end is supplied, plot the preceding --months calendar
-    months ending at that date.
+    If --end is supplied, plot the preceding --days ending at that date.
 
     QARTOD can be enabled or disabled with --qartod/--no-qartod.
     """
@@ -598,7 +597,7 @@ class TestTypes(Enum):
     "--end",
     default=None,
     type=click.DateTime(formats=["%Y-%m-%d"]),
-    help="End date for the plot. The plot will start --months before this date.",
+    help="End date for the plot. The plot will start --days before this date.",
 )
 @click.option(
     "--days",
