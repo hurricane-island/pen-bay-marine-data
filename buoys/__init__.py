@@ -1,3 +1,4 @@
+import Optional from typing
 import gpxpy
 import gpxpy.gpx
 import click
