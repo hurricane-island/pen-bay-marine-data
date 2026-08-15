@@ -445,6 +445,7 @@ def boxplot(
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath)
 
+
 def apply_qartod_filter(
     series: Series,
     observed_property: str,

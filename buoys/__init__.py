@@ -42,7 +42,7 @@ from lib import (
     influx_api_token,
     test_observed_property,
     Frequency,
-    ImageFormat,
+    ImageFormat
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -121,7 +121,7 @@ class StandardNames(Enum):
     )
     SEA_WATER_SALINITY = "sea_water_salinity"
     SEA_WATER_CHLOROPHYLL_RFU = "sea_water_chlorophyll_rfu"
-    SEA_WATER_PHYCOERYTHRIN_RFU = "sea_water_phycocerythrin_rfu"
+    SEA_WATER_PHYCOERYTHRIN_RFU = "sea_water_phycoerythrin_rfu"
     BAROMETRIC_PRESSURE = "barometric_pressure"
     BATTERY_VOLTAGE = "battery_voltage"
     WATER_PRESSURE = "water_pressure"
@@ -259,12 +259,6 @@ def filter_buoy_flat_files(name: StationName, table: TableName):
 
     return filter(filter_prefix, DATA_DIR.glob("*.dat"))
 
-def mean_absolute_change(series):
-    """
-    Calculate mean absolute change between consecutive observations.
-    """
-    return series.diff().abs().mean()
-
 
 @file_group.command(name=ClickOptions.DESCRIBE.value)
 @station_name
@@ -280,11 +274,6 @@ def buoys_file_describe(name: StationName, table: TableName):
     mad = df.select_dtypes(include="number").apply(
          lambda x: median_abs_deviation(x, nan_policy="omit")
     )
-    mac = (
-        df.select_dtypes(include="number")
-        .apply(mean_absolute_change)
-    )
-    summary["Mean_Absolute_Change"] = mac
     summary["MAD"] = mad
     print("\nSamples:\n")
     print(summary)
@@ -925,6 +914,52 @@ def buoys_db_describe(
         mode="pandas",
     )
     print(read_back.head())
+
+
+@file_group.command(name="derivatives")
+@station_name
+@data_table
+@click.argument(
+    "series",
+    type=click.Choice(StandardNames, case_sensitive=False),
+)
+@click.option(
+    "--percentile",
+    "-p",
+    default=(0.90, 0.95, 0.99),
+    multiple=True,
+    type=float,
+    help="Percentiles to calculate for the summary statistics. Accepts multiple values, e.g., -p 0.90 -p 0.95 -p 0.99",
+)
+def buoys_file_first_and_second_derivative(
+    name: StationName,
+    table: TableName,
+    series: StandardNames,
+    percentile: tuple[float, float, float]
+):
+    """
+    Calculate the first and second derivative of a time series to identify
+    rapid changes and spikes in the series. Performs hourly resampling to
+    fill gaps, so that time differences are consistent. The output values
+    are in units per second and per hour, respectively, to use as inputs 
+    for a QARTOD configuration file.
+    """
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(list(files))
+    vendor_name = VendoredNames[series.name]
+    ds = df[vendor_name.value]
+    ds = ds.sort_index()
+    ds = ds[~ds.index.duplicated(keep="first")].asfreq("h")  # resample filling gaps with NaN
+    slope = ds.diff()
+    summary = DataFrame(
+        data={
+            "|dy/dt| (/s)": (slope.abs() / 3600.0).squeeze(),
+            "|d²y/dt²| (/hr)": slope.diff().abs().squeeze()
+        },
+        index=ds.index
+    ).describe(percentiles=sorted(percentile)).map('{:.8f}'.format)
+    click.echo(summary)
+
 
 @firmware.command(name="mock")
 @station_name
