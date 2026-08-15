@@ -52,7 +52,15 @@ def test_cli_buoys_plot_tail(name, observed_property):
     """
     Expect files to be written to disk
     """
-    result = runner.invoke(buoys_plot_tail, [name, "sonde", observed_property])
+    args = [
+        name,
+        "sonde",
+        observed_property,
+        "--end", "2026-06-01",
+        "--days", "30",
+        "--qartod", "qartod.yaml",
+    ]
+    result = runner.invoke(buoys_plot_tail, args)
     assert result.exit_code == 0
 
 
