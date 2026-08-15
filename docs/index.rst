@@ -6,11 +6,7 @@
 Pen Bay Marine Data documentation
 =================================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
-
-
+Tools for working with Pen Bay Marine Data. This includes command line tools for downloading and processing data, specific to buoys and weather stations in Penobscot Bay, Maine.
 
 .. toctree::
    :maxdepth: 2

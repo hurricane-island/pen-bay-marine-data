@@ -12,6 +12,7 @@ Features:
 """
 
 import re
+import requests
 from pathlib import Path
 from enum import Enum
 from datetime import datetime, timedelta
@@ -313,13 +314,19 @@ class TestTypes(Enum):
 @plot.command(name=ClickOptions.TAIL.value)
 @source_options
 @plot_options
-@click.option("--qartod", default="qartod.yaml", help="QARTOD configuration file")
-@click.option("--days", default=30, help="Number of days to plot")
+@click.option("--qartod", default="qartod.yaml", help="QARTOD configuration file.")
+@click.option("--days", default=30, type=click.IntRange(min=0), help="Number of days to plot.")
+@click.option(
+    "--end",
+    default=datetime.now(),
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="End date for the analysis and plotting. Defaults to the current date and time.",
+)
 @click.option(
     "--test",
     default=TestTypes.ROLLUP,
     type=click.Choice(TestTypes, case_sensitive=False),
-    help="QARTOD test to plot",
+    help="QARTOD test to plot.",
 )
 def buoys_plot_tail(
     name: StationName,
@@ -328,19 +335,19 @@ def buoys_plot_tail(
     qartod: str,
     days: int,
     test: TestTypes,
-    image_format: ImageFormat = ImageFormat.PNG,
+    end: datetime,
+    image_format: ImageFormat,
 ):
     """
     Plot the most recent data from a buoy for a single data stream.
     """
-    end: datetime = datetime.now()
     start: datetime = end - timedelta(days=days)
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
-    mask = df.index > start
+    mask = (df.index > start) & (df.index <= end)
     df = df[mask].sort_values("TimeRecovered").sort_index(kind="stable")
     df = df[~df.index.duplicated(keep="first")]
-    df = df.asfreq("h")
+    df = df.asfreq("h")  # Resample and fill gaps with NaN to force gaps when plotting
     renamed = []
     units = {}
     for col in df.columns:
@@ -366,13 +373,12 @@ def buoys_plot_tail(
     )
     ylim = (None, None)
     if qartod is not None:
-        qa_path = Path(__file__).parent / "qartod.yaml"
-        if qa_path.exists():
-            config = Config(qa_path)
-        else:
+        qa_path = Path(__file__).parent / qartod
+        if not qa_path.exists():
             raise click.ClickException(
                 f"QARTOD configuration file not found: {qa_path}"
             )
+        config = Config(qa_path)
         flags = PandasStream(df.reset_index(names="time"), time="time").run(config)
         store = PandasStore(flags)
         result = store.save().set_index("time")
@@ -390,9 +396,9 @@ def buoys_plot_tail(
             .groupby("observed_property")
             .get_group(series.value)[test.value]
         )
-        suspect = df[qa == 3][series.value]
-        failed = df[qa == 4][series.value]
-        remaining = df[qa < 3][series.value].asfreq("h")
+        suspect = df.loc[qa == 3, series.value]
+        failed = df.loc[qa == 4, series.value]
+        remaining = df.loc[qa < 3, series.value].asfreq("h")
         ax.scatter(
             suspect.index,
             suspect,
@@ -413,7 +419,6 @@ def buoys_plot_tail(
             zorder=2,
             label="filtered",
         )
-        # ylim = (remaining.min(), remaining.max())
 
     display_name = series.value.replace("_", " ").title()
     if start.year == end.year:
@@ -431,14 +436,22 @@ def buoys_plot_tail(
         ax.set_ylabel(f"{units[series.value]}")
     ax.legend(loc="best")
     fig.tight_layout()
+    qartod_suffix = Path(qartod).stem if qartod is not None else "noqartod"
     filepath = (
         FIGURES_DIR
         / ClickOptions.TAIL.value
         / name.value
-        / f"{series.value}.{image_format.value}"
+        / (
+            f"{series.value}_"
+            f"{start:%Y-%m-%d}_"
+            f"{end:%Y-%m-%d}_"
+            f"{qartod_suffix}."
+            f"{image_format.value}"
+        )
     )
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath, dpi=300, bbox_inches="tight")
+    click.echo(f"Saved plot to {filepath}")
 
 
 @plot.command(name="cable")
@@ -558,12 +571,24 @@ def haversine(lon1, lat1, lon2, lat2):
     "--satellites", required=True, type=int, help="minimum number of satellites"
 )
 @click.option(
+    "--start",
+    default=None,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="Start date for filtering GPS points.",
+)
+@click.option(
+    "--end",
+    default=None,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="End date for filtering GPS points.",
+)
+@click.option(
     "--cable",
     is_flag=True,
     help="include predicted watch circle from WHOI cable simulation",
 )
 def buoys_plot_locations(
-    name, latitude, longitude, distance=100.0, satellites=4, cable=False
+    name, latitude, longitude, distance=100.0, satellites=4, start=None, end=None, cable=False,
 ):
     """
     Plot the lat and long of the buoy hourly over the course of the deployment period.
@@ -588,9 +613,11 @@ def buoys_plot_locations(
     mask = (
         (array(list(map(compute_distance, zip(lon, lat)))) < distance)
         & (satellite_count >= satellites)
-        & (df.index > datetime(2026, 1, 1))
-    )  # filter out erroneous GPS points and early data
-
+    )
+    if start is not None:
+        mask &= df.index >= start
+    if end is not None:
+        mask &= df.index <= end
     filtered_lon = lon[mask]
     filtered_lat = lat[mask]
     if filtered_lon.size == 0:
@@ -946,3 +973,19 @@ def buoys_file_secondderivative(
     print(abs_second_derivative.describe(percentiles=[0.90, 0.95, 0.99]))
     threshold = abs_second_derivative.quantile(0.99)
     print(f"\nSuggested threshold (99th percentile): {threshold:.4f}")
+
+@firmware.command(name="mock")
+@station_name
+def buoys_firmware_mock(name: StationName):
+    """
+    Generate a mock message from a buoy logger for testing cloud 
+    integrations, including databases, location alerts, and missing
+    data detection.
+    """
+    # comma separate list, with each up to 26 characters
+    head = f"SL({name.value.lower()})\r"
+    names = "SN=ExternalTemp,SpConductivity_us,Pressure_abs,Chlorophyll_RFU,BGA_PE_RFU,BatteryVoltage,InternalHumidity,Salinity,Latitude,Longitude"
+    values = "D=08/11/26,17:15:00,13.42,41200,10.15,2.87,0.41,13.06,38,44.04203,-68.89106\r"
+    tail = "DIS\r"
+
+    click.echo(head + names + values + tail)
