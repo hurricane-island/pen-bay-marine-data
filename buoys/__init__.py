@@ -42,9 +42,7 @@ from lib import (
     influx_api_token,
     test_observed_property,
     Frequency,
-    ImageFormat,
-    calculate_rate_of_change,
-    calculate_spike_change
+    ImageFormat
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -930,32 +928,15 @@ def buoys_db_describe(
     )
     print(read_back.head())
 
-@file_group.command(name="rate-of-change")
-@station_name
-@data_table
-@click.argument(
-    "series",
-    type=click.Choice(StandardNames, case_sensitive=False),
-)
-def buoys_file_rate(name: StationName, table: TableName, series: StandardNames): # Analyze the rate of change for one observed property.
-    files = filter_buoy_flat_files(name, table)
-    df = read_campbell_logger_files(list(files))
-    vendor_name = VendoredNames[series.name]
-    data = df[vendor_name.value]
-    slope = calculate_rate_of_change(data)
-    abs_slope = slope.abs().dropna()
-    print(abs_slope.describe(percentiles=[0.90, 0.95, 0.99]))
-    threshold = abs_slope.quantile(0.99)
-    print(f"\nSuggested threshold (99th percentile): {threshold:.4f}")
 
-@file_group.command(name="second-derivative")
+@file_group.command(name="derivatives")
 @station_name
 @data_table
 @click.argument(
     "series",
     type=click.Choice(StandardNames, case_sensitive=False),
 )
-def buoys_file_second_derivative(
+def buoys_file_first_and_second_derivative(
     name: StationName,
     table: TableName,
     series: StandardNames,
@@ -970,8 +951,14 @@ def buoys_file_second_derivative(
     ds = df[vendor_name.value]
     ds = ds.sort_index()
     ds = ds[~ds.index.duplicated(keep="first")].asfreq("h")  # resample filling gaps with NaN
-    second_derivative = ds.diff().diff().abs()
-    summary = second_derivative.describe(percentiles=[0.90, 0.95, 0.99])
+    slope = ds.diff()
+    summary = DataFrame(
+        data={
+        "|ẏ|": slope.abs().squeeze(),
+        "|ÿ|": slope.diff().abs().squeeze()
+    },
+        index=ds.index
+    ).describe(percentiles=[0.90, 0.95, 0.99])
     click.echo(summary)
 
 @firmware.command(name="mock")

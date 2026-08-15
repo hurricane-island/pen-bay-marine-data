@@ -446,57 +446,6 @@ def boxplot(
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath)
 
-def calculate_rate_of_change(series: Series) -> Series:
-    """
-    Calculate the rate of change for a time series. Units are value change per hour.
-    """
-    series = series.sort_index()
-    series = series[~series.index.duplicated(keep="first")]
-    # Time difference in hours
-    dt = (
-        series.index.to_series()
-        .diff()
-        .dt.total_seconds()
-        / 3600
-    )
-    slope = series.diff() / dt
-    return slope
-
-def determine_rate_threshold(series: Series, percentile: float = 0.99):
-    """
-    Calculate a suggested rate-of-change threshold from historical data.
-    """
-    slope = calculate_rate_of_change(series)
-    abs_slope = slope.abs().dropna()
-    if len(abs_slope) == 0:
-        print("No valid slope data available to determine threshold")
-        return None
-    if abs_slope.max() == 0:
-        print("No variability detected")
-        return None
-
-    print(abs_slope.describe(percentiles=[0.90, 0.95, 0.99]))
-    threshold = abs_slope.quantile(percentile)
-    print(f"Suggested threshold: {threshold:.4f}")
-    return threshold
-
-def calculate_spike_change(series: Series) -> Series:
-    """
-    Calculate the second derivative (change in rate of change) for spike detection.
-    Units are value change per hour squared.
-    """
-    series = series.sort_index()
-    series = series[~series.index.duplicated(keep="first")]
-    dt = (
-        series.index.to_series()
-        .diff()
-        .dt.total_seconds()
-        / 3600
-    )
-    first_derivative = series.diff() / dt
-    second_derivative = first_derivative.diff() / dt
-    return second_derivative.abs()
-
 
 def apply_qartod_filter(
     series: Series,
