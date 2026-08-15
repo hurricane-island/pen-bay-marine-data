@@ -923,14 +923,26 @@ def buoys_db_describe(
     "series",
     type=click.Choice(StandardNames, case_sensitive=False),
 )
+@click.option(
+    "--percentile",
+    "-p",
+    default=(0.90, 0.95, 0.99),
+    multiple=True,
+    type=float,
+    help="Percentiles to calculate for the summary statistics. Accepts multiple values, e.g., -p 0.90 -p 0.95 -p 0.99",
+)
 def buoys_file_first_and_second_derivative(
     name: StationName,
     table: TableName,
     series: StandardNames,
+    percentile: tuple[float, float, float]
 ):
     """
-    Calculate the second derivative of a time series to identify rapid changes.
-    This can be useful for detecting spikes or sudden shifts in the data.
+    Calculate the first and second derivative of a time series to identify
+    rapid changes and spikes in the series. Performs hourly resampling to
+    fill gaps, so that time differences are consistent. The output values
+    are in units per second and per hour, respectively, to use as inputs 
+    for a QARTOD configuration file.
     """
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
@@ -941,11 +953,11 @@ def buoys_file_first_and_second_derivative(
     slope = ds.diff()
     summary = DataFrame(
         data={
-        "|ẏ|": slope.abs().squeeze(),
-        "|ÿ|": slope.diff().abs().squeeze()
-    },
+            "|dy/dt| (/s)": (slope.abs() / 3600.0).squeeze(),
+            "|d²y/dt²| (/hr)": slope.diff().abs().squeeze()
+        },
         index=ds.index
-    ).describe(percentiles=[0.90, 0.95, 0.99])
+    ).describe(percentiles=sorted(percentile)).map('{:.8f}'.format)
     click.echo(summary)
 
 
