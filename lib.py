@@ -16,7 +16,6 @@ from numpy.typing import NDArray
 from ioos_qc.config import Config
 from ioos_qc.streams import PandasStream
 from ioos_qc.stores import PandasStore
-import pandas as pd
 
 class ImageFormat(Enum):
     """
