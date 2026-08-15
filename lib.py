@@ -447,6 +447,9 @@ def boxplot(
     fig.savefig(filepath)
 
 def calculate_rate_of_change(series: Series) -> Series:
+    """
+    Calculate the rate of change for a time series. Units are value change per hour.
+    """
     series = series.sort_index()
     series = series[~series.index.duplicated(keep="first")]
     # Time difference in hours
@@ -460,7 +463,9 @@ def calculate_rate_of_change(series: Series) -> Series:
     return slope
 
 def determine_rate_threshold(series: Series, percentile: float = 0.99):
-    # Calculate a suggested rate-of-change threshold from historical data.
+    """
+    Calculate a suggested rate-of-change threshold from historical data.
+    """
     slope = calculate_rate_of_change(series)
     abs_slope = slope.abs().dropna()
     if len(abs_slope) == 0:
@@ -476,32 +481,22 @@ def determine_rate_threshold(series: Series, percentile: float = 0.99):
     return threshold
 
 def calculate_spike_change(series: Series) -> Series:
+    """
+    Calculate the second derivative (change in rate of change) for spike detection.
+    Units are value change per hour squared.
+    """
     series = series.sort_index()
-series = series[~series.index.duplicated(keep="first")]
-    # Calculate second derivative (change in rate of change) for spike detection.  Units are value change per hour squared.
-    # Time difference in hours
+    series = series[~series.index.duplicated(keep="first")]
     dt = (
         series.index.to_series()
         .diff()
         .dt.total_seconds()
         / 3600
     )
-    # First derivative
     first_derivative = series.diff() / dt
-    # Second derivative
     second_derivative = first_derivative.diff() / dt
     return second_derivative.abs()
 
-def determine_spike_threshold(series: Series, percentile: float = 0.99):
-    # Determine spike threshold from second derivative. Uses percentile of observed changes.
-    spike_change = calculate_spike_change(series).dropna()
-    if spike_change.empty:
-        print("No variability detected")
-        return None
-    threshold = spike_change.quantile(percentile)
-    print(spike_change.describe())
-    print(f"Suggested spike threshold: {threshold:.4f}")
-    return threshold
 
 def apply_qartod_filter(
     series: Series,

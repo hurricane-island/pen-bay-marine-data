@@ -44,8 +44,6 @@ from lib import (
     Frequency,
     ImageFormat,
     calculate_rate_of_change,
-    determine_rate_threshold, 
-    determine_spike_threshold, 
     calculate_spike_change
 )
 
@@ -294,8 +292,6 @@ def buoys_file_describe(name: StationName, table: TableName):
     summary["MAD"] = mad
     print("\nSamples:\n")
     print(summary)
-    print("\nRate of Change Thresholds:\n")
-  
 
 
 class TestTypes(Enum):
@@ -945,7 +941,7 @@ def buoys_file_rate(name: StationName, table: TableName, series: StandardNames):
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
     vendor_name = VendoredNames[series.name]
-    data = df[vendor_name.value].copy()
+    data = df[vendor_name.value]
     slope = calculate_rate_of_change(data)
     abs_slope = slope.abs().dropna()
     print(abs_slope.describe(percentiles=[0.90, 0.95, 0.99]))
@@ -959,20 +955,24 @@ def buoys_file_rate(name: StationName, table: TableName, series: StandardNames):
     "series",
     type=click.Choice(StandardNames, case_sensitive=False),
 )
-def buoys_file_secondderivative(
+def buoys_file_second_derivative(
     name: StationName,
     table: TableName,
     series: StandardNames,
 ):
+    """
+    Calculate the second derivative of a time series to identify rapid changes.
+    This can be useful for detecting spikes or sudden shifts in the data.
+    """
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
     vendor_name = VendoredNames[series.name]
-    data = df[vendor_name.value].copy()
-    second_derivative = calculate_spike_change(data)
-    abs_second_derivative = second_derivative.abs().dropna()
-    print(abs_second_derivative.describe(percentiles=[0.90, 0.95, 0.99]))
-    threshold = abs_second_derivative.quantile(0.99)
-    print(f"\nSuggested threshold (99th percentile): {threshold:.4f}")
+    ds = df[vendor_name.value]
+    ds = ds.sort_index()
+    ds = ds[~ds.index.duplicated(keep="first")].asfreq("h")  # resample filling gaps with NaN
+    second_derivative = ds.diff().diff().abs()
+    summary = second_derivative.describe(percentiles=[0.90, 0.95, 0.99])
+    click.echo(summary)
 
 @firmware.command(name="mock")
 @station_name
