@@ -259,14 +259,6 @@ def filter_buoy_flat_files(name: StationName, table: TableName):
 
     return filter(filter_prefix, DATA_DIR.glob("*.dat"))
 
-def mean_absolute_change(series):
-    """
-    Calculate mean absolute change between consecutive observations.
-    """
-    return series.diff().abs().mean()
-
-def absolute_change(series):
-    return series.diff().abs()
 
 @file_group.command(name=ClickOptions.DESCRIBE.value)
 @station_name
@@ -282,11 +274,6 @@ def buoys_file_describe(name: StationName, table: TableName):
     mad = df.select_dtypes(include="number").apply(
          lambda x: median_abs_deviation(x, nan_policy="omit")
     )
-    mac = (
-        df.select_dtypes(include="number")
-        .apply(mean_absolute_change)
-    )
-    summary["Mean_Absolute_Change"] = mac
     summary["MAD"] = mad
     print("\nSamples:\n")
     print(summary)
