@@ -948,6 +948,7 @@ def buoys_file_first_and_second_derivative(
     ).describe(percentiles=[0.90, 0.95, 0.99])
     click.echo(summary)
 
+
 @firmware.command(name="mock")
 @station_name
 def buoys_firmware_mock(name: StationName):
