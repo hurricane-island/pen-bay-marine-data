@@ -1,5 +1,6 @@
 """
-Command line interfaces for working with vertical profiles of water column data, such as temperature, salinity, and density.
+Command line interfaces for working with vertical profiles of water column data,
+such as temperature, salinity, and density.
 """
 import click
 
