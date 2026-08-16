@@ -1,0 +1,94 @@
+streams:
+  sea_water_temperature:
+    qartod:
+      climatology_test:
+        config:  # list of objects, each with a tspan, and vspan
+          - tspan: [1, 3]
+            vspan: [-1.0, 5.0]
+            period: "month"
+          - tspan: [4, 6]
+            vspan: [2.0, 20.0]
+            period: "month"
+          - tspan: [7, 9]
+            vspan: [13.0, 22.0]
+            period: "month"
+          - tspan: [10, 12]
+            vspan: [2.0, 18.0]
+            period: "month"
+      rate_of_change_test:
+        threshold: 0.0006  # units per second, C or K.
+      spike_test:
+        suspect_threshold: 1.0 # dimensionless
+        fail_threshold: 1.5
+      location_test:
+        # Within 75m of 44.318369, -68.926953
+        bbox: [-68.92789, 44.31769, -68.92601, 44.31905]
+  sea_water_salinity:
+    qartod:
+      climatology_test:
+        config:
+          - tspan: [1, 3]
+            vspan: [25.0, 35.0]
+            period: "month"
+          - tspan: [4, 6]
+            vspan: [29.0, 32.0]
+            period: "month"
+          - tspan: [7, 9]
+            vspan: [29.0, 32.0]
+            period: "month"
+          - tspan: [10, 12]
+            vspan: [25.0, 35.0]
+            period: "month"
+      rate_of_change_test:
+        threshold: 0.0190
+      spike_test:
+        suspect_threshold: 21.0
+        fail_threshold: 21.741370
+      location_test:
+        bbox: [-68.92789, 44.31769, -68.92601, 44.31905]
+  sea_water_chlorophyll_rfu:
+    qartod:
+      climatology_test:
+        config:
+          - tspan: [1, 3]
+            vspan: [0.0, 10.0]
+            period: "month"
+          - tspan: [4, 6]
+            vspan: [0.0, 30.0]
+            period: "month"
+          - tspan: [7, 9]
+            vspan: [0.0, 10.0]
+            period: "month"
+          - tspan: [10, 12]
+            vspan: [0.0, 8.0]
+            period: "month"
+      rate_of_change_test:
+        threshold: 0.0009
+      spike_test:
+        suspect_threshold: 3.0
+        fail_threshold: 5.0
+      location_test:
+        bbox: [-68.92789, 44.31769, -68.92601, 44.31905]
+  sea_water_phycoerythrin_rfu:
+    qartod:
+      climatology_test:
+        config:
+          - tspan: [1, 3]
+            vspan: [0.0, 2.0]
+            period: "month"
+          - tspan: [4, 6]
+            vspan: [0.0, 25.0]
+            period: "month"
+          - tspan: [7, 9]
+            vspan: [0.0, 25.0]
+            period: "month"
+          - tspan: [10, 12]
+            vspan: [0.0, 15.0]
+            period: "month"
+      rate_of_change_test:
+        threshold: 0.0028
+      spike_test:
+        suspect_threshold: 12.0
+        fail_threshold: 19.4
+      location_test:
+        bbox: [-68.92789, 44.31769, -68.92601, 44.31905]

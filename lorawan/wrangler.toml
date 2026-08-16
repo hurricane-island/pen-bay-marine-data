@@ -1,0 +1,14 @@
+name = "ttn-to-influx"
+main = "worker.js"
+compatibility_date = "2026-08-06"
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+destinations = [ "grafana-logs" ]
+
+[observability.traces]
+enabled = true
+destinations = [ "grafana-traces" ]
+
+

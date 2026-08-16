@@ -12,13 +12,15 @@ Features:
 """
 
 import re
+import requests
+from itertools import cycle
 from pathlib import Path
 from enum import Enum
 from datetime import datetime, timedelta
 from math import radians, cos, sin, sqrt, atan2
 from hashlib import md5
-from numpy import concatenate, array, argsort
-from pandas import read_csv, DataFrame, concat
+from numpy import concatenate, array, argsort, where
+from pandas import Series, read_csv, DataFrame, concat
 from influxdb_client_3 import InfluxDBClient3
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.patches import Circle
@@ -28,6 +30,7 @@ from ioos_qc.streams import PandasStream
 from ioos_qc.stores import PandasStore
 from scipy.io import loadmat
 from pyproj import Transformer
+from yaml import safe_load
 import gpxpy
 import gpxpy.gpx
 import click
@@ -41,7 +44,7 @@ from lib import (
     influx_api_token,
     test_observed_property,
     Frequency,
-    ImageFormat,
+    ImageFormat
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -120,7 +123,7 @@ class StandardNames(Enum):
     )
     SEA_WATER_SALINITY = "sea_water_salinity"
     SEA_WATER_CHLOROPHYLL_RFU = "sea_water_chlorophyll_rfu"
-    SEA_WATER_PHYCOERYTHRIN_RFU = "sea_water_phycocerythrin_rfu"
+    SEA_WATER_PHYCOERYTHRIN_RFU = "sea_water_phycoerythrin_rfu"
     BAROMETRIC_PRESSURE = "barometric_pressure"
     BATTERY_VOLTAGE = "battery_voltage"
     WATER_PRESSURE = "water_pressure"
@@ -258,12 +261,6 @@ def filter_buoy_flat_files(name: StationName, table: TableName):
 
     return filter(filter_prefix, DATA_DIR.glob("*.dat"))
 
-def mean_absolute_change(series):
-    """
-    Calculate mean absolute change between consecutive observations.
-    """
-    return series.diff().abs().mean()
-
 
 @file_group.command(name=ClickOptions.DESCRIBE.value)
 @station_name
@@ -279,11 +276,6 @@ def buoys_file_describe(name: StationName, table: TableName):
     mad = df.select_dtypes(include="number").apply(
          lambda x: median_abs_deviation(x, nan_policy="omit")
     )
-    mac = (
-        df.select_dtypes(include="number")
-        .apply(mean_absolute_change)
-    )
-    summary["Mean_Absolute_Change"] = mac
     summary["MAD"] = mad
     print("\nSamples:\n")
     print(summary)
@@ -300,39 +292,113 @@ class TestTypes(Enum):
     CLIMATOLOGY = "climatology"
     FLAT_LINE = "flat_line"
     ROLLUP = "rollup"
+    GAP = "gap"
+    LOCATION = "location"
+
+def deep_merge_inplace(base: dict, update: dict) -> None:
+    """
+    Recursively merges update into base in-place.
+    
+    Nested dictionaries are merged. All other types (including lists, sets, 
+    and primitives) are overwritten by the value in update.
+    """
+    for key, value in update.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            deep_merge_inplace(base[key], value)
+        else:
+            base[key] = value
+
+def load_and_merge_qa_configs(qartod: tuple[str]) -> dict:
+    """
+    Load the default QARTOD configuration and merge it with any user-provided
+    configuration files. The user-provided configurations will override the defaults.
+    """
+    accumulate = {}
+    for file in qartod:
+        qa_path = Path(__file__).parent / file
+        if not qa_path.exists():
+            raise click.ClickException(
+                f"QARTOD configuration file not found: {qa_path}"
+            )
+        with open(qa_path, "r", encoding="utf-8") as fid:
+            deep_merge_inplace(accumulate, safe_load(fid))
+    return accumulate
+
+def load_and_subset_multifile_table(
+    name: StationName,
+    table: TableName,
+    start: datetime,
+    end: datetime
+) -> tuple[DataFrame, list]:
+    """
+    Load and subset a multi-file table for a given station and table name, returning
+    a DataFrame with data between the specified start and end dates.
+    """
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(list(files))
+    mask = (df.index > start) & (df.index <= end)
+    df = df[mask].sort_values("TimeRecovered")
+    duplicates = df.index.duplicated(keep="first")
+    dropped = df[duplicates].index.to_list()
+    df = df[~duplicates].sort_index(kind="stable")
+    resampled = df.asfreq("h")  # Resample and fill gaps with NaN to force gaps when plotting
+    return resampled, dropped
 
 
 @plot.command(name=ClickOptions.TAIL.value)
 @source_options
 @plot_options
-@click.option("--qartod", default="qartod.yaml", help="QARTOD configuration file")
-@click.option("--days", default=30, help="Number of days to plot")
+@click.option(
+    "--qartod",
+    "-q",
+    multiple=True,
+    type=str,
+    help="QARTOD configuration file. Accepts multiple YAML files, which will be merged together in the order they are provided.",
+)
+@click.option(
+    "--days",
+    default=30,
+    type=click.IntRange(min=0),
+    help="Number of days to plot backwards from the end date. Defaults to 30 days.",
+)
+@click.option(
+    "--end",
+    default=datetime.now(),
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="End date for the analysis and plotting. Defaults to the current date and time.",
+)
 @click.option(
     "--test",
     default=TestTypes.ROLLUP,
     type=click.Choice(TestTypes, case_sensitive=False),
-    help="QARTOD test to plot",
+    help="QARTOD test to plot.",
+)
+@click.option(
+    "--scale/--no-scale",
+    is_flag=True,
+    default=False,
+    help="Scale the output plot to remaining data, otherwise use the full range. Defaults to True.",
 )
 def buoys_plot_tail(
     name: StationName,
     table: TableName,
     series: StandardNames,
-    qartod: str,
+    qartod: tuple[str],
     days: int,
     test: TestTypes,
-    image_format: ImageFormat = ImageFormat.PNG,
+    end: datetime,
+    image_format: ImageFormat,
+    scale: bool
 ):
     """
     Plot the most recent data from a buoy for a single data stream.
     """
-    end: datetime = datetime.now()
     start: datetime = end - timedelta(days=days)
-    files = filter_buoy_flat_files(name, table)
-    df = read_campbell_logger_files(list(files))
-    mask = df.index > start
-    df = df[mask].sort_values("TimeRecovered").sort_index(kind="stable")
-    df = df[~df.index.duplicated(keep="first")]
-    df = df.asfreq("h")
+    df, dropped = load_and_subset_multifile_table(name, table, start, end)
+    if df.empty:
+        raise click.ClickException(
+            f"No local data for {name.value} {table.value} between {start} and {end}."
+        )
     renamed = []
     units = {}
     for col in df.columns:
@@ -353,21 +419,33 @@ def buoys_plot_tail(
         color="grey",
         linestyle="dashed",
         linewidth=1,
-        zorder=1,
+        zorder=2,
         label="raw",
     )
     ylim = (None, None)
-    if qartod is not None:
-        qa_path = Path(__file__).parent / "qartod.yaml"
-        if qa_path.exists():
-            config = Config(qa_path)
-        else:
-            raise click.ClickException(
-                f"QARTOD configuration file not found: {qa_path}"
-            )
-        flags = PandasStream(df.reset_index(names="time"), time="time").run(config)
+    suffix = "no-qa"
+    if len(qartod) > 0:
+        config_key_value = load_and_merge_qa_configs(qartod)
+        climatology_breakpoints = config_key_value["streams"][series.value]["qartod"].get("climatology_test", {}).get("config", [])
+        breaks = []
+        for each in climatology_breakpoints:
+            for yr in (2025, 2026):
+                breaks.append(datetime(month=each["tspan"][0], day=1, year=yr))
+        config = Config(config_key_value)
+        gps, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, start, end)
+        lat = gps["Latitude"].to_numpy().flatten()
+        lon = gps["Longitude"].to_numpy().flatten()
+        suffix = "-".join(Path(each).stem for each in qartod) + "-" + test.value
+        df["Latitude"] = lat
+        df["Longitude"] = lon
+        flags = PandasStream(
+            df=df.reset_index(names="time"),
+            time="time",
+            lat="Latitude",
+            lon="Longitude",
+        ).run(config)
         store = PandasStore(flags)
-        result = store.save().set_index("time")
+        result = store.save().set_index("time").drop(columns=["lat", "lon"])
         frames: dict[str, list[str]] = {}
         for each in result.columns:
             _series, _name = each.split("_qartod_")
@@ -375,26 +453,53 @@ def buoys_plot_tail(
                 frames[_series] = []
             frames[_series].append(_name)
         by_observed_property = []
-        for items in frames.items():
-            by_observed_property.append(test_observed_property(result, *items))
+        for _property, tests in frames.items():
+            test_results = test_observed_property(result, _property, tests)
+            check_nan = df[_property].isna()
+            test_results["gap"] = where(check_nan, 3, 1)
+            by_observed_property.append(test_results)
         qa = (
             concat(by_observed_property, axis=0)
             .groupby("observed_property")
-            .get_group(series.value)[test.value]
+            .get_group(series.value)
         )
-        suspect = df[qa == 3][series.value]
-        failed = df[qa == 4][series.value]
-        remaining = df[qa < 3][series.value].asfreq("h")
+        gaps = df.loc[qa["gap"] == 3, series.value]
+        qa = qa[test.value]
+        suspect = df.loc[qa == 3, series.value]
+        failed = df.loc[qa == 4, series.value]
+        remaining = df.loc[((qa < 3) | (qa == 9)), series.value].asfreq("h")
+
+        ax.vlines(
+            gaps.index,
+            ymin=0,
+            ymax=1,
+            color="pink",
+            linewidth=1,
+            label="gap",
+            transform=ax.get_xaxis_transform(),
+            zorder=0
+        )
+        ax.vlines(
+            breaks,
+            ymin=0,
+            ymax=1,
+            color="black",
+            linewidth=1,
+            linestyle="dotted",
+            label="climatology change",
+            transform=ax.get_xaxis_transform(),
+            zorder=0
+        )
         ax.scatter(
             suspect.index,
             suspect,
             label="suspect",
             color="orange",
             marker="x",
-            zorder=0,
+            zorder=1,
         )
         ax.scatter(
-            failed.index, failed, label="failed", color="red", marker="x", zorder=0
+            failed.index, failed, label="failed", color="red", marker="x", zorder=1
         )
         ax.plot(
             remaining.index,
@@ -405,32 +510,56 @@ def buoys_plot_tail(
             zorder=2,
             label="filtered",
         )
-        # ylim = (remaining.min(), remaining.max())
+        if scale:
+            ylim = (remaining.min(), remaining.max())
 
+    ax.vlines(
+        dropped,
+        ymin=0,
+        ymax=1,
+        color="cyan",
+        linewidth=1,
+        label="duplicate",
+        transform=ax.get_xaxis_transform(),
+        zorder=0
+    )
+    start = max(df.index.min(), start)
+    end = min(df.index.max(), end)
+    _days = (end - start).days
     display_name = series.value.replace("_", " ").title()
     if start.year == end.year:
         year_range = f"{start.year}"
     else:
         year_range = f"{start.year}-{end.year}"
-    plt.title(f"{name.value} {display_name} {year_range}".title())
+    ax.set_title(f"{name.value} {display_name} {year_range} ({test.value.replace('_', ' ')})".title())
     ax.set_xlabel("Date")
     ax.xaxis.set_tick_params(rotation=45)
     ax.set_xlim(max(start, df.index.min()), end)
     ax.set_ylim(*ylim)
-    ax.xaxis.set_major_locator(mdates.DayLocator(interval=(days // 8) + 2))
+    ax.xaxis.set_major_locator(mdates.DayLocator(interval=(_days // 8) + 2))
+    ax.xaxis.set_minor_locator(mdates.DayLocator(interval=1))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # Customize format
     if units is not None:
         ax.set_ylabel(f"{units[series.value]}")
-    ax.legend(loc="best")
+    ax.legend(bbox_to_anchor=(1, 1), loc='upper left')
     fig.tight_layout()
     filepath = (
         FIGURES_DIR
         / ClickOptions.TAIL.value
         / name.value
-        / f"{series.value}.{image_format.value}"
+        / table.value
+        / series.value
+        / (
+            f"{start:%Y-%m-%d}_"
+            f"{end:%Y-%m-%d}_"
+            f"{suffix}."
+            f"{image_format.value}"
+        )
     )
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath, dpi=300, bbox_inches="tight")
+    click.echo(f"Saved plot to {filepath}")
+    plt.close(fig)  # clean up when testing to avoid memory issues with pytest and matplotlib
 
 
 @plot.command(name="cable")
@@ -550,12 +679,24 @@ def haversine(lon1, lat1, lon2, lat2):
     "--satellites", required=True, type=int, help="minimum number of satellites"
 )
 @click.option(
+    "--start",
+    default=None,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="Start date for filtering GPS points.",
+)
+@click.option(
+    "--end",
+    default=None,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="End date for filtering GPS points.",
+)
+@click.option(
     "--cable",
     is_flag=True,
     help="include predicted watch circle from WHOI cable simulation",
 )
 def buoys_plot_locations(
-    name, latitude, longitude, distance=100.0, satellites=4, cable=False
+    name, latitude, longitude, distance=100.0, satellites=4, start=None, end=None, cable=False,
 ):
     """
     Plot the lat and long of the buoy hourly over the course of the deployment period.
@@ -580,9 +721,11 @@ def buoys_plot_locations(
     mask = (
         (array(list(map(compute_distance, zip(lon, lat)))) < distance)
         & (satellite_count >= satellites)
-        & (df.index > datetime(2026, 1, 1))
-    )  # filter out erroneous GPS points and early data
-
+    )
+    if start is not None:
+        mask &= df.index >= start
+    if end is not None:
+        mask &= df.index <= end
     filtered_lon = lon[mask]
     filtered_lat = lat[mask]
     if filtered_lon.size == 0:
@@ -898,3 +1041,65 @@ def buoys_db_describe(
         mode="pandas",
     )
     print(read_back.head())
+
+
+@file_group.command(name="derivatives")
+@station_name
+@data_table
+@click.argument(
+    "series",
+    type=click.Choice(StandardNames, case_sensitive=False),
+)
+@click.option(
+    "--percentile",
+    "-p",
+    default=(0.90, 0.95, 0.99),
+    multiple=True,
+    type=float,
+    help="Percentiles to calculate for the summary statistics. Accepts multiple values, e.g., -p 0.90 -p 0.95 -p 0.99",
+)
+def buoys_file_first_and_second_derivative(
+    name: StationName,
+    table: TableName,
+    series: StandardNames,
+    percentile: tuple[float, float, float]
+):
+    """
+    Calculate the first and second derivative of a time series to identify
+    rapid changes and spikes in the series. Performs hourly resampling to
+    fill gaps, so that time differences are consistent. The output values
+    are in units per second and per hour, respectively, to use as inputs 
+    for a QARTOD configuration file.
+    """
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(list(files))
+    vendor_name = VendoredNames[series.name]
+    ds = df[vendor_name.value]
+    ds = ds.sort_index()
+    ds = ds[~ds.index.duplicated(keep="first")].asfreq("h")  # resample filling gaps with NaN
+    slope = ds.diff()
+    summary = DataFrame(
+        data={
+            "|dy/dt| (/s)": (slope.abs() / 3600.0).squeeze(),
+            "|d²y/dt²| (/hr)": slope.diff().abs().squeeze()
+        },
+        index=ds.index
+    ).describe(percentiles=sorted(percentile)).map('{:.8f}'.format)
+    click.echo(summary)
+
+
+@firmware.command(name="mock")
+@station_name
+def buoys_firmware_mock(name: StationName):
+    """
+    Generate a mock message from a buoy logger for testing cloud 
+    integrations, including databases, location alerts, and missing
+    data detection.
+    """
+    # comma separate list, with each up to 26 characters
+    head = f"SL({name.value.lower()})\r"
+    names = "SN=ExternalTemp,SpConductivity_us,Pressure_abs,Chlorophyll_RFU,BGA_PE_RFU,BatteryVoltage,InternalHumidity,Salinity,Latitude,Longitude"
+    values = "D=08/11/26,17:15:00,13.42,41200,10.15,2.87,0.41,13.06,38,44.04203,-68.89106\r"
+    tail = "DIS\r"
+
+    click.echo(head + names + values + tail)
