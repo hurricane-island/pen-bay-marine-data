@@ -109,7 +109,9 @@ def fahrenheit_to_kelvin(fahrenheit: float) -> float:
 
 
 def test_observed_property(
-    result: DataFrame, observed_property: str, tests: list[str]
+    result: DataFrame,
+    observed_property: str,
+    tests: list[str]
 ) -> DataFrame:
     """
     Get quality assurance flags for observed property.
@@ -118,12 +120,14 @@ def test_observed_property(
         f"{observed_property}_qartod_{test}": test.replace("_test", "")
         for test in tests
     }
-    df = result[columns.keys()].rename(columns=columns)
+    df = result[columns.keys()].rename(columns=columns).replace(9, -1)  # replace missing values with -1
+    # Can't do max, because missing location values will trigger flag=9,
+    # which is not what we want in rollup.
     df["rollup"] = df.max(axis=1).astype("object")
     for col in df.columns:
         df[col] = df[col].astype("object")
     df["observed_property"] = observed_property
-    return df
+    return df.replace(-1, 9)  # replace missing values back to 9
 
 
 def test_data_frame(df: DataFrame, config: Config, time_column: str) -> DataFrame:
