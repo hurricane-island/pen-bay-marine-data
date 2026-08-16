@@ -6,10 +6,11 @@ tests will fail due to a system exit event.
 """
 import pytest
 from click.testing import CliRunner
-from . import buoys_file_gpx, buoys_file_list, buoys_file_describe, buoys_file_export, buoys_plot_tail, buoys_firmware_library, buoys_firmware_template
+from . import buoys_file_gpx, buoys_file_list, buoys_file_describe, buoys_file_export, buoys_plot_tail, buoys_firmware_library, buoys_firmware_template, TestTypes
 
 by_station = pytest.mark.parametrize("name", ["wynken", "blynken"])
-by_observed_property = pytest.mark.parametrize("observed_property", ["sea_water_salinity", "sea_water_temperature"])
+by_observed_property = pytest.mark.parametrize("observed_property", ["sea_water_salinity", "sea_water_temperature", "sea_water_chlorophyll_rfu", "sea_water_phycoerythrin_rfu"])
+by_qartod_test = pytest.mark.parametrize("qartod_test", [each for each in set(TestTypes) if each != TestTypes.GAP])
 runner = CliRunner()
 
 def test_cli_buoys_file_list():
@@ -46,9 +47,16 @@ def test_cli_buoys_file_gpx(name):
     result = runner.invoke(buoys_file_gpx, [name])
     assert result.exit_code == 0
 
-@by_station
+
+# Decorators are evaluated in reverse order
+@by_qartod_test
 @by_observed_property
-def test_cli_buoys_plot_tail(name, observed_property):
+@by_station
+def test_cli_buoys_plot_tail(
+    name: str,
+    observed_property: str,
+    qartod_test: TestTypes
+):
     """
     Expect files to be written to disk
     """
@@ -56,9 +64,11 @@ def test_cli_buoys_plot_tail(name, observed_property):
         name,
         "sonde",
         observed_property,
-        "--end", "2026-06-01",
-        "--days", "30",
-        "--qartod", "qartod.yaml",
+        "--days", "1000",
+        "-q", "qartod.yaml",
+        "-q", f"{name}.yaml",
+        "--test", qartod_test.value,
+        "--scale"
     ]
     result = runner.invoke(buoys_plot_tail, args)
     assert result.exit_code == 0

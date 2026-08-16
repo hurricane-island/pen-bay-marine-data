@@ -4,118 +4,55 @@ streams:
       gross_range_test:
         suspect_span: [-1.0, 26.0]
         fail_span: [-5.0, 50.0]
-
       climatology_test:
-        config:  # list of objects, each with a tspan, and vspan
-          - tspan: ["1-1", "3-31"]
-            vspan: [0.1, 15.0]
-          - tspan: ["4-1", "6-30"]
-            vspan: [0.1, 15.0]
-          - tspan: ["7-1", "9-30"]
-            vspan: [0.1, 15.0]
-          - tspan: ["10-1", "12-31"]
-            vspan: [0.1, 15.0]
         zinp: []  # required, but empty
-
-      rate_of_change_test:
-        threshold: 0.000356  # units per second, C or K.
-
       spike_test:
-        suspect_threshold: 0.8 # dimensionless
-        fail_threshold: 1.1
         method: differential  # will not catch tails, only values with neighbors
-
       flat_line_test:
         tolerance: 0.001
-        suspect_threshold: 28800 # seconds, 8 hours
-        fail_threshold: 43200 # seconds, 12 hours
-  
+        suspect_threshold: 28800.0 # seconds, 8 hours
+        fail_threshold: 43200.0 # seconds, 12 hours
+      location_test:
+        bbox:
   sea_water_salinity:
     qartod:
       gross_range_test:
-         suspect_span: [27.0, 35.0]
-         fail_span: [0.0, 70.0]
-      
+        suspect_span: [27.0, 35.0]
+        fail_span: [0.0, 70.0]
       climatology_test:
-        config:  # list of objects, each with a tspan, and vspan
-          - tspan: ["1-1", "3-31"]
-            vspan: [25.0, 35.0]
-          - tspan: ["4-1", "6-30"]
-            vspan: [29.0, 32.0]
-          - tspan: ["7-1", "9-30"] 
-            vspan: [29.0, 32.0]
-          - tspan: ["10-1", "12-31"]
-            vspan: [25.0, 35.0]
-        zinp: []  # required, but empty
-
+        zinp: []
       rate_of_change_test:
-         threshold: 0.0190 0
-
+        threshold: 0.0190
       spike_test:
-         suspect_threshold: 21.0
-         fail_threshold: 21.741370
-
+        method: differential
       flat_line_test:
-         tolerance: 0.001
-         suspect_threshold: 28800
-         fail_threshold: 43200
-  
+        tolerance: 0.001
+        suspect_threshold: 28800.0
+        fail_threshold: 43200.0
   sea_water_chlorophyll_rfu:
     qartod:
       gross_range_test:
-         suspect_span: [0.05, 4.0]
-         fail_span: [0, 100]
-      
+        suspect_span: [0.0, 50.0]
+        fail_span: [0.0, 100.0]
       climatology_test:
-        config:  # list of objects, each with a tspan, and vspan
-          - tspan: ["1-1", "3-31"]
-            vspan: [0, 0.8]
-          - tspan: ["4-1", "6-30"]
-            vspan: [0.1, 1.5]
-          - tspan: ["7-1", "9-30"]
-            vspan: [0.1, 3]
-          - tspan: ["10-1", "12-31"]
-            vspan: [0.1, 2]
-        zinp: []  # required, but empty
-
-      rate_of_change_test:
-         threshold: 0.000335 # RFU/sec
-
+        zinp: []
       spike_test:
-         suspect_threshold: 0.24
-         fail_threshold: 3.900062
-
+        method: differential
       flat_line_test:
-         tolerance: 0.001
-         suspect_threshold: 28800
-         fail_threshold: 43200
-  
+        tolerance: 0.001
+        suspect_threshold: 28800.0
+        fail_threshold: 43200.0
   sea_water_phycoerythrin_rfu:
     qartod:
       gross_range_test:
-         suspect_span: [0.05, 5]
-         fail_span: [0, 100]
-      
+        suspect_span: [0.0, 25.0]
+        fail_span: [0.0, 100.0]
       climatology_test:
-        config:  # list of objects, each with a tspan, and vspan
-          - tspan: ["1-1", "3-31"]
-            vspan: [0, 3]
-          - tspan: ["4-1", "6-30"]
-            vspan: [0.1, 3]
-          - tspan: ["7-1", "9-30"]
-            vspan: [0.1, 4] #
-          - tspan: ["10-1", "12-31"]
-            vspan: [0, 3 ]
-        zinp: []  # required, but empty
-
-      rate_of_change_test:
-         threshold: 0.000945
-
+        zinp: []
       spike_test:
-         suspect_threshold: 20
-         fail_threshold: 25.357321
-
+        method: differential
       flat_line_test:
-         tolerance: 0.001
-         suspect_threshold: 28800
-         fail_threshold: 43200
+        tolerance: 0.001
+        suspect_threshold: 28800.0
+        fail_threshold: 43200.0
+
