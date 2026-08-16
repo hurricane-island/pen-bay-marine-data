@@ -5,6 +5,7 @@ from pandas import set_option
 from click import group
 from weather import weather
 from buoys import buoys
+from profiles import profiles
 from lorawan import lorawan
 from island import island
 
@@ -17,6 +18,7 @@ def cli():
 
 cli.add_command(weather)
 cli.add_command(buoys)
+cli.add_command(profiles)
 cli.add_command(lorawan)
 cli.add_command(island)
 
