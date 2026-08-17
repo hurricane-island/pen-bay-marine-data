@@ -6,7 +6,8 @@ tests will fail due to a system exit event.
 """
 import pytest
 from click.testing import CliRunner
-from . import buoys_file_gpx, buoys_file_list, buoys_file_describe, buoys_file_export, buoys_plot_tail, buoys_firmware_library, buoys_firmware_template, TestTypes
+from buoys import buoys_file_gpx, buoys_file_list, buoys_file_describe, buoys_file_export, buoys_plot_tail,TestTypes
+from buoys.firmware import buoys_firmware_template, buoys_firmware_library
 
 by_station = pytest.mark.parametrize("name", ["wynken", "blynken"])
 by_observed_property = pytest.mark.parametrize("observed_property", ["sea_water_salinity", "sea_water_temperature", "sea_water_chlorophyll_rfu", "sea_water_phycoerythrin_rfu"])

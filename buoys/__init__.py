@@ -18,7 +18,6 @@ from datetime import datetime, timedelta
 from math import radians, cos, sin, sqrt, atan2
 from numpy import concatenate, array, argsort
 from pandas import read_csv, DataFrame, concat
-from influxdb_client_3 import InfluxDBClient3
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.patches import Circle
 from matplotlib.markers import MarkerStyle
@@ -30,11 +29,8 @@ import click
 from scipy.stats import median_abs_deviation
 from lib import (
     Source,
-    influx_options,
     plot_options,
     boxplot,
-    influx_host,
-    influx_api_token,
     Frequency,
     ImageFormat
 )
@@ -68,7 +64,6 @@ class ClickOptions(Enum):
     BUOYS = "buoys"
     PLOT = "plot"
     FIRMWARE = "firmware"
-    DB = "db"
     # plotting commands
     TAIL = "tail"
     DATASTREAM = "datastream"
@@ -845,55 +840,6 @@ def buoys_file_gpx(name: StationName):
     path = EXPORT_DIR / ("-".join(parts).lower() + ".gpx")
     with open(path, "w", encoding="utf-8") as fid:
         fid.write(gpx.to_xml())
-
-
-
-
-@database.command(name="upload")
-@station_name
-@data_table
-@influx_host
-@influx_api_token
-def buoys_db_upload(name: StationName, table: TableName, host: str, token: str):
-    """
-    Upload buoy data to the database.
-    """
-    files = list(filter_buoy_flat_files(name, table))
-    client = InfluxDBClient3(host=host, database="buoy-test-3", token=token)
-    # columns = [VendoredNames.SEA_WATER_TEMPERATURE, VendoredNames.SEA_WATER_SALINITY]
-    columns = [VendoredNames.SEA_WATER_TEMPERATURE]
-    rename = [StandardNames[key.name].value for key in columns]
-    for each in files:
-        df = read_single_campbell_logger_file(each)
-        subset = df[[key.value for key in columns]]
-        subset.columns = rename
-        subset.index.name = "time"
-        with open(each, "r", encoding="utf-8") as fid:
-            metadata = fid.readline().split(",")
-        subset.insert(column="location", value=metadata[1].lower(), loc=0)
-        subset.insert(column="thing", value=metadata[3], loc=1)
-        subset.insert(column="firmware", value=metadata[5][5:-1], loc=2)
-        client.write(
-            subset,
-            data_frame_measurement_name=table.value,
-            data_frame_tag_columns=["location", "thing", "firmware"],
-        )
-
-
-@database.command(name="describe")
-@station_name
-@data_table
-@influx_options
-def buoys_db_describe(
-    name: StationName, table: TableName, host: str, measurement: str, token: str
-):
-    time = "time"
-    client = InfluxDBClient3(host=host, database="buoy-test", token=token)
-    read_back: DataFrame = client.query(
-        f"SELECT * FROM {measurement} ORDER BY {time} LIMIT 10",
-        mode="pandas",
-    )
-    print(read_back.head())
 
 
 @file_group.command(name="derivatives")
