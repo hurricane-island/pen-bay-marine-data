@@ -161,7 +161,8 @@ def test_cli_buoys_plot_tail_examples_studies(
         "-q", "qartod.yaml",
         "-q", f"{name}.yaml",
         "--test", qartod_test,
-        *example_style_commands
+        "--no-scale",
+        "--figsize", 9.0, 4.5,
     ]
     result = runner.invoke(buoys_plot_tail, args)
     assert result.exit_code == 0
