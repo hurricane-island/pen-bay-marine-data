@@ -181,6 +181,20 @@ def source_options(function):
     function = station_name(function)
     return function
 
+def figure_size(default_size: tuple[float, float]):
+    """
+    Decorator to add a --figsize option to a Click command.
+    """
+
+    def decorator(cmd):
+        return click.option(
+            "--figsize",
+            nargs=2,
+            default=default_size,
+            help="Size of the output figure in inches (width, height).",
+        )(cmd)
+
+    return decorator
 
 # Subcommands assignment
 buoys.add_command(plot)
@@ -388,6 +402,7 @@ def buoys_file_export(
     default=False,
     help="Scale the output plot to remaining data, otherwise use the full range. Defaults to True.",
 )
+@figure_size((7.5, 3.0))
 def buoys_plot_tail(
     name: StationName,
     table: TableName,
@@ -397,7 +412,8 @@ def buoys_plot_tail(
     test: TestTypes,
     end: datetime,
     image_format: ImageFormat,
-    scale: bool
+    scale: bool,
+    figsize: tuple[float, float]
 ):
     """
     Plot the most recent data from a buoy for a single data stream.
@@ -422,7 +438,7 @@ def buoys_plot_tail(
     config_key_value = load_and_merge_qa_configs(qartod)
 
     # Begin plotting
-    fig, ax = plt.subplots(figsize=(7.5, 3))
+    fig, ax = plt.subplots(figsize=figsize)
     ax.plot(
         df.index,
         df[series.value],

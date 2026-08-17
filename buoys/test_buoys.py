@@ -11,7 +11,7 @@ from buoys.firmware import buoys_firmware_template, buoys_firmware_library
 
 by_station = pytest.mark.parametrize("name", ["wynken", "blynken"])
 by_observed_property = pytest.mark.parametrize("observed_property", ["sea_water_salinity", "sea_water_temperature", "sea_water_chlorophyll_rfu", "sea_water_phycoerythrin_rfu"])
-by_qartod_test = pytest.mark.parametrize("qartod_test", [each for each in set(TestTypes) if each != TestTypes.GAP])
+by_qartod_test = pytest.mark.parametrize("qartod_test", [each.value for each in set(TestTypes) if each != TestTypes.GAP])
 runner = CliRunner()
 
 def test_cli_buoys_file_list():
@@ -56,7 +56,7 @@ def test_cli_buoys_file_gpx(name):
 def test_cli_buoys_plot_tail(
     name: str,
     observed_property: str,
-    qartod_test: TestTypes
+    qartod_test: str
 ):
     """
     Expect files to be written to disk
@@ -68,12 +68,103 @@ def test_cli_buoys_plot_tail(
         "--days", "1000",
         "-q", "qartod.yaml",
         "-q", f"{name}.yaml",
-        "--test", qartod_test.value,
+        "--test", qartod_test,
         "--scale"
     ]
     result = runner.invoke(buoys_plot_tail, args)
     assert result.exit_code == 0
 
+example_style_commands = [
+    "--scale",
+    "--figsize", 9.0, 4.5,
+]
+
+@by_station
+def test_cli_buoys_plot_tail_examples_temperature_raw(
+    name: str
+):
+    """
+    Expect files to be written to disk
+    """
+    args = [
+        name,
+        "sonde",
+        "sea_water_temperature",
+        "--days", "1000",
+        "-q", "empty.yaml",
+        "--test", "rollup",
+        *example_style_commands
+    ]
+    result = runner.invoke(buoys_plot_tail, args)
+    assert result.exit_code == 0
+
+@by_station
+@by_qartod_test
+def test_cli_buoys_plot_tail_examples_temperature(
+    name: str,
+    qartod_test: str
+):
+    """
+    Expect files to be written to disk
+    """
+    args = [
+        name,
+        "sonde",
+        "sea_water_temperature",
+        "--days", "1000",
+        "-q", "qartod.yaml",
+        "-q", f"{name}.yaml",
+        "--test", qartod_test,
+        *example_style_commands
+    ]
+    result = runner.invoke(buoys_plot_tail, args)
+    assert result.exit_code == 0
+
+@by_station
+@pytest.mark.parametrize("observed_property", ["sea_water_salinity", "sea_water_chlorophyll_rfu"])
+def test_cli_buoys_plot_tail_examples_studies_raw(
+    name: str,
+    observed_property: str
+):
+    """
+    Expect files to be written to disk
+    """
+    args = [
+        name,
+        "sonde",
+        observed_property,
+        "--end", "2026-08-16",
+        "--days", "180",
+        "-q", "empty.yaml",
+        *example_style_commands
+    ]
+    result = runner.invoke(buoys_plot_tail, args)
+    assert result.exit_code == 0
+
+@by_qartod_test
+@by_station
+@pytest.mark.parametrize("observed_property", ["sea_water_salinity", "sea_water_chlorophyll_rfu"])
+def test_cli_buoys_plot_tail_examples_studies(
+    name: str,
+    qartod_test: str,
+    observed_property: str
+):
+    """
+    Expect files to be written to disk
+    """
+    args = [
+        name,
+        "sonde",
+        observed_property,
+        "--end", "2026-08-16",
+        "--days", "180",
+        "-q", "qartod.yaml",
+        "-q", f"{name}.yaml",
+        "--test", qartod_test,
+        *example_style_commands
+    ]
+    result = runner.invoke(buoys_plot_tail, args)
+    assert result.exit_code == 0
 
 @by_station
 def test_cli_buoys_firmware_template(name):
