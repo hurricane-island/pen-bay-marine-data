@@ -1,4 +1,3 @@
-# pylint: disable=too-many-locals
 """
 Command line interface for working with buoy data and firmware.
 
@@ -12,15 +11,12 @@ Features:
 """
 
 import re
-import requests
 from typing import cast
-from itertools import cycle
 from pathlib import Path
 from enum import Enum
 from datetime import datetime, timedelta
 from math import radians, cos, sin, sqrt, atan2
-from hashlib import md5
-from numpy import concatenate, array, argsort, where
+from numpy import concatenate, array, argsort
 from pandas import read_csv, DataFrame, concat
 from influxdb_client_3 import InfluxDBClient3
 from matplotlib import pyplot as plt, dates as mdates
@@ -54,8 +50,6 @@ from buoys.qartod import (
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
 EXPORT_DIR = Path(__file__).parent / "export"
-FIRMWARE_DIR = Path(__file__).parent / "firmware"
-TEMPLATE_DIR = Path(__file__).parent / "templates"
 CABLE_DIR = Path(__file__).parent / "cable"
 transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
 
@@ -68,7 +62,6 @@ class ClickOptions(Enum):
     # file and firmware commands
     LIST = "list"
     DESCRIBE = "describe"
-    TEMPLATE = "template"
     EXPORT = "export"
     # groups
     FILE = "file"
@@ -155,13 +148,6 @@ class ObservedProperty:
 
 @click.group(name=ClickOptions.BUOYS.value)
 def buoys():
-    """
-    Command line interface for working with buoy data and firmware.
-    """
-
-
-@click.group(name=ClickOptions.FIRMWARE.value)
-def firmware():
     """
     Command line interface for working with buoy data and firmware.
     """
@@ -308,7 +294,9 @@ def load_and_subset_multifile_table(
 
 @file_group.command(name="qartod")
 @source_options
-def buoys_file_qartod():
+def buoys_file_qartod(
+    name: StationName, table: TableName, series: StandardNames, qartod: tuple[str]
+):
     """
     Run QARTOD tests on the buoy data and return a DataFrame with quality flags.
     """
@@ -816,8 +804,8 @@ def buoys_file_export(name: StationName, table: TableName):
     headers = list(map(format_column, unique.columns))
     parts = list(filter(None, re.split(r"([A-Z][^A-Z]*)", table.value)))
     parts.insert(0, name.value)
-    filename = "-".join(parts).lower() + ".csv"
-    path = EXPORT_DIR / filename
+    filename = "-".join(parts).lower()
+    path = (EXPORT_DIR / filename / filename).with_suffix(".csv")
     unique.to_csv(path, header=headers)
 
 
@@ -859,69 +847,6 @@ def buoys_file_gpx(name: StationName):
         fid.write(gpx.to_xml())
 
 
-def checksum(contents: str) -> str:
-    """
-    Generate a checksum for a file based on its contents.
-    This can be used to create unique filenames for firmware templates.
-    """
-    encoded_data = contents.encode("utf-8")
-    hasher = md5()
-    hasher.update(encoded_data)
-    return hasher.hexdigest()
-
-
-@firmware.command(name=ClickOptions.TEMPLATE.value)
-@station_name
-@click.option("--address", required=True, help="Pakbus address")
-@click.option("--client", required=True, help="Client ID")
-@click.option("--file", default="buoy.dld", help="Template file")
-@click.option("--latitude", required=True, help="Latitude")
-@click.option("--longitude", required=True, help="Longitude")
-def buoys_firmware_template(
-    name: StationName,
-    address: str,
-    client: str,
-    file: str,
-    latitude: str,
-    longitude: str,
-):
-    """
-    Fill in firmware template with options passed on
-    the command line.
-    """
-    with open(TEMPLATE_DIR / file, "r", encoding="utf-8") as fid:
-        filedata = fid.read()
-
-    for var, value in {
-        "STATION_NAME": name.value,
-        "PAKBUS_ADDRESS": address,
-        "CLIENT_ID": client,
-        "LATITUDE": latitude,
-        "LONGITUDE": longitude,
-    }.items():
-        slug = "$" + var
-        filedata = filedata.replace(slug, value)
-
-    prefix = name.value.lower()
-    filename = FIRMWARE_DIR / f"{prefix}.{checksum(filedata)}.dld"
-    filename.parent.mkdir(parents=True, exist_ok=True)
-    with open(filename, "w", encoding="utf-8") as fid:
-        fid.write(filedata)
-
-
-@firmware.command(name="lib")
-@click.option("--file", default="lib.dld", help="Template file")
-def buoys_firmware_library(file: str):
-    """
-    Fill in firmware template with options passed on
-    the command line.
-    """
-    with open(TEMPLATE_DIR / file, "r", encoding="utf-8") as fid:
-        filedata = fid.read()
-    filename = FIRMWARE_DIR / f"lib.{checksum(filedata)}.dld"
-    filename.parent.mkdir(parents=True, exist_ok=True)
-    with open(filename, "w", encoding="utf-8") as fid:
-        fid.write(filedata)
 
 
 @database.command(name="upload")
@@ -1015,19 +940,3 @@ def buoys_file_first_and_second_derivative(
     ).describe(percentiles=sorted(percentile)).map('{:.8f}'.format)
     click.echo(summary)
 
-
-@firmware.command(name="mock")
-@station_name
-def buoys_firmware_mock(name: StationName):
-    """
-    Generate a mock message from a buoy logger for testing cloud 
-    integrations, including databases, location alerts, and missing
-    data detection.
-    """
-    # comma separate list, with each up to 26 characters
-    head = f"SL({name.value.lower()})\r"
-    names = "SN=ExternalTemp,SpConductivity_us,Pressure_abs,Chlorophyll_RFU,BGA_PE_RFU,BatteryVoltage,InternalHumidity,Salinity,Latitude,Longitude"
-    values = "D=08/11/26,17:15:00,13.42,41200,10.15,2.87,0.41,13.06,38,44.04203,-68.89106\r"
-    tail = "DIS\r"
-
-    click.echo(head + names + values + tail)
