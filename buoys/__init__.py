@@ -1,4 +1,3 @@
-# pylint: disable=too-many-locals
 """
 Command line interface for working with buoy data and firmware.
 
@@ -12,46 +11,43 @@ Features:
 """
 
 import re
-import requests
-from itertools import cycle
+from typing import cast, Optional
+from warnings import simplefilter
 from pathlib import Path
 from enum import Enum
 from datetime import datetime, timedelta
 from math import radians, cos, sin, sqrt, atan2
-from hashlib import md5
-from numpy import concatenate, array, argsort, where
-from pandas import Series, read_csv, DataFrame, concat
-from influxdb_client_3 import InfluxDBClient3
+from numpy import concatenate, array, argsort
+from pandas import read_csv, DataFrame, concat
+from pandas.errors import PerformanceWarning
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.patches import Circle
 from matplotlib.markers import MarkerStyle
-from ioos_qc.config import Config
-from ioos_qc.streams import PandasStream
-from ioos_qc.stores import PandasStore
 from scipy.io import loadmat
 from pyproj import Transformer
-from yaml import safe_load
 import gpxpy
 import gpxpy.gpx
 import click
 from scipy.stats import median_abs_deviation
 from lib import (
     Source,
-    influx_options,
     plot_options,
     boxplot,
-    influx_host,
-    influx_api_token,
-    test_observed_property,
     Frequency,
     ImageFormat
+)
+from buoys.qartod import (
+    run_qartod_tests,
+    TestTypes,
+    get_climatology_breakpoints,
+    load_and_merge_qa_configs,
+    qartod_configs_option,
+    qartod_test_option
 )
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
 EXPORT_DIR = Path(__file__).parent / "export"
-FIRMWARE_DIR = Path(__file__).parent / "firmware"
-TEMPLATE_DIR = Path(__file__).parent / "templates"
 CABLE_DIR = Path(__file__).parent / "cable"
 transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
 
@@ -64,14 +60,11 @@ class ClickOptions(Enum):
     # file and firmware commands
     LIST = "list"
     DESCRIBE = "describe"
-    TEMPLATE = "template"
     EXPORT = "export"
     # groups
     FILE = "file"
     BUOYS = "buoys"
     PLOT = "plot"
-    FIRMWARE = "firmware"
-    DB = "db"
     # plotting commands
     TAIL = "tail"
     DATASTREAM = "datastream"
@@ -156,13 +149,6 @@ def buoys():
     """
 
 
-@click.group(name=ClickOptions.FIRMWARE.value)
-def firmware():
-    """
-    Command line interface for working with buoy data and firmware.
-    """
-
-
 @click.group(name=ClickOptions.PLOT.value)
 def plot():
     """
@@ -174,13 +160,6 @@ def plot():
 def file_group():
     """
     Commands that interact with the buoy data file system.
-    """
-
-
-@click.group(name=ClickOptions.DB.value)
-def database():
-    """
-    Commands that interact with the buoy database.
     """
 
 
@@ -205,9 +184,7 @@ def source_options(function):
 
 # Subcommands assignment
 buoys.add_command(plot)
-buoys.add_command(firmware)
 buoys.add_command(file_group)
-buoys.add_command(database)
 
 
 @file_group.command(name=ClickOptions.LIST.value)
@@ -281,80 +258,118 @@ def buoys_file_describe(name: StationName, table: TableName):
     print(summary)
 
 
-class TestTypes(Enum):
-    """
-    Supported QARTOD test types.
-    """
-
-    GROSS_RANGE = "gross_range"
-    RATE_OF_CHANGE = "rate_of_change"
-    SPIKE = "spike"
-    CLIMATOLOGY = "climatology"
-    FLAT_LINE = "flat_line"
-    ROLLUP = "rollup"
-    GAP = "gap"
-    LOCATION = "location"
-
-def deep_merge_inplace(base: dict, update: dict) -> None:
-    """
-    Recursively merges update into base in-place.
-    
-    Nested dictionaries are merged. All other types (including lists, sets, 
-    and primitives) are overwritten by the value in update.
-    """
-    for key, value in update.items():
-        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-            deep_merge_inplace(base[key], value)
-        else:
-            base[key] = value
-
-def load_and_merge_qa_configs(qartod: tuple[str]) -> dict:
-    """
-    Load the default QARTOD configuration and merge it with any user-provided
-    configuration files. The user-provided configurations will override the defaults.
-    """
-    accumulate = {}
-    for file in qartod:
-        qa_path = Path(__file__).parent / file
-        if not qa_path.exists():
-            raise click.ClickException(
-                f"QARTOD configuration file not found: {qa_path}"
-            )
-        with open(qa_path, "r", encoding="utf-8") as fid:
-            deep_merge_inplace(accumulate, safe_load(fid))
-    return accumulate
-
 def load_and_subset_multifile_table(
     name: StationName,
     table: TableName,
-    start: datetime,
-    end: datetime
+    start: Optional[datetime],
+    end: Optional[datetime],
+    omit: Optional[list[str|tuple[str, str]]] = None,
 ) -> tuple[DataFrame, list]:
     """
     Load and subset a multi-file table for a given station and table name, returning
     a DataFrame with data between the specified start and end dates.
     """
+    simplefilter(action="ignore", category=PerformanceWarning)
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
-    mask = (df.index > start) & (df.index <= end)
-    df = df[mask].sort_values("TimeRecovered")
+    if omit is not None:
+        df = df.drop(columns=omit, errors="ignore")
+    _end = end if end is not None else datetime.now()
+    mask = (df.index <= _end)
+    if start is not None:
+        mask &= (df.index > start)
+    df = df[mask].sort_values("TimeRecovered").drop(columns=["TimeRecovered"], errors="ignore")
     duplicates = df.index.duplicated(keep="first")
     dropped = df[duplicates].index.to_list()
     df = df[~duplicates].sort_index(kind="stable")
     resampled = df.asfreq("h")  # Resample and fill gaps with NaN to force gaps when plotting
     return resampled, dropped
 
+def format_column_name_with_units(col: str) -> str:
+    """
+    Format a column name with its units if available.
+    """
+    if isinstance(col, tuple) and len(col) == 3:
+        name, unit, _ = col
+        return f"{name} ({unit})"
+    return str(col)
+
+def format_column_standard_name(col: str) -> str:
+    """
+    Replace with standard name if available, otherwise return the original column name.
+    """
+    try:
+        vendor_name = VendoredNames(col[0])
+        std_name = StandardNames[vendor_name.name]
+        return std_name.value
+    except (KeyError, ValueError):
+        return col[0]
+
+@file_group.command(name=ClickOptions.EXPORT.value)
+@station_name
+@qartod_configs_option
+@qartod_test_option
+@click.option(
+    "--flag",
+    type=click.Choice([3, 4]),
+    default=3,
+    help="Filter out this QARTOD flag. 3 = suspect/failed, 4 = failed. Defaults to 3.",
+)
+def buoys_file_export(
+    name: StationName,
+    qartod: tuple[str],
+    test: TestTypes,
+    flag: int
+):
+    """
+    Export buoy data to a different format.
+    """
+    
+    sonde, _ = load_and_subset_multifile_table(name, TableName.SONDE, None, None)
+    diagnostic, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, None, None)
+    df = sonde.drop(columns=["RECORD"]).join(diagnostic, how="left")[[
+        "Latitude",
+        "Longitude",
+        "External_Temp",
+        "Salinity",
+        "Chlorophyll_RFU",
+        "BGA_PE_RFU",
+        "ODO_Sat",
+        "ODO",
+        "Pressure_mH2O"
+    ]]
+    df.index.rename("time", inplace=True)
+    unit_names = list(map(format_column_name_with_units, df.columns))
+    std_names = list(map(format_column_standard_name, df.columns))
+    df.columns = std_names
+    config_key_value = load_and_merge_qa_configs(qartod)
+    qa = run_qartod_tests(df, config_key_value)
+    for group in qa.groups.keys():
+        flags = qa.get_group(group)[test.value]
+        df[group] = df[group].where((flags < flag) | (flags == 9))
+    df.columns = unit_names  # revert to original headers for export
+    start = df.index.min()
+    end = df.index.max()
+    filepath = (
+        EXPORT_DIR
+        / name.value
+        / (
+            f"{start:%Y-%m-%d}_"
+            f"{end:%Y-%m-%d}_"
+            f"{'-'.join(Path(each).stem for each in qartod)}"
+            f"-{test.value}"
+        )
+    ).with_suffix(".csv")
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(filepath, header=unit_names)
+    click.echo(f"Saved file to {filepath}")
+
 
 @plot.command(name=ClickOptions.TAIL.value)
 @source_options
 @plot_options
-@click.option(
-    "--qartod",
-    "-q",
-    multiple=True,
-    type=str,
-    help="QARTOD configuration file. Accepts multiple YAML files, which will be merged together in the order they are provided.",
-)
+@qartod_configs_option
+@qartod_test_option
 @click.option(
     "--days",
     default=30,
@@ -366,12 +381,6 @@ def load_and_subset_multifile_table(
     default=datetime.now(),
     type=click.DateTime(formats=["%Y-%m-%d"]),
     help="End date for the analysis and plotting. Defaults to the current date and time.",
-)
-@click.option(
-    "--test",
-    default=TestTypes.ROLLUP,
-    type=click.Choice(TestTypes, case_sensitive=False),
-    help="QARTOD test to plot.",
 )
 @click.option(
     "--scale/--no-scale",
@@ -393,26 +402,27 @@ def buoys_plot_tail(
     """
     Plot the most recent data from a buoy for a single data stream.
     """
+    simplefilter(action="ignore", category=PerformanceWarning)
+    if len(qartod) == 0:
+        raise click.ClickException(
+            "At least one QARTOD config file must be provided using the -q option."
+        )
     start: datetime = end - timedelta(days=days)
     df, dropped = load_and_subset_multifile_table(name, table, start, end)
     if df.empty:
         raise click.ClickException(
             f"No local data for {name.value} {table.value} between {start} and {end}."
         )
-    renamed = []
-    units = {}
-    for col in df.columns:
-        try:
-            vendor_name = VendoredNames(col[0])
-            std_name = StandardNames[vendor_name.name]
-            renamed.append(std_name.value)
-        except (KeyError, ValueError):
-            renamed.append(col[0])
-        units[renamed[-1]] = col[1]
+    gps, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, start, end)
+    df = df.drop(columns=["RECORD"]).join(gps, how="left")
+    renamed = list(map(format_column_standard_name, df.columns))
+    units = {each: col[1] for each, col in zip(renamed, df.columns)}
     df.columns = renamed
+    df = df[["Latitude", "Longitude", series.value]]
+    config_key_value = load_and_merge_qa_configs(qartod)
 
+    # Begin plotting
     fig, ax = plt.subplots(figsize=(7.5, 3))
-
     ax.plot(
         df.index,
         df[series.value],
@@ -423,50 +433,16 @@ def buoys_plot_tail(
         label="raw",
     )
     ylim = (None, None)
-    suffix = "no-qa"
-    if len(qartod) > 0:
-        config_key_value = load_and_merge_qa_configs(qartod)
-        climatology_breakpoints = config_key_value["streams"][series.value]["qartod"].get("climatology_test", {}).get("config", [])
-        breaks = []
-        for each in climatology_breakpoints:
-            for yr in (2025, 2026):
-                breaks.append(datetime(month=each["tspan"][0], day=1, year=yr))
-        config = Config(config_key_value)
-        gps, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, start, end)
-        lat = gps["Latitude"].to_numpy().flatten()
-        lon = gps["Longitude"].to_numpy().flatten()
-        suffix = "-".join(Path(each).stem for each in qartod) + "-" + test.value
-        df["Latitude"] = lat
-        df["Longitude"] = lon
-        flags = PandasStream(
-            df=df.reset_index(names="time"),
-            time="time",
-            lat="Latitude",
-            lon="Longitude",
-        ).run(config)
-        store = PandasStore(flags)
-        result = store.save().set_index("time").drop(columns=["lat", "lon"])
-        frames: dict[str, list[str]] = {}
-        for each in result.columns:
-            _series, _name = each.split("_qartod_")
-            if _series not in frames:
-                frames[_series] = []
-            frames[_series].append(_name)
-        by_observed_property = []
-        for _property, tests in frames.items():
-            test_results = test_observed_property(result, _property, tests)
-            check_nan = df[_property].isna()
-            test_results["gap"] = where(check_nan, 3, 1)
-            by_observed_property.append(test_results)
-        qa = (
-            concat(by_observed_property, axis=0)
-            .groupby("observed_property")
-            .get_group(series.value)
-        )
-        gaps = df.loc[qa["gap"] == 3, series.value]
+    if series.value in config_key_value["streams"]:
+        qa = run_qartod_tests(df, {
+            "streams": {
+                series.value: config_key_value["streams"][series.value]
+            }
+        }).get_group(series.value)
+        gaps = cast(DataFrame, df.loc[qa["gap"] == 3, series.value])
         qa = qa[test.value]
-        suspect = df.loc[qa == 3, series.value]
-        failed = df.loc[qa == 4, series.value]
+        suspect = cast(DataFrame, df.loc[qa == 3, series.value])
+        failed = cast(DataFrame, df.loc[qa == 4, series.value])
         remaining = df.loc[((qa < 3) | (qa == 9)), series.value].asfreq("h")
 
         ax.vlines(
@@ -480,7 +456,7 @@ def buoys_plot_tail(
             zorder=0
         )
         ax.vlines(
-            breaks,
+            get_climatology_breakpoints(config_key_value, series.value),
             ymin=0,
             ymax=1,
             color="black",
@@ -523,18 +499,18 @@ def buoys_plot_tail(
         transform=ax.get_xaxis_transform(),
         zorder=0
     )
-    start = max(df.index.min(), start)
-    end = min(df.index.max(), end)
-    _days = (end - start).days
+    _start = df.index.min()
+    _end = df.index.max()
+    _days = (_end - _start).days
     display_name = series.value.replace("_", " ").title()
-    if start.year == end.year:
-        year_range = f"{start.year}"
+    if _start.year == _end.year:
+        year_range = f"{_start.year}"
     else:
-        year_range = f"{start.year}-{end.year}"
+        year_range = f"{_start.year}-{_end.year}"
     ax.set_title(f"{name.value} {display_name} {year_range} ({test.value.replace('_', ' ')})".title())
     ax.set_xlabel("Date")
     ax.xaxis.set_tick_params(rotation=45)
-    ax.set_xlim(max(start, df.index.min()), end)
+    ax.set_xlim(_start, _end)
     ax.set_ylim(*ylim)
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=(_days // 8) + 2))
     ax.xaxis.set_minor_locator(mdates.DayLocator(interval=1))
@@ -550,12 +526,12 @@ def buoys_plot_tail(
         / table.value
         / series.value
         / (
-            f"{start:%Y-%m-%d}_"
-            f"{end:%Y-%m-%d}_"
-            f"{suffix}."
-            f"{image_format.value}"
+            f"{_start:%Y-%m-%d}_"
+            f"{_end:%Y-%m-%d}_"
+            f"{'-'.join(Path(each).stem for each in qartod)}"
+            f"-{test.value}"
         )
-    )
+    ).with_suffix(f".{image_format.value}")
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath, dpi=300, bbox_inches="tight")
     click.echo(f"Saved plot to {filepath}")
@@ -848,51 +824,6 @@ def buoys_plot_datastream(
     )
 
 
-@file_group.command(name=ClickOptions.EXPORT.value)
-@station_name
-@data_table
-def buoys_file_export(name: StationName, table: TableName):
-    """
-    Export buoy data to a different format.
-    """
-    files = filter_buoy_flat_files(name, table)
-    drop_columns = [
-        "RECORD",
-        "WiperPosition",
-        "Sonde_External_Voltage",
-        "Sonde_Battery",
-        "WiperPeakCurrent",
-        "TimeRecovered",
-        ("Chlorophyll", "cells/mL"),
-        "BGA_PE_cellsmL",
-        "Pressure_Vert_Pos",
-        "Depth",
-    ]
-    df = read_campbell_logger_files(list(files)).drop(
-        columns=drop_columns, errors="ignore"
-    )
-    mask = ~df.index.duplicated(
-        keep=False
-    )  # TODO: This approach drops all duplicate index entries. Consider implementing a more nuanced duplicate handling strategy if needed.
-    unique = df[mask].sort_index()
-    unique.index.rename("time", inplace=True)
-
-    def format_column(col) -> str:
-        # Handle columns that are not 3-tuples gracefully
-        if isinstance(col, tuple) and len(col) == 3:
-            name, unit, _ = col
-            return f"{name} ({unit})"
-        # Fallback: just return string representation
-        return str(col)
-
-    headers = list(map(format_column, unique.columns))
-    parts = list(filter(None, re.split(r"([A-Z][^A-Z]*)", table.value)))
-    parts.insert(0, name.value)
-    filename = "-".join(parts).lower() + ".csv"
-    path = EXPORT_DIR / filename
-    unique.to_csv(path, header=headers)
-
-
 @file_group.command(name="gpx")
 @station_name
 def buoys_file_gpx(name: StationName):
@@ -929,118 +860,6 @@ def buoys_file_gpx(name: StationName):
     path = EXPORT_DIR / ("-".join(parts).lower() + ".gpx")
     with open(path, "w", encoding="utf-8") as fid:
         fid.write(gpx.to_xml())
-
-
-def checksum(contents: str) -> str:
-    """
-    Generate a checksum for a file based on its contents.
-    This can be used to create unique filenames for firmware templates.
-    """
-    encoded_data = contents.encode("utf-8")
-    hasher = md5()
-    hasher.update(encoded_data)
-    return hasher.hexdigest()
-
-
-@firmware.command(name=ClickOptions.TEMPLATE.value)
-@station_name
-@click.option("--address", required=True, help="Pakbus address")
-@click.option("--client", required=True, help="Client ID")
-@click.option("--file", default="buoy.dld", help="Template file")
-@click.option("--latitude", required=True, help="Latitude")
-@click.option("--longitude", required=True, help="Longitude")
-def buoys_firmware_template(
-    name: StationName,
-    address: str,
-    client: str,
-    file: str,
-    latitude: str,
-    longitude: str,
-):
-    """
-    Fill in firmware template with options passed on
-    the command line.
-    """
-    with open(TEMPLATE_DIR / file, "r", encoding="utf-8") as fid:
-        filedata = fid.read()
-
-    for var, value in {
-        "STATION_NAME": name.value,
-        "PAKBUS_ADDRESS": address,
-        "CLIENT_ID": client,
-        "LATITUDE": latitude,
-        "LONGITUDE": longitude,
-    }.items():
-        slug = "$" + var
-        filedata = filedata.replace(slug, value)
-
-    prefix = name.value.lower()
-    filename = FIRMWARE_DIR / f"{prefix}.{checksum(filedata)}.dld"
-    filename.parent.mkdir(parents=True, exist_ok=True)
-    with open(filename, "w", encoding="utf-8") as fid:
-        fid.write(filedata)
-
-
-@firmware.command(name="lib")
-@click.option("--file", default="lib.dld", help="Template file")
-def buoys_firmware_library(file: str):
-    """
-    Fill in firmware template with options passed on
-    the command line.
-    """
-    with open(TEMPLATE_DIR / file, "r", encoding="utf-8") as fid:
-        filedata = fid.read()
-    filename = FIRMWARE_DIR / f"lib.{checksum(filedata)}.dld"
-    filename.parent.mkdir(parents=True, exist_ok=True)
-    with open(filename, "w", encoding="utf-8") as fid:
-        fid.write(filedata)
-
-
-@database.command(name="upload")
-@station_name
-@data_table
-@influx_host
-@influx_api_token
-def buoys_db_upload(name: StationName, table: TableName, host: str, token: str):
-    """
-    Upload buoy data to the database.
-    """
-    files = list(filter_buoy_flat_files(name, table))
-    client = InfluxDBClient3(host=host, database="buoy-test-3", token=token)
-    # columns = [VendoredNames.SEA_WATER_TEMPERATURE, VendoredNames.SEA_WATER_SALINITY]
-    columns = [VendoredNames.SEA_WATER_TEMPERATURE]
-    rename = [StandardNames[key.name].value for key in columns]
-    for each in files:
-        df = read_single_campbell_logger_file(each)
-        subset = df[[key.value for key in columns]]
-        subset.columns = rename
-        subset.index.name = "time"
-        with open(each, "r", encoding="utf-8") as fid:
-            metadata = fid.readline().split(",")
-        subset.insert(column="location", value=metadata[1].lower(), loc=0)
-        subset.insert(column="thing", value=metadata[3], loc=1)
-        subset.insert(column="firmware", value=metadata[5][5:-1], loc=2)
-        client.write(
-            subset,
-            data_frame_measurement_name=table.value,
-            data_frame_tag_columns=["location", "thing", "firmware"],
-        )
-
-
-@database.command(name="describe")
-@station_name
-@data_table
-@influx_options
-def buoys_db_describe(
-    name: StationName, table: TableName, host: str, measurement: str, token: str
-):
-    time = "time"
-    client = InfluxDBClient3(host=host, database="buoy-test", token=token)
-    read_back: DataFrame = client.query(
-        f"SELECT * FROM {measurement} ORDER BY {time} LIMIT 10",
-        mode="pandas",
-    )
-    print(read_back.head())
 
 
 @file_group.command(name="derivatives")
@@ -1086,20 +905,3 @@ def buoys_file_first_and_second_derivative(
         index=ds.index
     ).describe(percentiles=sorted(percentile)).map('{:.8f}'.format)
     click.echo(summary)
-
-
-@firmware.command(name="mock")
-@station_name
-def buoys_firmware_mock(name: StationName):
-    """
-    Generate a mock message from a buoy logger for testing cloud 
-    integrations, including databases, location alerts, and missing
-    data detection.
-    """
-    # comma separate list, with each up to 26 characters
-    head = f"SL({name.value.lower()})\r"
-    names = "SN=ExternalTemp,SpConductivity_us,Pressure_abs,Chlorophyll_RFU,BGA_PE_RFU,BatteryVoltage,InternalHumidity,Salinity,Latitude,Longitude"
-    values = "D=08/11/26,17:15:00,13.42,41200,10.15,2.87,0.41,13.06,38,44.04203,-68.89106\r"
-    tail = "DIS\r"
-
-    click.echo(head + names + values + tail)

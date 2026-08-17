@@ -130,27 +130,6 @@ def test_observed_property(
     return df.replace(-1, 9)  # replace missing values back to 9
 
 
-def test_data_frame(df: DataFrame, config: Config, time_column: str) -> DataFrame:
-    """
-    Apply any necessary processing to the DataFrame
-    """
-    flags = PandasStream(df).run(config)
-    store = PandasStore(flags)
-    result = store.save().set_index(time_column)
-    frames: dict[str, list[str]] = {}
-    for test in result.columns:
-        _series, name = test.split("_qartod_")
-        if _series not in frames:
-            frames[_series] = []
-        frames[_series].append(name)
-
-    by_observed_property = []
-    for items in frames.items():
-        df = test_observed_property(result, *items)
-        by_observed_property.append(df)
-    return concat(by_observed_property, axis=0)
-
-
 def cardinal_direction_to_degrees(series: Series) -> Series:
     """
     Convert cardinal directions to degrees.
@@ -194,83 +173,6 @@ def plot_single_series(
         plot_label = label
 
     ax.plot(series_to_plot.index, series_to_plot, label=plot_label, **kwargs)
-
-def apply_qartod_filter(
-    series: Series,
-    observed_property: str,
-    config: Config,
-    time_column: str = "time",
-) -> Series:
-    df = series.reset_index()
-    flags = PandasStream(df).run(config)
-    store = PandasStore(flags)
-    result = store.save()
-    qc_columns = [
-        col
-        for col in result.columns
-        if col.startswith(f"{observed_property}_qartod_")
-        and not col.endswith("_rollup")
-    ]
-    result[f"{observed_property}_qartod_rollup"] = result[qc_columns].max(axis=1) #rollup of qartod for observed property
-    print(result.columns)
-    print(result[f"{observed_property}_qartod_rollup"].value_counts())
-    failed = result[result[f"{observed_property}_qartod_rollup"] == 4]
-    print("FAILED QC ROWS:")
-    print(failed)
-    qc = result[f"{observed_property}_qartod_rollup"]
-    qc.index = series.index
-    return series[qc != 4]
-
-def run_qartod_tests(
-    df: DataFrame, config: Config, time_column: str = "time"
-):
-    """
-    Run QARTOD tests on a DataFrame and return the results.
-    """
-    flags = PandasStream(df).run(config)
-    store = PandasStore(flags)
-    result = store.save().set_index(time_column)
-    frames: dict[str, list[str]] = {}
-    for test in result.columns:
-        _series, name = test.split("_qartod_")
-        if _series not in frames:
-            frames[_series] = []
-        frames[_series].append(name)
-
-    by_observed_property = []
-    print("frames:", frames)
-    for items in frames.items():
-        df = test_observed_property(result, *items)
-        by_observed_property.append(df)
-    return concat(by_observed_property, axis=0)
-
-def plot_qartod_flags(
-    ax: Axes,
-    series: Series,
-    observed_property: str,
-    config: Config,
-    time_column: str = "time",
-    zorder: int = 3,
-    label: bool = False,
-):
-    """
-    Add scatter markers for flagged data points.
-    """
-    df = series.rename_axis(time_column).reset_index()
-    qa = run_qartod_tests(df, config, time_column=time_column)
-    gb = qa.groupby("observed_property").get_group(observed_property)
-    suspect = series[gb["rollup"] == 3]
-    failed = series[gb["rollup"] == 4]
-    if len(suspect) > 0:
-        a = "suspect" if label else None
-        ax.scatter(
-            suspect.index, suspect, label=a, color="orange", marker="x", zorder=zorder
-        )
-    if len(failed) > 0:
-        b = "failed" if label else None
-        ax.scatter(
-            failed.index, failed, label=b, color="red", marker="x", zorder=zorder
-        )
 
 
 def plot_tail(
@@ -358,34 +260,6 @@ def group_observations_by_time(
     return bins, positions, years
 
 
-def describe_data_frame(df: DataFrame, config_path: str):
-    """
-    Display a summary of the DataFrame without an overwhelming amount of detail.
-    """
-    summary = df.describe().T.drop(columns=["25%", "50%", "75%", "std", "mean"])
-    print("\nSamples:\n")
-    print(summary)
-    config = Config(config_path)
-    flags = PandasStream(df.reset_index()).run(config)
-    store = PandasStore(flags)
-    result = store.save().set_index("time")
-    frames: dict[str, list[str]] = {}
-    for test in result.columns:
-        _series, name = test.split("_qartod_")
-        if _series not in frames:
-            frames[_series] = []
-        frames[_series].append(name)
-
-    by_observed_property = []
-    for items in frames.items():
-        df = test_observed_property(result, *items)
-        by_observed_property.append(df)
-    qa = concat(by_observed_property, axis=0)
-    gb = qa.groupby("observed_property")
-    print("\nQuality Assurance Flags:\n")
-    group_summary = gb.describe().T
-    print(group_summary)
-
 class Frequency(Enum):
     """
     Supported aggregation frequencies for plotting.
@@ -448,30 +322,3 @@ def boxplot(
     filepath = prefix / thing / f"{observed_property}_{freq.name.lower()}.{image_format.value}"
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath)
-
-
-def apply_qartod_filter(
-    series: Series,
-    observed_property: str,
-    config: Config,
-    time_column: str = "time",
-) -> Series:
-    df = series.reset_index()
-    flags = PandasStream(df).run(config)
-    store = PandasStore(flags)
-    result = store.save()
-    qc_columns = [
-        col
-        for col in result.columns
-        if col.startswith(f"{observed_property}_qartod_")
-        and not col.endswith("_rollup")
-    ]
-    result[f"{observed_property}_qartod_rollup"] = result[qc_columns].max(axis=1) #rollup of qartod for observed property
-    print(result.columns)
-    print(result[f"{observed_property}_qartod_rollup"].value_counts())
-    failed = result[result[f"{observed_property}_qartod_rollup"] == 4]
-    print("FAILED QC ROWS:")
-    print(failed)
-    qc = result[f"{observed_property}_qartod_rollup"]
-    qc.index = series.index
-    return series[qc != 4]

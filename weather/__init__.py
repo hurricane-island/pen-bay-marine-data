@@ -33,7 +33,6 @@ from lib import (
     plot_tail,
     fahrenheit_to_kelvin,
     cardinal_direction_to_degrees,
-    describe_data_frame,
     StandardUnits,
     Source
 )
@@ -501,7 +500,9 @@ def weather_file_describe(station: StationName):
     Parse and normalize weather station data for display
     """
     df = WeatherLinkArchive(station.value).df
-    describe_data_frame(df, f"{Path(__file__).parent}/qartod.yaml")
+    summary = df.describe().T.drop(columns=["25%", "50%", "75%", "std", "mean"])
+    print("\nSamples:\n")
+    print(summary)
 
 
 @file.command(name=ClickCommands.EXPORT.value)
@@ -522,7 +523,9 @@ def weather_db_describe(host: str, measurement: str, token: str):
     Show information about the data already stored in Influx database.
     """
     df = WeeWxInfluxArchive(measurement, token, host).df
-    describe_data_frame(df, f"{Path(__file__).parent}/qartod.yaml")
+    summary = df.describe().T.drop(columns=["25%", "50%", "75%", "std", "mean"])
+    print("\nSamples:\n")
+    print(summary)
 
 
 @database.command(name=ClickCommands.BACKFILL.value)
