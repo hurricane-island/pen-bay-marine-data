@@ -13,6 +13,7 @@ Features:
 
 import re
 import requests
+from typing import cast
 from itertools import cycle
 from pathlib import Path
 from enum import Enum
@@ -20,17 +21,13 @@ from datetime import datetime, timedelta
 from math import radians, cos, sin, sqrt, atan2
 from hashlib import md5
 from numpy import concatenate, array, argsort, where
-from pandas import Series, read_csv, DataFrame, concat
+from pandas import read_csv, DataFrame, concat
 from influxdb_client_3 import InfluxDBClient3
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.patches import Circle
 from matplotlib.markers import MarkerStyle
-from ioos_qc.config import Config
-from ioos_qc.streams import PandasStream
-from ioos_qc.stores import PandasStore
 from scipy.io import loadmat
 from pyproj import Transformer
-from yaml import safe_load
 import gpxpy
 import gpxpy.gpx
 import click
@@ -42,9 +39,16 @@ from lib import (
     boxplot,
     influx_host,
     influx_api_token,
-    test_observed_property,
     Frequency,
     ImageFormat
+)
+from buoys.qartod import (
+    run_qartod_tests,
+    TestTypes,
+    get_climatology_breakpoints,
+    load_and_merge_qa_configs,
+    qartod_configs_option,
+    qartod_test_option
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -281,49 +285,6 @@ def buoys_file_describe(name: StationName, table: TableName):
     print(summary)
 
 
-class TestTypes(Enum):
-    """
-    Supported QARTOD test types.
-    """
-
-    GROSS_RANGE = "gross_range"
-    RATE_OF_CHANGE = "rate_of_change"
-    SPIKE = "spike"
-    CLIMATOLOGY = "climatology"
-    FLAT_LINE = "flat_line"
-    ROLLUP = "rollup"
-    GAP = "gap"
-    LOCATION = "location"
-
-def deep_merge_inplace(base: dict, update: dict) -> None:
-    """
-    Recursively merges update into base in-place.
-    
-    Nested dictionaries are merged. All other types (including lists, sets, 
-    and primitives) are overwritten by the value in update.
-    """
-    for key, value in update.items():
-        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-            deep_merge_inplace(base[key], value)
-        else:
-            base[key] = value
-
-def load_and_merge_qa_configs(qartod: tuple[str]) -> dict:
-    """
-    Load the default QARTOD configuration and merge it with any user-provided
-    configuration files. The user-provided configurations will override the defaults.
-    """
-    accumulate = {}
-    for file in qartod:
-        qa_path = Path(__file__).parent / file
-        if not qa_path.exists():
-            raise click.ClickException(
-                f"QARTOD configuration file not found: {qa_path}"
-            )
-        with open(qa_path, "r", encoding="utf-8") as fid:
-            deep_merge_inplace(accumulate, safe_load(fid))
-    return accumulate
-
 def load_and_subset_multifile_table(
     name: StationName,
     table: TableName,
@@ -345,16 +306,20 @@ def load_and_subset_multifile_table(
     return resampled, dropped
 
 
+@file_group.command(name="qartod")
+@source_options
+def buoys_file_qartod():
+    """
+    Run QARTOD tests on the buoy data and return a DataFrame with quality flags.
+    """
+    pass  # Implementation goes here
+
+
 @plot.command(name=ClickOptions.TAIL.value)
 @source_options
 @plot_options
-@click.option(
-    "--qartod",
-    "-q",
-    multiple=True,
-    type=str,
-    help="QARTOD configuration file. Accepts multiple YAML files, which will be merged together in the order they are provided.",
-)
+@qartod_configs_option
+@qartod_test_option
 @click.option(
     "--days",
     default=30,
@@ -366,12 +331,6 @@ def load_and_subset_multifile_table(
     default=datetime.now(),
     type=click.DateTime(formats=["%Y-%m-%d"]),
     help="End date for the analysis and plotting. Defaults to the current date and time.",
-)
-@click.option(
-    "--test",
-    default=TestTypes.ROLLUP,
-    type=click.Choice(TestTypes, case_sensitive=False),
-    help="QARTOD test to plot.",
 )
 @click.option(
     "--scale/--no-scale",
@@ -426,47 +385,16 @@ def buoys_plot_tail(
     suffix = "no-qa"
     if len(qartod) > 0:
         config_key_value = load_and_merge_qa_configs(qartod)
-        climatology_breakpoints = config_key_value["streams"][series.value]["qartod"].get("climatology_test", {}).get("config", [])
-        breaks = []
-        for each in climatology_breakpoints:
-            for yr in (2025, 2026):
-                breaks.append(datetime(month=each["tspan"][0], day=1, year=yr))
-        config = Config(config_key_value)
-        gps, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, start, end)
-        lat = gps["Latitude"].to_numpy().flatten()
-        lon = gps["Longitude"].to_numpy().flatten()
+        breaks = get_climatology_breakpoints(config_key_value, series.value)
         suffix = "-".join(Path(each).stem for each in qartod) + "-" + test.value
-        df["Latitude"] = lat
-        df["Longitude"] = lon
-        flags = PandasStream(
-            df=df.reset_index(names="time"),
-            time="time",
-            lat="Latitude",
-            lon="Longitude",
-        ).run(config)
-        store = PandasStore(flags)
-        result = store.save().set_index("time").drop(columns=["lat", "lon"])
-        frames: dict[str, list[str]] = {}
-        for each in result.columns:
-            _series, _name = each.split("_qartod_")
-            if _series not in frames:
-                frames[_series] = []
-            frames[_series].append(_name)
-        by_observed_property = []
-        for _property, tests in frames.items():
-            test_results = test_observed_property(result, _property, tests)
-            check_nan = df[_property].isna()
-            test_results["gap"] = where(check_nan, 3, 1)
-            by_observed_property.append(test_results)
-        qa = (
-            concat(by_observed_property, axis=0)
-            .groupby("observed_property")
-            .get_group(series.value)
-        )
-        gaps = df.loc[qa["gap"] == 3, series.value]
+        gps, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, start, end)
+        df["Latitude"] = gps["Latitude"].to_numpy().flatten()
+        df["Longitude"] = gps["Longitude"].to_numpy().flatten()
+        qa = run_qartod_tests(df, config_key_value).get_group(series.value)
+        gaps = cast(DataFrame, df.loc[qa["gap"] == 3, series.value])
         qa = qa[test.value]
-        suspect = df.loc[qa == 3, series.value]
-        failed = df.loc[qa == 4, series.value]
+        suspect = cast(DataFrame, df.loc[qa == 3, series.value])
+        failed = cast(DataFrame, df.loc[qa == 4, series.value])
         remaining = df.loc[((qa < 3) | (qa == 9)), series.value].asfreq("h")
 
         ax.vlines(
