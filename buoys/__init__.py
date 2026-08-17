@@ -12,12 +12,14 @@ Features:
 
 import re
 from typing import cast, Optional
+from warnings import simplefilter
 from pathlib import Path
 from enum import Enum
 from datetime import datetime, timedelta
 from math import radians, cos, sin, sqrt, atan2
 from numpy import concatenate, array, argsort
 from pandas import read_csv, DataFrame, concat
+from pandas.errors import PerformanceWarning
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.patches import Circle
 from matplotlib.markers import MarkerStyle
@@ -267,6 +269,7 @@ def load_and_subset_multifile_table(
     Load and subset a multi-file table for a given station and table name, returning
     a DataFrame with data between the specified start and end dates.
     """
+    simplefilter(action="ignore", category=PerformanceWarning)
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
     if omit is not None:
@@ -304,57 +307,62 @@ def format_column_standard_name(col: str) -> str:
 
 @file_group.command(name=ClickOptions.EXPORT.value)
 @station_name
-@data_table
-def buoys_file_export(name: StationName, table: TableName):
+@qartod_configs_option
+@qartod_test_option
+@click.option(
+    "--flag",
+    type=click.Choice([3, 4]),
+    default=3,
+    help="Filter out this QARTOD flag. 3 = suspect/failed, 4 = failed. Defaults to 3.",
+)
+def buoys_file_export(
+    name: StationName,
+    qartod: tuple[str],
+    test: TestTypes,
+    flag: int
+):
     """
     Export buoy data to a different format.
     """
-    unique, _ = load_and_subset_multifile_table(name, table, None, None, omit=[
-        "RECORD",
-        "WiperPosition",
-        "Sonde_External_Voltage",
-        "Sonde_Battery",
-        "WiperPeakCurrent",
-        ("Chlorophyll", "cells/mL"),
-        ("Chlorophyll_ugL", "ug/L"),
-        ("Pressure_abs", "psi"),
-        "BGA_PE_cellsmL",
-        "Pressure_Vert_Pos",
-        "Depth",
-        ("Conductivity_us", "us/cm"),
-        ("SpConductivity_us", "us/cm"),
-        ("TDS", "mg/L"),
-        ("BGA_PE_ugL", "ug/L"),
-        ("Conductivity_nLF", "us/cm"),
-    ])
-    unique.index.rename("time", inplace=True)
-    headers = list(map(format_column_name_with_units, unique.columns))
-    start = unique.index.min()
-    end = unique.index.max()
-    path = (
+    
+    sonde, _ = load_and_subset_multifile_table(name, TableName.SONDE, None, None)
+    diagnostic, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, None, None)
+    df = sonde.drop(columns=["RECORD"]).join(diagnostic, how="left")[[
+        "Latitude",
+        "Longitude",
+        "External_Temp",
+        "Salinity",
+        "Chlorophyll_RFU",
+        "BGA_PE_RFU",
+        "ODO_Sat",
+        "ODO",
+        "Pressure_mH2O"
+    ]]
+    df.index.rename("time", inplace=True)
+    unit_names = list(map(format_column_name_with_units, df.columns))
+    std_names = list(map(format_column_standard_name, df.columns))
+    df.columns = std_names
+    config_key_value = load_and_merge_qa_configs(qartod)
+    qa = run_qartod_tests(df, config_key_value)
+    for group in qa.groups.keys():
+        flags = qa.get_group(group)[test.value]
+        df[group] = df[group].where((flags < flag) | (flags == 9))
+    df.columns = unit_names  # revert to original headers for export
+    start = df.index.min()
+    end = df.index.max()
+    filepath = (
         EXPORT_DIR
         / name.value
-        / table.name.lower()
         / (
             f"{start:%Y-%m-%d}_"
-            f"{end:%Y-%m-%d}"
+            f"{end:%Y-%m-%d}_"
+            f"{'-'.join(Path(each).stem for each in qartod)}"
+            f"-{test.value}"
         )
     ).with_suffix(".csv")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    unique.to_csv(path, header=headers)
-
-
-@file_group.command(name="qartod")
-@source_options
-@qartod_configs_option
-@qartod_test_option
-def buoys_file_qartod(
-    name: StationName, table: TableName, series: StandardNames, qartod: tuple[str], test: TestTypes
-):
-    """
-    Run QARTOD tests on the buoy data and return a DataFrame with quality flags.
-    """
-    click.echo(f"Running QARTOD tests for {name.value} {table.value}")
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(filepath, header=unit_names)
+    click.echo(f"Saved file to {filepath}")
 
 
 @plot.command(name=ClickOptions.TAIL.value)
@@ -394,26 +402,27 @@ def buoys_plot_tail(
     """
     Plot the most recent data from a buoy for a single data stream.
     """
+    simplefilter(action="ignore", category=PerformanceWarning)
+    if len(qartod) == 0:
+        raise click.ClickException(
+            "At least one QARTOD config file must be provided using the -q option."
+        )
     start: datetime = end - timedelta(days=days)
     df, dropped = load_and_subset_multifile_table(name, table, start, end)
     if df.empty:
         raise click.ClickException(
             f"No local data for {name.value} {table.value} between {start} and {end}."
         )
-    renamed = []
-    units = {}
-    for col in df.columns:
-        try:
-            vendor_name = VendoredNames(col[0])
-            std_name = StandardNames[vendor_name.name]
-            renamed.append(std_name.value)
-        except (KeyError, ValueError):
-            renamed.append(col[0])
-        units[renamed[-1]] = col[1]
+    gps, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, start, end)
+    df = df.drop(columns=["RECORD"]).join(gps, how="left")
+    renamed = list(map(format_column_standard_name, df.columns))
+    units = {each: col[1] for each, col in zip(renamed, df.columns)}
     df.columns = renamed
+    df = df[["Latitude", "Longitude", series.value]]
+    config_key_value = load_and_merge_qa_configs(qartod)
 
+    # Begin plotting
     fig, ax = plt.subplots(figsize=(7.5, 3))
-
     ax.plot(
         df.index,
         df[series.value],
@@ -424,15 +433,12 @@ def buoys_plot_tail(
         label="raw",
     )
     ylim = (None, None)
-    suffix = "no-qa"
-    if len(qartod) > 0:
-        config_key_value = load_and_merge_qa_configs(qartod)
-        breaks = get_climatology_breakpoints(config_key_value, series.value)
-        suffix = "-".join(Path(each).stem for each in qartod) + "-" + test.value
-        gps, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, start, end)
-        df["Latitude"] = gps["Latitude"].to_numpy().flatten()
-        df["Longitude"] = gps["Longitude"].to_numpy().flatten()
-        qa = run_qartod_tests(df, config_key_value).get_group(series.value)
+    if series.value in config_key_value["streams"]:
+        qa = run_qartod_tests(df, {
+            "streams": {
+                series.value: config_key_value["streams"][series.value]
+            }
+        }).get_group(series.value)
         gaps = cast(DataFrame, df.loc[qa["gap"] == 3, series.value])
         qa = qa[test.value]
         suspect = cast(DataFrame, df.loc[qa == 3, series.value])
@@ -450,7 +456,7 @@ def buoys_plot_tail(
             zorder=0
         )
         ax.vlines(
-            breaks,
+            get_climatology_breakpoints(config_key_value, series.value),
             ymin=0,
             ymax=1,
             color="black",
@@ -493,18 +499,18 @@ def buoys_plot_tail(
         transform=ax.get_xaxis_transform(),
         zorder=0
     )
-    start = df.index.min()
-    end = df.index.max()
-    _days = (end - start).days
+    _start = df.index.min()
+    _end = df.index.max()
+    _days = (_end - _start).days
     display_name = series.value.replace("_", " ").title()
-    if start.year == end.year:
-        year_range = f"{start.year}"
+    if _start.year == _end.year:
+        year_range = f"{_start.year}"
     else:
-        year_range = f"{start.year}-{end.year}"
+        year_range = f"{_start.year}-{_end.year}"
     ax.set_title(f"{name.value} {display_name} {year_range} ({test.value.replace('_', ' ')})".title())
     ax.set_xlabel("Date")
     ax.xaxis.set_tick_params(rotation=45)
-    ax.set_xlim(start, end)
+    ax.set_xlim(_start, _end)
     ax.set_ylim(*ylim)
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=(_days // 8) + 2))
     ax.xaxis.set_minor_locator(mdates.DayLocator(interval=1))
@@ -520,12 +526,12 @@ def buoys_plot_tail(
         / table.value
         / series.value
         / (
-            f"{start:%Y-%m-%d}_"
-            f"{end:%Y-%m-%d}_"
-            f"{suffix}."
-            f"{image_format.value}"
+            f"{_start:%Y-%m-%d}_"
+            f"{_end:%Y-%m-%d}_"
+            f"{'-'.join(Path(each).stem for each in qartod)}"
+            f"-{test.value}"
         )
-    )
+    ).with_suffix(f".{image_format.value}")
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath, dpi=300, bbox_inches="tight")
     click.echo(f"Saved plot to {filepath}")

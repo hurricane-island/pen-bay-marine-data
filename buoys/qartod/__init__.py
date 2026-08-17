@@ -3,12 +3,14 @@ Quality assurance and quality control (QA/QC) for buoy data using QARTOD tests.
 """
 
 from datetime import datetime
+from typing import cast
 from enum import Enum
 from pathlib import Path
 from click import option, Choice
 from yaml import safe_load
 from numpy import where
 from pandas import concat, DataFrame
+from pandas.core.groupby import DataFrameGroupBy
 from ioos_qc.config import Config
 from ioos_qc.streams import PandasStream
 from ioos_qc.stores import PandasStore
@@ -33,10 +35,11 @@ qartod_configs_option = option(
     "--qartod",
     "-q",
     multiple=True,
+    required=True,
     type=str,
     help=(
-        "QARTOD configuration file(s). Accepts multiple YAML files, "
-        "which will be merged together in the order they are provided."
+        "QARTOD configuration YAML file(s), which will be merged together "
+        "in the order they are provided."
     ),
 )
 
@@ -133,7 +136,7 @@ def run_qartod_tests(
     time_col: str = "time",
     lat_col: str = "Latitude",
     lon_col: str = "Longitude",
-):
+) -> DataFrameGroupBy:
     """
     Run QARTOD tests on the provided data using the specified configuration. This
     expects latitude and longitude columns to be present in the DataFrame for
@@ -155,4 +158,5 @@ def run_qartod_tests(
         flags = test_observed_property(result, key, tests, group_by_key)
         flags[TestTypes.GAP.value] = where(df[key].isna(), 3, 1)
         by_observed_property.append(flags)
-    return concat(by_observed_property, axis=0).groupby(group_by_key)
+    result = cast(DataFrame, concat(by_observed_property, axis=0))
+    return result.groupby(group_by_key)
