@@ -11,7 +11,7 @@ Features:
 """
 
 import re
-from typing import cast
+from typing import cast, Optional
 from pathlib import Path
 from enum import Enum
 from datetime import datetime, timedelta
@@ -63,7 +63,6 @@ class ClickOptions(Enum):
     FILE = "file"
     BUOYS = "buoys"
     PLOT = "plot"
-    FIRMWARE = "firmware"
     # plotting commands
     TAIL = "tail"
     DATASTREAM = "datastream"
@@ -162,13 +161,6 @@ def file_group():
     """
 
 
-@click.group(name=ClickOptions.DB.value)
-def database():
-    """
-    Commands that interact with the buoy database.
-    """
-
-
 station_name = click.argument(
     "name", type=click.Choice(StationName, case_sensitive=False)
 )
@@ -190,9 +182,7 @@ def source_options(function):
 
 # Subcommands assignment
 buoys.add_command(plot)
-buoys.add_command(firmware)
 buoys.add_command(file_group)
-buoys.add_command(database)
 
 
 @file_group.command(name=ClickOptions.LIST.value)
@@ -269,8 +259,9 @@ def buoys_file_describe(name: StationName, table: TableName):
 def load_and_subset_multifile_table(
     name: StationName,
     table: TableName,
-    start: datetime,
-    end: datetime
+    start: Optional[datetime],
+    end: Optional[datetime],
+    omit: Optional[list[str|tuple[str, str]]] = None,
 ) -> tuple[DataFrame, list]:
     """
     Load and subset a multi-file table for a given station and table name, returning
@@ -278,24 +269,92 @@ def load_and_subset_multifile_table(
     """
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
-    mask = (df.index > start) & (df.index <= end)
-    df = df[mask].sort_values("TimeRecovered")
+    if omit is not None:
+        df = df.drop(columns=omit, errors="ignore")
+    _end = end if end is not None else datetime.now()
+    mask = (df.index <= _end)
+    if start is not None:
+        mask &= (df.index > start)
+    df = df[mask].sort_values("TimeRecovered").drop(columns=["TimeRecovered"], errors="ignore")
     duplicates = df.index.duplicated(keep="first")
     dropped = df[duplicates].index.to_list()
     df = df[~duplicates].sort_index(kind="stable")
     resampled = df.asfreq("h")  # Resample and fill gaps with NaN to force gaps when plotting
     return resampled, dropped
 
+def format_column_name_with_units(col: str) -> str:
+    """
+    Format a column name with its units if available.
+    """
+    if isinstance(col, tuple) and len(col) == 3:
+        name, unit, _ = col
+        return f"{name} ({unit})"
+    return str(col)
+
+def format_column_standard_name(col: str) -> str:
+    """
+    Replace with standard name if available, otherwise return the original column name.
+    """
+    try:
+        vendor_name = VendoredNames(col[0])
+        std_name = StandardNames[vendor_name.name]
+        return std_name.value
+    except (KeyError, ValueError):
+        return col[0]
+
+@file_group.command(name=ClickOptions.EXPORT.value)
+@station_name
+@data_table
+def buoys_file_export(name: StationName, table: TableName):
+    """
+    Export buoy data to a different format.
+    """
+    unique, _ = load_and_subset_multifile_table(name, table, None, None, omit=[
+        "RECORD",
+        "WiperPosition",
+        "Sonde_External_Voltage",
+        "Sonde_Battery",
+        "WiperPeakCurrent",
+        ("Chlorophyll", "cells/mL"),
+        ("Chlorophyll_ugL", "ug/L"),
+        ("Pressure_abs", "psi"),
+        "BGA_PE_cellsmL",
+        "Pressure_Vert_Pos",
+        "Depth",
+        ("Conductivity_us", "us/cm"),
+        ("SpConductivity_us", "us/cm"),
+        ("TDS", "mg/L"),
+        ("BGA_PE_ugL", "ug/L"),
+        ("Conductivity_nLF", "us/cm"),
+    ])
+    unique.index.rename("time", inplace=True)
+    headers = list(map(format_column_name_with_units, unique.columns))
+    start = unique.index.min()
+    end = unique.index.max()
+    path = (
+        EXPORT_DIR
+        / name.value
+        / table.name.lower()
+        / (
+            f"{start:%Y-%m-%d}_"
+            f"{end:%Y-%m-%d}"
+        )
+    ).with_suffix(".csv")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    unique.to_csv(path, header=headers)
+
 
 @file_group.command(name="qartod")
 @source_options
+@qartod_configs_option
+@qartod_test_option
 def buoys_file_qartod(
-    name: StationName, table: TableName, series: StandardNames, qartod: tuple[str]
+    name: StationName, table: TableName, series: StandardNames, qartod: tuple[str], test: TestTypes
 ):
     """
     Run QARTOD tests on the buoy data and return a DataFrame with quality flags.
     """
-    pass  # Implementation goes here
+    click.echo(f"Running QARTOD tests for {name.value} {table.value}")
 
 
 @plot.command(name=ClickOptions.TAIL.value)
@@ -434,8 +493,8 @@ def buoys_plot_tail(
         transform=ax.get_xaxis_transform(),
         zorder=0
     )
-    start = max(df.index.min(), start)
-    end = min(df.index.max(), end)
+    start = df.index.min()
+    end = df.index.max()
     _days = (end - start).days
     display_name = series.value.replace("_", " ").title()
     if start.year == end.year:
@@ -445,7 +504,7 @@ def buoys_plot_tail(
     ax.set_title(f"{name.value} {display_name} {year_range} ({test.value.replace('_', ' ')})".title())
     ax.set_xlabel("Date")
     ax.xaxis.set_tick_params(rotation=45)
-    ax.set_xlim(max(start, df.index.min()), end)
+    ax.set_xlim(start, end)
     ax.set_ylim(*ylim)
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=(_days // 8) + 2))
     ax.xaxis.set_minor_locator(mdates.DayLocator(interval=1))
@@ -759,51 +818,6 @@ def buoys_plot_datastream(
     )
 
 
-@file_group.command(name=ClickOptions.EXPORT.value)
-@station_name
-@data_table
-def buoys_file_export(name: StationName, table: TableName):
-    """
-    Export buoy data to a different format.
-    """
-    files = filter_buoy_flat_files(name, table)
-    drop_columns = [
-        "RECORD",
-        "WiperPosition",
-        "Sonde_External_Voltage",
-        "Sonde_Battery",
-        "WiperPeakCurrent",
-        "TimeRecovered",
-        ("Chlorophyll", "cells/mL"),
-        "BGA_PE_cellsmL",
-        "Pressure_Vert_Pos",
-        "Depth",
-    ]
-    df = read_campbell_logger_files(list(files)).drop(
-        columns=drop_columns, errors="ignore"
-    )
-    mask = ~df.index.duplicated(
-        keep=False
-    )  # TODO: This approach drops all duplicate index entries. Consider implementing a more nuanced duplicate handling strategy if needed.
-    unique = df[mask].sort_index()
-    unique.index.rename("time", inplace=True)
-
-    def format_column(col) -> str:
-        # Handle columns that are not 3-tuples gracefully
-        if isinstance(col, tuple) and len(col) == 3:
-            name, unit, _ = col
-            return f"{name} ({unit})"
-        # Fallback: just return string representation
-        return str(col)
-
-    headers = list(map(format_column, unique.columns))
-    parts = list(filter(None, re.split(r"([A-Z][^A-Z]*)", table.value)))
-    parts.insert(0, name.value)
-    filename = "-".join(parts).lower()
-    path = (EXPORT_DIR / filename / filename).with_suffix(".csv")
-    unique.to_csv(path, header=headers)
-
-
 @file_group.command(name="gpx")
 @station_name
 def buoys_file_gpx(name: StationName):
@@ -885,4 +899,3 @@ def buoys_file_first_and_second_derivative(
         index=ds.index
     ).describe(percentiles=sorted(percentile)).map('{:.8f}'.format)
     click.echo(summary)
-
