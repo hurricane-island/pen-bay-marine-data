@@ -27,6 +27,7 @@ class ImageFormat(Enum):
     """
 
     PNG = "png"
+    PDF = "pdf"
 
 
 class StandardUnits(Enum):
