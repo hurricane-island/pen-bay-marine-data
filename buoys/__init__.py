@@ -98,9 +98,9 @@ class VendoredNames(Enum):
     SEA_WATER_SALINITY = "Salinity"
     SEA_WATER_CHLOROPHYLL_RFU = "Chlorophyll_RFU"
     SEA_WATER_PHYCOERYTHRIN_RFU = "BGA_PE_RFU"
-    BAROMETRIC_PRESSURE = "Pressure_abs"
+    BAROMETRIC_PRESSURE = "Pressure_mH2O"
     BATTERY_VOLTAGE = "BatteryVoltage"
-    WATER_PRESSURE = "Pressure_mH2O"
+    WATER_PRESSURE = "Pressure_abs"
     DISSOLVED_OXYGEN = "ODO"
     DISSOLVED_OXYGEN_SATURATION = "ODO_Sat"
 
@@ -119,7 +119,7 @@ class StandardNames(Enum):
     SEA_WATER_PHYCOERYTHRIN_RFU = "sea_water_phycoerythrin_rfu"
     BAROMETRIC_PRESSURE = "barometric_pressure"
     BATTERY_VOLTAGE = "battery_voltage"
-    WATER_PRESSURE = "water_pressure"
+    WATER_PRESSURE = "sea_water_pressure"
     DISSOLVED_OXYGEN = "dissolved_oxygen"
     DISSOLVED_OXYGEN_SATURATION = "dissolved_oxygen_saturation"
 
