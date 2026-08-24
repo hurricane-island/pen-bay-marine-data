@@ -1,8 +1,13 @@
 Public BattV
 Public PTemp_C
 Public WindUV(2)
-Alias WindUV(1) = U
-Alias WindUV(2) = V
+Alias WindUV(1) = U2
+Alias WindUV(2) = V2
+
+Public WindUVStatus(3)
+Alias WindUVStatus(1) = U3
+Alias WindUVStatus(2) = V3
+Alias WindUVStatus(3) = Status
 
 Units BattV = Volts
 Units PTemp_C = Deg C
@@ -12,5 +17,6 @@ BeginProg
     Battery(BattV)
     PanelTemp(PTemp_C, 60)
     SDI12Recorder(WindUV, C1, "0", "R1!", 1, 0)
+    SDI12Recorder(WindUVStatus, C1, "0", "R1!", 1, 0)
   NextScan
 EndProg
