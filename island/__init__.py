@@ -53,7 +53,6 @@ def island_plot_grid() -> None:
         f"Power In: {df_this_year['In kWh']:.2f} vs {df_last_year['In kWh']:.2f} ({(df_this_year['In kWh'] / df_last_year['In kWh']) * 100:.2f}%)")
 
 
-
     fig, ax = subplots(figsize=(10, 3))
     rsmp_load = df["Out kWh"].resample(interval).sum()
     ax.plot(rsmp_load.index, rsmp_load, color="black", label="Out kWh", linewidth=0.5)
@@ -65,16 +64,19 @@ def island_plot_grid() -> None:
 
     ax.set_title(f"Power and State of Charge ({interval} window)")
     ax.set_xlabel("Date")
+    ax.set_xlim(datetime(2026, 1, 1), None)
     ax.set_ylabel("Total Power In/Out (kWh)", color="black")
     ax.xaxis.set_major_locator(DayLocator(bymonthday=1))
     ax.xaxis.set_major_formatter(DateFormatter("%b"))  # Customize format
 
     ax2 = ax.twinx()
     weekly_soc = df["Min SOC"].resample(interval).min()
+   
     ax2.plot(weekly_soc.index, weekly_soc, color="black", linewidth=2.0)
     ax2.set_ylabel("Min State of Charge (%)", color="black")
     ax2.set_ylim(0, 100)  # Set y-axis limits for SOC
     ax2.tick_params(axis='y', colors='black')  # Set tick color for SOC axis
+    fig.autofmt_xdate()
     fig.tight_layout()
     fig.savefig(FIGURES / "outback.png", dpi=300, bbox_inches="tight")
 
