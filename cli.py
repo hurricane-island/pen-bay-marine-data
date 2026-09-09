@@ -8,6 +8,7 @@ from buoys import buoys
 from profiles import profiles
 from lorawan import lorawan
 from island import island
+from emolt import emolt
 
 
 @group(name="cli")
@@ -21,6 +22,7 @@ cli.add_command(buoys)
 cli.add_command(profiles)
 cli.add_command(lorawan)
 cli.add_command(island)
+cli.add_command(emolt)
 
 if __name__ == "__main__":
     # Show all data instead of substituting "..."
