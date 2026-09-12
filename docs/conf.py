@@ -8,7 +8,7 @@
 import os
 import sys
 project = 'Pen Bay Marine Data'
-copyright = '2025, Hurricane Island Center for Science and Leadership'
+copyright = '2025-26, Hurricane Island Center for Science and Leadership'
 author = 'Hurricane Island Center for Science and Leadership'
 
 # -- General configuration ---------------------------------------------------
