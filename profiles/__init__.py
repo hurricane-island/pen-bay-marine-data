@@ -2,16 +2,16 @@
 Command line interfaces for working with vertical profiles of water column data,
 such as temperature, salinity, and density.
 """
-import click
 from enum import Enum
-from typing import cast
+from typing import Optional, cast
 from pathlib import Path
-from pandas import read_csv, DataFrame, Series, cut
-from numpy import arange, zeros, arange, ones, array, column_stack, concatenate, meshgrid, linspace, isnan, interp, nan, floor, ceil
+from click import group, argument, option, Choice, echo
+from pandas import read_csv, DataFrame, cut
+from numpy import arange, array, column_stack, meshgrid, linspace, interp, nan
 from matplotlib.pyplot import subplots, close
 from scipy.interpolate import griddata
 from gsw import rho
-from buoys import haversine
+from lib import haversine
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
@@ -33,7 +33,7 @@ class Dimension(Enum):
     DENSITY = "density"
     PRESSURE = "DEP psia"
 
-@click.group()
+@group()
 def profiles():
     """Profile CLI commands."""
 
@@ -71,23 +71,23 @@ def load_profile_downcast(filepath: Path, encoding="utf-16"):
 
 
 @plot.command(name="single")
-@click.argument(
+@argument(
     "filename"
 )
-@click.option(
+@option(
     "--dim",
     default=Dimension.TEMPERATURE,
-    type=click.Choice(Dimension, case_sensitive=False),
+    type=Choice(Dimension, case_sensitive=False),
     required=True,
     help="Dimension for analysis.",
 )
-@click.option(
+@option(
     "--step",
     default=1.0,
     help="Step size for depth binning.",
     type=float
 )
-@click.option(
+@option(
     "--figsize",
     default=(3, 4),
     help="Figure size as a tuple (width, height).",
@@ -158,25 +158,25 @@ def profiles_plot_single(filename: str, dim: Dimension, step: float, figsize: tu
     outfile.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
     fig.savefig(outfile, dpi=300, bbox_inches='tight')
-    click.echo(f"Figure saved to {outfile}")
+    echo(f"Figure saved to {outfile}")
     close(fig)
 
 @plot.command("transect")
-@click.argument("prefix")
-@click.option(
+@argument("prefix")
+@option(
     "--dim",
     default=Dimension.TEMPERATURE,
-    type=click.Choice(Dimension, case_sensitive=False),
+    type=Choice(Dimension, case_sensitive=False),
     required=True,
     help="Dimension for analysis.",
 )
-@click.option(
+@option(
     "--levels",
-    default=10,
-    type=int,
+    default=None,
+    type=Optional[int],
     help="Bins for colormap breaks."
 )
-def profiles_plot_transect(prefix: str, dim: Dimension, levels=10):
+def profiles_plot_transect(prefix: str, dim: Dimension, levels: Optional[int]):
     """
     Create a plot of a transect, with value linearly interpolated between
     sites.
@@ -217,7 +217,6 @@ def profiles_plot_transect(prefix: str, dim: Dimension, levels=10):
     # Determine the bounds of the transect cross-section
     x_min, x_max = x.min(), x.max()
     z_min, z_max = z.min(), z.max()
-    h_min, h_max = h.min(), h.max()
 
     # Create a structured grid coordinate matrix
     x_pts = linspace(x_min, x_max, 200)
@@ -238,7 +237,7 @@ def profiles_plot_transect(prefix: str, dim: Dimension, levels=10):
     grid_v[out_of_bounds_mask] = nan
 
     fig, ax = subplots(figsize=(10, 6))
-    contour = ax.contourf(grid_x, grid_z, grid_v, cmap='cool')
+    contour = ax.contourf(grid_x, grid_z, grid_v, cmap='cool', levels=levels)
     cbar = fig.colorbar(contour, shrink=0.5)
     cbar.set_label(dim.name.lower())
     ax.scatter(x, z, color='none', edgecolor='black', s=40)

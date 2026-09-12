@@ -2,7 +2,7 @@
 Command line interface for working with buoy database.
 """
 
-from pathlib import Path
+from typing import cast
 from enum import Enum
 from pandas import DataFrame
 from influxdb_client_3 import InfluxDBClient3
@@ -12,25 +12,26 @@ from lib import (
     influx_host,
     influx_api_token,
 )
-from buoys import (
-    buoys,
-    station_name,
-    data_table,
-    filter_buoy_flat_files,
-    read_single_campbell_logger_file,
+from buoys.options import (
     StationName,
     TableName,
     VendoredNames,
     StandardNames,
+    station_name,
+    data_table,
+    filter_buoy_flat_files,
+    read_single_campbell_logger_file,
 )
-
-DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 class DatabaseCommands(Enum):
+    """
+    Group and commands for interacting with the buoy database.
+    """
+
     DATABASE = "db"
-    UPLOAD = "upload"
     DESCRIBE = "describe"
+    UPLOAD = "upload"
 
 
 @group(name=DatabaseCommands.DATABASE.value)
@@ -40,7 +41,23 @@ def database():
     """
 
 
-buoys.add_command(database)
+@database.command(DatabaseCommands.DESCRIBE.value)
+@influx_options
+def buoys_db_describe(
+    host: str, measurement: str, token: str
+):
+    """
+    Read all variables in a measurement (table) back from the
+    influx database.
+    """
+    time = "time"
+    client = InfluxDBClient3(host=host, database="buoy-test", token=token)
+    result = client.query(
+        f"SELECT * FROM {measurement} ORDER BY {time} LIMIT 10",
+        mode="pandas",
+    )
+    read_back = cast(DataFrame, result)
+    print(read_back.head())
 
 
 @database.command(name="upload")
@@ -54,7 +71,6 @@ def buoys_db_upload(name: StationName, table: TableName, host: str, token: str):
     """
     files = list(filter_buoy_flat_files(name, table))
     client = InfluxDBClient3(host=host, database="buoy-test-3", token=token)
-    # columns = [VendoredNames.SEA_WATER_TEMPERATURE, VendoredNames.SEA_WATER_SALINITY]
     columns = [VendoredNames.SEA_WATER_TEMPERATURE]
     rename = [StandardNames[key.name].value for key in columns]
     for each in files:
@@ -72,19 +88,3 @@ def buoys_db_upload(name: StationName, table: TableName, host: str, token: str):
             data_frame_measurement_name=table.value,
             data_frame_tag_columns=["location", "thing", "firmware"],
         )
-
-
-@database.command(DatabaseCommands.DESCRIBE.value)
-@station_name
-@data_table
-@influx_options
-def buoys_db_describe(
-    name: StationName, table: TableName, host: str, measurement: str, token: str
-):
-    time = "time"
-    client = InfluxDBClient3(host=host, database="buoy-test", token=token)
-    read_back: DataFrame = client.query(
-        f"SELECT * FROM {measurement} ORDER BY {time} LIMIT 10",
-        mode="pandas",
-    )
-    print(read_back.head())
