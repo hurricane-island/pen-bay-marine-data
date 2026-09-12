@@ -7,8 +7,11 @@
 *.egg-info
 weather/weewx.conf
 */__pycache__/
+*/*/__pycache__/
+*/*/*/__pycache__/
 *.pyc
 
 # sphinx build
 www/
 github-pages/
+*/figures/

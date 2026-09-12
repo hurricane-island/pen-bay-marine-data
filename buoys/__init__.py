@@ -16,7 +16,6 @@ from warnings import simplefilter
 from pathlib import Path
 from enum import Enum
 from datetime import datetime, timedelta
-from math import radians, cos, sin, sqrt, atan2
 from numpy import concatenate, array, argsort
 from pandas import read_csv, DataFrame, concat
 from pandas.errors import PerformanceWarning
@@ -24,18 +23,21 @@ from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.patches import Circle
 from matplotlib.markers import MarkerStyle
 from scipy.io import loadmat
+from scipy.stats import median_abs_deviation
 from pyproj import Transformer
 import gpxpy
 import gpxpy.gpx
 import click
-from scipy.stats import median_abs_deviation
 from lib import (
     Source,
     plot_options,
     boxplot,
     Frequency,
-    ImageFormat
+    ImageFormat,
+    haversine
 )
+from buoys.database import database
+from buoys.firmware import firmware
 from buoys.qartod import (
     run_qartod_tests,
     TestTypes,
@@ -44,44 +46,24 @@ from buoys.qartod import (
     qartod_configs_option,
     qartod_test_option
 )
-from hashlib import md5
-from click import group, option, echo
-
-FIRMWARE_DIR = Path(__file__).parent / "programs"
-TEMPLATE_DIR = Path(__file__).parent / "templates"
-
-
-class FirmwareCommands(Enum):
-    """
-    Enum for firmware commands.
-    """
-
-    FIRMWARE = "firmware"
-    TEMPLATE = "template"
-    LIBRARY = "lib"
-
-
-@group(name=FirmwareCommands.FIRMWARE.value)
-def firmware():
-    """
-    Command line interface for working with buoy data and firmware.
-    """
+from buoys.options import (
+    StationName,
+    TableName,
+    VendoredNames,
+    StandardNames,
+    station_name,
+    data_table,
+    source_options,
+    figure_size,
+    read_campbell_logger_files,
+    filter_buoy_flat_files,
+    DATA_DIR,
+    FIGURES_DIR,
+    EXPORT_DIR,
+    CABLE_DIR,
+)
 
 
-def checksum(contents: str) -> str:
-    """
-    Generate a checksum for a file based on its contents.
-    This can be used to create unique filenames for firmware templates.
-    """
-    encoded_data = contents.encode("utf-8")
-    hasher = md5()
-    hasher.update(encoded_data)
-    return hasher.hexdigest()
-
-DATA_DIR = Path(__file__).parent / "data"
-FIGURES_DIR = Path(__file__).parent / "figures"
-EXPORT_DIR = Path(__file__).parent / "export"
-CABLE_DIR = Path(__file__).parent / "cable"
 transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
 
 
@@ -101,60 +83,6 @@ class ClickOptions(Enum):
     # plotting commands
     TAIL = "tail"
     DATASTREAM = "datastream"
-
-
-class StationName(Enum):
-    """
-    Supported buoy station names.
-    """
-
-    WYNKEN = "wynken"
-    BLYNKEN = "blynken"
-
-
-class TableName(Enum):
-    """
-    Supported data table names.
-    """
-
-    DIAGNOSTIC = "Ai1"
-    SONDE = "SondeValues"
-
-
-class VendoredNames(Enum):
-    """
-    Names that are used in the raw data but don't conform to CF Metadata standards.
-    These are mapped to `StandardNames` for use in the CLI and plotting functions.
-    """
-
-    SEA_WATER_TEMPERATURE = "External_Temp"
-    SEA_WATER_SALINITY = "Salinity"
-    SEA_WATER_CHLOROPHYLL_RFU = "Chlorophyll_RFU"
-    SEA_WATER_PHYCOERYTHRIN_RFU = "BGA_PE_RFU"
-    BAROMETRIC_PRESSURE = "Pressure_mH2O"
-    BATTERY_VOLTAGE = "BatteryVoltage"
-    WATER_PRESSURE = "Pressure_abs"
-    DISSOLVED_OXYGEN = "ODO"
-    DISSOLVED_OXYGEN_SATURATION = "ODO_Sat"
-
-
-class StandardNames(Enum):
-    """
-    Supported data series names.
-    """
-
-    SEA_WATER_TEMPERATURE = "sea_water_temperature"
-    MASS_CONCENTRATION_OF_OXYGEN_IN_SEA_WATER = (
-        "mass_concentration_of_oxygen_in_sea_water"
-    )
-    SEA_WATER_SALINITY = "sea_water_salinity"
-    SEA_WATER_CHLOROPHYLL_RFU = "sea_water_chlorophyll_rfu"
-    SEA_WATER_PHYCOERYTHRIN_RFU = "sea_water_phycoerythrin_rfu"
-    BAROMETRIC_PRESSURE = "barometric_pressure"
-    BATTERY_VOLTAGE = "battery_voltage"
-    WATER_PRESSURE = "sea_water_pressure"
-    DISSOLVED_OXYGEN = "dissolved_oxygen"
-    DISSOLVED_OXYGEN_SATURATION = "dissolved_oxygen_saturation"
 
 
 # pylint: disable=too-few-public-methods
@@ -178,62 +106,29 @@ class ObservedProperty:
 @click.group(name=ClickOptions.BUOYS.value)
 def buoys():
     """
-    Command line interface for working with buoy data and firmware.
+    Interface for working with buoy data and firmware.
     """
-
-buoys.add_command(firmware)
 
 
 @click.group(name=ClickOptions.PLOT.value)
 def plot():
     """
-    Commands that generate plots using buoy data.
+    Generate plots using buoy data.
     """
 
 
 @click.group(name=ClickOptions.FILE.value)
 def file_group():
     """
-    Commands that interact with the buoy data file system.
+    Interact with the buoy data file system.
     """
 
 
-station_name = click.argument(
-    "name", type=click.Choice(StationName, case_sensitive=False)
-)
-data_table = click.argument("table", type=click.Choice(TableName, case_sensitive=False))
-
-
-def source_options(function):
-    """
-    Choose weather station and observation series. Re-usable decorator
-    for commands that need to select a station and series.
-    """
-    function = click.argument(
-        "series", type=click.Choice(StandardNames, case_sensitive=False)
-    )(function)
-    function = data_table(function)
-    function = station_name(function)
-    return function
-
-def figure_size(default_size: tuple[float, float]):
-    """
-    Decorator to add a --figsize option to a Click command.
-    """
-
-    def decorator(cmd):
-        return click.option(
-            "--figsize",
-            nargs=2,
-            default=default_size,
-            help="Size of the output figure in inches (width, height).",
-        )(cmd)
-
-    return decorator
-
-# Subcommands assignment
-buoys.add_command(plot)
+# Subcommands assignment, alphabetical order
+buoys.add_command(database)
 buoys.add_command(file_group)
+buoys.add_command(firmware)
+buoys.add_command(plot)
 
 
 @file_group.command(name=ClickOptions.LIST.value)
@@ -250,42 +145,6 @@ def buoys_file_list():
     for each in sorted(seen):
         print(each)
 
-
-def read_single_campbell_logger_file(file: Path) -> DataFrame:
-    """
-    Read a single Campbell logger file and return a DataFrame.
-    """
-    df = read_csv(file, header=[1, 2, 3], na_values=["NAN"], parse_dates=[0])
-    ts_col = df.columns[0]
-    return df.set_index(ts_col)
-
-
-def read_campbell_logger_files(files: list[Path]) -> DataFrame:
-    """
-    Read multiple Campbell logger files and return a single DataFrame.
-    """
-    all_data = []
-    for file in sorted(files):
-        df = read_single_campbell_logger_file(file)
-        # Add metadata column to be able to select overlapping data later without a join
-        time_recovered = file.stem.split("_")[2]
-        df["TimeRecovered"] = datetime.strptime(time_recovered, "%Y-%m-%dT%H-%M")
-        all_data.append(df)
-    return concat(all_data).dropna(how="all", axis=1)
-
-
-def filter_buoy_flat_files(name: StationName, table: TableName):
-    """
-    Filter buoy flat files based on command line options.
-    """
-
-    def filter_prefix(f: Path) -> bool:
-        lower_name = f.stem.lower()
-        station_match = name.value.lower() in lower_name
-        table_match = table.value.lower() in lower_name
-        return station_match and table_match
-
-    return filter(filter_prefix, DATA_DIR.glob("*.dat"))
 
 
 @file_group.command(name=ClickOptions.DESCRIBE.value)
@@ -681,17 +540,6 @@ def predicted_watch_circle(
     return predicted
 
 
-def haversine(lon1, lat1, lon2, lat2):
-    R = 6371000.0  # Earth radius in meters
-
-    phi1, phi2 = radians(lat1), radians(lat2)
-    delta_phi = radians(lat2 - lat1)
-    delta_lambda = radians(lon2 - lon1)
-    a = sin(delta_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(delta_lambda / 2) ** 2
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    return R * c  # Distance in meters
-
-
 @plot.command(name="locations")
 @station_name
 @click.option("--latitude", required=True, type=float)
@@ -956,78 +804,3 @@ def buoys_file_first_and_second_derivative(
         index=ds.index
     ).describe(percentiles=sorted(percentile)).map('{:.8f}'.format)
     click.echo(summary)
-
-
-
-
-@firmware.command(name=FirmwareCommands.TEMPLATE.value)
-@station_name
-@option("--address", required=True, help="Pakbus address")
-@option("--client", required=True, help="Client ID")
-@option("--file", default="buoy.dld", help="Template file")
-@option("--latitude", required=True, help="Latitude")
-@option("--longitude", required=True, help="Longitude")
-def buoys_firmware_template(
-    name: StationName,
-    address: str,
-    client: str,
-    file: str,
-    latitude: str,
-    longitude: str,
-):
-    """
-    Fill in firmware template with options passed on
-    the command line.
-    """
-    with open(TEMPLATE_DIR / file, "r", encoding="utf-8") as fid:
-        filedata = fid.read()
-
-    for var, value in {
-        "STATION_NAME": name.value,
-        "PAKBUS_ADDRESS": address,
-        "CLIENT_ID": client,
-        "LATITUDE": latitude,
-        "LONGITUDE": longitude,
-    }.items():
-        slug = "$" + var
-        filedata = filedata.replace(slug, value)
-
-    prefix = name.value.lower()
-    filename = FIRMWARE_DIR / f"{prefix}.{checksum(filedata)}.dld"
-    filename.parent.mkdir(parents=True, exist_ok=True)
-    with open(filename, "w", encoding="utf-8") as fid:
-        fid.write(filedata)
-
-
-@firmware.command(name=FirmwareCommands.LIBRARY.value)
-@option("--file", default="lib.dld", help="Template file")
-def buoys_firmware_library(file: str):
-    """
-    Fill in firmware template with options passed on
-    the command line.
-    """
-    with open(TEMPLATE_DIR / file, "r", encoding="utf-8") as fid:
-        filedata = fid.read()
-    filename = FIRMWARE_DIR / f"lib.{checksum(filedata)}.dld"
-    filename.parent.mkdir(parents=True, exist_ok=True)
-    with open(filename, "w", encoding="utf-8") as fid:
-        fid.write(filedata)
-
-
-@firmware.command(name="mock")
-@station_name
-def buoys_firmware_mock(name: StationName):
-    """
-    Generate a mock message from a buoy logger for testing cloud
-    integrations, including databases, location alerts, and missing
-    data detection.
-    """
-    # comma separate list, with each up to 26 characters
-    head = f"SL({name.value.lower()})\r"
-    names = "SN=ExternalTemp,SpConductivity_us,Pressure_abs,Chlorophyll_RFU,BGA_PE_RFU,BatteryVoltage,InternalHumidity,Salinity,Latitude,Longitude"
-    values = (
-        "D=08/11/26,17:15:00,13.42,41200,10.15,2.87,0.41,13.06,38,44.04203,-68.89106\r"
-    )
-    tail = "DIS\r"
-    echo(head + names + values + tail)
-

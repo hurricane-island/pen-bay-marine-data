@@ -5,17 +5,15 @@ to processing Pandas DataFrames and plotting with Matplotlib.
 
 from datetime import datetime, timedelta
 from enum import Enum
+from math import radians, sin, cos, atan2, sqrt
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, cast
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.axes import Axes
 from click import Choice, option
-from pandas import DataFrame, Grouper, Series, concat
+from pandas import DataFrame, Grouper, Series
 from numpy import array, float32, diff
 from numpy.typing import NDArray
-from ioos_qc.config import Config
-from ioos_qc.streams import PandasStream
-from ioos_qc.stores import PandasStore
 
 class ImageFormat(Enum):
     """
@@ -201,7 +199,6 @@ def plot_tail(
     fig, ax = plt.subplots(figsize=figsize)
     local_tail = local.loc[local.index > start]
     plot_single_series(local_tail, ax, resample, label="local", color="grey")
-
     if remote is not None:
         tail = remote.loc[remote.index > start]
         plot_single_series(
@@ -212,19 +209,18 @@ def plot_tail(
             color="black",
             linestyle=":",
         )
-    df = local_tail.rename_axis(time_column).reset_index()
     display_name = observed_property.replace("_", " ").title()
     if start.year == end.year:
         year_range = f"{start.year}"
     else:
         year_range = f"{start.year}-{end.year}"
-    plt.title(f"{thing} {display_name} {year_range}".title())
+    ax.set_title(f"{thing} {display_name} {year_range}".title())
     ax.set_xlabel("Date")
     ax.xaxis.set_tick_params(rotation=45)
-    ax.set_xlim(start, end)
+    ax.set_xlim(start, end)  # type: ignore
     ax.set_ylim(None, None)
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=(days // 8) + 2))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # Customize format
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
     if units is not None:
         ax.set_ylabel(f"{units}")
     fig.legend(loc="outside upper right")
@@ -247,7 +243,7 @@ def group_observations_by_time(
     """
     grouper = Grouper(freq=freq)
     gb = df.groupby(grouper, sort=True)
-    groups: list[datetime] = list(gb.groups.keys())
+    groups = cast(list[datetime], list(gb.groups.keys()))
     epoch = datetime(1970, 1, 1)
     positions = array([(group - epoch).days for group in groups], dtype=float32)
     bins = []
@@ -323,3 +319,14 @@ def boxplot(
     filepath = prefix / thing / f"{observed_property}_{freq.name.lower()}.{image_format.value}"
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath)
+
+
+def haversine(lon1, lat1, lon2, lat2):
+    R = 6371000.0  # Earth radius in meters
+
+    phi1, phi2 = radians(lat1), radians(lat2)
+    delta_phi = radians(lat2 - lat1)
+    delta_lambda = radians(lon2 - lon1)
+    a = sin(delta_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(delta_lambda / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c  # Distance in meters
