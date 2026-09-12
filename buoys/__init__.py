@@ -17,7 +17,7 @@ from pathlib import Path
 from enum import Enum
 from datetime import datetime, timedelta
 from numpy import concatenate, array, argsort
-from pandas import read_csv, DataFrame, concat
+from pandas import DataFrame
 from pandas.errors import PerformanceWarning
 from matplotlib import pyplot as plt, dates as mdates
 from matplotlib.patches import Circle
