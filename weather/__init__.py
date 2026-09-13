@@ -234,7 +234,7 @@ CF_STANDARDS = {
         weewx=Source(name="dewpoint", transform=fahrenheit_to_kelvin),
     ),
     StandardNames.WATER_EVAPOTRANSPIRATION_FLUX: ObservedProperty(
-        name=StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value,
+        name=StandardNames.WATER_EVAPOTRANSPIRATION_FLUX,
         units=StandardUnits.FLUX,
         weewx=Source(
             name="ET",
