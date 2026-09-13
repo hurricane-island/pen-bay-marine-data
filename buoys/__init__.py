@@ -14,7 +14,7 @@ import re
 from typing import cast, Optional
 from warnings import simplefilter
 from pathlib import Path
-from enum import Enum
+from enum import StrEnum, auto
 from datetime import datetime, timedelta
 from numpy import concatenate, array, argsort
 from pandas import DataFrame
@@ -67,22 +67,22 @@ from buoys.options import (
 transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
 
 
-class ClickOptions(Enum):
+class ClickOptions(StrEnum):
     """
     Available commands for buoy data processing.
     """
 
     # file and firmware commands
-    LIST = "list"
-    DESCRIBE = "describe"
-    EXPORT = "export"
+    LIST = auto()
+    DESCRIBE = auto()
+    EXPORT = auto()
     # groups
-    FILE = "file"
-    BUOYS = "buoys"
-    PLOT = "plot"
+    FILE = auto()
+    BUOYS = auto()
+    PLOT = auto()
     # plotting commands
-    TAIL = "tail"
-    DATASTREAM = "datastream"
+    TAIL = auto()
+    DATASTREAM = auto()
 
 
 # pylint: disable=too-few-public-methods
@@ -103,21 +103,21 @@ class ObservedProperty:
         self.campbell_scientific = campbell_scientific
 
 
-@click.group(name=ClickOptions.BUOYS.value)
+@click.group(name=ClickOptions.BUOYS)
 def buoys():
     """
     Interface for working with buoy data and firmware.
     """
 
 
-@click.group(name=ClickOptions.PLOT.value)
+@click.group(name=ClickOptions.PLOT)
 def plot():
     """
     Generate plots using buoy data.
     """
 
 
-@click.group(name=ClickOptions.FILE.value)
+@click.group(name=ClickOptions.FILE)
 def file_group():
     """
     Interact with the buoy data file system.
@@ -131,7 +131,7 @@ buoys.add_command(firmware)
 buoys.add_command(plot)
 
 
-@file_group.command(name=ClickOptions.LIST.value)
+@file_group.command(name=ClickOptions.LIST)
 def buoys_file_list():
     """
     List available stations from static data.
@@ -147,7 +147,7 @@ def buoys_file_list():
 
 
 
-@file_group.command(name=ClickOptions.DESCRIBE.value)
+@file_group.command(name=ClickOptions.DESCRIBE)
 @station_name
 @data_table
 def buoys_file_describe(name: StationName, table: TableName):
@@ -213,7 +213,7 @@ def format_column_standard_name(col: str) -> str:
     except (KeyError, ValueError):
         return col[0]
 
-@file_group.command(name=ClickOptions.EXPORT.value)
+@file_group.command(name=ClickOptions.EXPORT)
 @station_name
 @qartod_configs_option
 @qartod_test_option
@@ -273,7 +273,7 @@ def buoys_file_export(
     click.echo(f"Saved file to {filepath}")
 
 
-@plot.command(name=ClickOptions.TAIL.value)
+@plot.command(name=ClickOptions.TAIL)
 @source_options
 @plot_options
 @qartod_configs_option
@@ -431,7 +431,7 @@ def buoys_plot_tail(
     fig.tight_layout()
     filepath = (
         FIGURES_DIR
-        / ClickOptions.TAIL.value
+        / ClickOptions.TAIL
         / name.value
         / table.value
         / series.value
@@ -654,7 +654,7 @@ def buoys_plot_locations(
     fig.savefig(filename, dpi=300, bbox_inches="tight")
 
 
-@plot.command(name=ClickOptions.DATASTREAM.value)
+@plot.command(name=ClickOptions.DATASTREAM)
 @source_options
 @click.option(
     "--aggregate",

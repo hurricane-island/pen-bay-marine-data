@@ -2,7 +2,7 @@
 Command line interfaces for working with vertical profiles of water column data,
 such as temperature, salinity, and density.
 """
-from enum import Enum
+from enum import StrEnum, auto
 import json
 from typing import Optional, cast
 from pathlib import Path
@@ -23,7 +23,7 @@ DATA_DIR = Path(__file__).parent / "data"
 TMP_DIR = Path(__file__).parent / "tmp"
 FIGURES_DIR = Path(__file__).parent / "figures"
 
-class Dimension(Enum):
+class Dimension(StrEnum):
     """
     Data columns
     """
@@ -37,7 +37,7 @@ class Dimension(Enum):
     SALINITY = "SAL-ppt"
     CHLOROPHYLL = "Chl RFU"
     PYCOERYTHRIN = "BGA-PE RFU"
-    DENSITY = "density"
+    DENSITY = auto()
     PRESSURE = "DEP psia"
 
 @group()
@@ -68,12 +68,12 @@ def load_profile_downcast(filepath: Path, encoding="utf-16"):
         encoding=encoding,
         index_col=False
     )
-    df[Dimension.DENSITY.value] = rho(
-        df[Dimension.SALINITY.value],
-        df[Dimension.TEMPERATURE.value],
-        df[Dimension.PRESSURE.value] * 0.689476
+    df[Dimension.DENSITY] = rho(
+        df[Dimension.SALINITY],
+        df[Dimension.TEMPERATURE],
+        df[Dimension.PRESSURE] * 0.689476
     )
-    stop = cast(int, df[Dimension.DEPTH.value].idxmax()) + 1
+    stop = cast(int, df[Dimension.DEPTH].idxmax()) + 1
     return df[:stop]
 
 
@@ -127,10 +127,10 @@ def profiles_plot_single(filename: str, dim: Dimension, step: float, figsize: tu
 
 
     df: DataFrame = read_csv(filepath, skiprows=skiprows, encoding='utf-16',index_col=False)
-    df[Dimension.DENSITY.value] = rho(
-        df[Dimension.SALINITY.value],
-        df[Dimension.TEMPERATURE.value],
-        df[Dimension.PRESSURE.value] * 0.689476
+    df[Dimension.DENSITY] = rho(
+        df[Dimension.SALINITY],
+        df[Dimension.TEMPERATURE],
+        df[Dimension.PRESSURE] * 0.689476
     )
 
     max_depth = df[depth_col].max()
@@ -146,15 +146,15 @@ def profiles_plot_single(filename: str, dim: Dimension, step: float, figsize: tu
     downcast["depth_bin"] = cut(downcast[depth_col], bins=bins)
 
     # Group by the bins and calculate the average
-    resampled_df = downcast.groupby("depth_bin", observed=False)[dim.value].mean().reset_index()
+    resampled_df = downcast.groupby("depth_bin", observed=False)[dim].mean().reset_index()
     resampled_df.columns = ["distance_interval", "average_value"]
     depth = [x.left + step/2 for x in resampled_df["distance_interval"]]
 
     fig, ax = subplots(figsize=figsize)
     ax.plot(resampled_df["average_value"], depth, color="black", zorder=2, label=f"mean ({step} m)")
-    ax.scatter(downcast[dim.value], downcast[depth_col], marker="x", color="grey", zorder=1, label="downcast")
-    ax.scatter(upcast[dim.value], upcast[depth_col], marker="x", color="pink", zorder=0, label="upcast")
-    ax.set_xlabel(dim.value)
+    ax.scatter(downcast[dim], downcast[depth_col], marker="x", color="grey", zorder=1, label="downcast")
+    ax.scatter(upcast[dim], upcast[depth_col], marker="x", color="pink", zorder=0, label="upcast")
+    ax.set_xlabel(dim)
     ax.set_ylabel("Depth (m)")
     ax.invert_yaxis()
     ax.set_title(f"{site} {dim.name.lower()} (dt = {interval} s)")
@@ -198,8 +198,8 @@ def profiles_plot_transect(prefix: str, dim: Dimension, levels: Optional[int]):
     x_sample = 0.0
     for file in sorted(files):
         df = load_profile_downcast(file)
-        lat = df[Dimension.LATITUDE.value].mean()
-        lon = df[Dimension.LONGITUDE.value].mean()
+        lat = df[Dimension.LATITUDE].mean()
+        lon = df[Dimension.LONGITUDE].mean()
         if prev_coords is None:
             dx = 0.0
         else:
@@ -210,10 +210,10 @@ def profiles_plot_transect(prefix: str, dim: Dimension, levels: Optional[int]):
         prev_coords = (lon, lat)
         count = len(df)
         x.extend([x_sample] * count)
-        depth = -df[Dimension.DEPTH.value]
+        depth = -df[Dimension.DEPTH]
         z.extend(depth.tolist())
         z_max.append(depth.min())
-        h.extend(df[dim.value].tolist())
+        h.extend(df[dim].tolist())
 
     x = array(x)
     z = array(z)
@@ -283,8 +283,8 @@ def profiles_plot_map(prefix: str):
     files = list(DATA_DIR.glob(f"{prefix}*.csv"))
     for file in sorted(files):
         df = load_profile_downcast(file)
-        lat = df[Dimension.LATITUDE.value].mean()
-        lon = df[Dimension.LONGITUDE.value].mean()
+        lat = df[Dimension.LATITUDE].mean()
+        lon = df[Dimension.LONGITUDE].mean()
         x, y = transformer.transform(lon, lat)
         ax.scatter(x, y, color="black", s=40)
 

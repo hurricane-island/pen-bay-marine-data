@@ -22,7 +22,8 @@ Questions:
 """
 
 from pathlib import Path
-from enum import Enum
+from enum import StrEnum, auto
+from typing import cast
 import click
 from pandas import read_csv, to_datetime, DataFrame, Series, concat
 from influxdb_client_3 import InfluxDBClient3
@@ -48,7 +49,7 @@ PERCENT_TO_FRACTION = 0.01
 INCHES_TO_MILLIMETERS = 25.4
 INCHES_PER_HOUR_TO_KILOGRAMS_PER_SQUARE_METER_PER_SECOND = INCHES_TO_MILLIMETERS / 3600
 
-class Device(Enum):
+class Device(StrEnum):
     """
     Valid device names. Used to ensure consistent device
     naming across CLI.
@@ -57,16 +58,16 @@ class Device(Enum):
     RIKA_900_09 = "rika-900-09"
 
 
-class Middleware(Enum):
+class Middleware(StrEnum):
     """
     Valid middleware names. Used to ensure consistent middleware
     naming across CLI.
     """
-    WEEWX = "weewx"
+    WEEWX = auto()
     WEATHER_LINK = "weather-link"
 
 
-class ClickCommands(Enum):
+class ClickCommands(StrEnum):
     """
     Valid click command names. Does not factor in
     Click groups. Used to ensure consistent command
@@ -74,12 +75,12 @@ class ClickCommands(Enum):
     """
 
     # plotting commands
-    TAIL = "tail"
-    DAILY = "daily"
+    TAIL = auto()
+    DAILY = auto()
     # db and file commands...
-    DESCRIBE = "describe"
-    BACKFILL = "backfill"
-    EXPORT = "export"
+    DESCRIBE = auto()
+    BACKFILL = auto()
+    EXPORT = auto()
 
 
 # pylint: disable=too-few-public-methods
@@ -91,18 +92,18 @@ class ObservedProperty:
     """
 
     name: str
-    units: str
+    units: StandardUnits
     weewx: Source
     weather_link: Source
 
-    def __init__(self, name: str, unit: str, weewx: Source, weather_link: Source):
+    def __init__(self, name: str, units: StandardUnits, weewx: Source, weather_link: Source):
         self.name = name
-        self.unit = unit
+        self.units = units
         self.weewx = weewx
         self.weather_link = weather_link
 
 
-class StandardNames(Enum):
+class StandardNames(StrEnum):
     """
     CF Metadata Standard Names. These are all of the Davis Vantage Pro2
     observed properties that have Climate and Forecast (CF) metadata standard
@@ -110,42 +111,42 @@ class StandardNames(Enum):
     a starting point from what we currently have in the field.
     """
 
-    AIR_TEMPERATURE = "air_temperature"
-    RELATIVE_HUMIDITY = "relative_humidity"
-    WIND_SPEED = "wind_speed"
-    WIND_FROM_DIRECTION = "wind_from_direction"
-    AIR_PRESSURE = "air_pressure"
-    WIND_SPEED_OF_GUST = "wind_speed_of_gust"
-    WIND_GUST_FROM_DIRECTION = "wind_gust_from_direction"
-    WIND_CHILL_OF_AIR_TEMPERATURE = "wind_chill_of_air_temperature"
-    SOLAR_IRRADIANCE = "solar_irradiance"
-    ULTRAVIOLET_INDEX = "ultraviolet_index"
-    RAINFALL_AMOUNT = "rainfall_amount"
-    RAINFALL_RATE = "rainfall_rate"
-    HEAT_INDEX_OF_AIR_TEMPERATURE = "heat_index_of_air_temperature"
-    DEW_POINT_TEMPERATURE = "dew_point_temperature"
-    WATER_EVAPOTRANSPIRATION_FLUX = "water_evapotranspiration_flux"
+    AIR_TEMPERATURE = auto()
+    RELATIVE_HUMIDITY = auto()
+    WIND_SPEED = auto()
+    WIND_FROM_DIRECTION = auto()
+    AIR_PRESSURE = auto()
+    WIND_SPEED_OF_GUST = auto()
+    WIND_GUST_FROM_DIRECTION = auto()
+    WIND_CHILL_OF_AIR_TEMPERATURE = auto()
+    SOLAR_IRRADIANCE = auto()
+    ULTRAVIOLET_INDEX = auto()
+    RAINFALL_AMOUNT = auto()
+    RAINFALL_RATE = auto()
+    HEAT_INDEX_OF_AIR_TEMPERATURE = auto()
+    DEW_POINT_TEMPERATURE = auto()
+    WATER_EVAPOTRANSPIRATION_FLUX = auto()
 
 
 # Standard units for display, not used in determining value conversions
 CF_STANDARDS = {
     StandardNames.AIR_TEMPERATURE: ObservedProperty(
-        name=StandardNames.AIR_TEMPERATURE.value,
-        unit=StandardUnits.TEMPERATURE.value,
+        name=StandardNames.AIR_TEMPERATURE,
+        units=StandardUnits.TEMPERATURE,
         weather_link=Source(name="Temp Out", transform=fahrenheit_to_kelvin),
         weewx=Source(name="outTemp", transform=fahrenheit_to_kelvin),
     ),
     StandardNames.RELATIVE_HUMIDITY: ObservedProperty(
-        name=StandardNames.RELATIVE_HUMIDITY.value,
-        unit="",
+        name=StandardNames.RELATIVE_HUMIDITY,
+        units=StandardUnits.NONE,
         weather_link=Source(
             name="Out Hum", transform=lambda x: x * PERCENT_TO_FRACTION
         ),
         weewx=Source(name="outHumidity", transform=lambda x: x * PERCENT_TO_FRACTION),
     ),
     StandardNames.WIND_SPEED: ObservedProperty(
-        name=StandardNames.WIND_SPEED.value,
-        unit=StandardUnits.SPEED.value,
+        name=StandardNames.WIND_SPEED,
+        units=StandardUnits.SPEED,
         weather_link=Source(
             name="Wind Speed",
             transform=lambda x: x * KNOTS_TO_SPEED,
@@ -153,14 +154,14 @@ CF_STANDARDS = {
         weewx=Source(name="windSpeed", transform=lambda x: x * MILES_PER_HOUR_TO_SPEED),
     ),
     StandardNames.WIND_FROM_DIRECTION: ObservedProperty(
-        name=StandardNames.WIND_FROM_DIRECTION.value,
-        unit=StandardUnits.DIRECTION.value,
+        name=StandardNames.WIND_FROM_DIRECTION,
+        units=StandardUnits.DIRECTION,
         weather_link=Source(name="Wind Dir", transform=lambda x: x),
         weewx=Source(name="windDir", transform=cardinal_direction_to_degrees),
     ),
     StandardNames.AIR_PRESSURE: ObservedProperty(
-        name=StandardNames.AIR_PRESSURE.value,
-        unit=StandardUnits.PRESSURE.value,
+        name=StandardNames.AIR_PRESSURE,
+        units=StandardUnits.PRESSURE,
         weather_link=Source(
             name="Bar", transform=lambda x: x * INCHES_OF_MERCURY_TO_PRESSURE
         ),
@@ -169,46 +170,46 @@ CF_STANDARDS = {
         ),
     ),
     StandardNames.WIND_SPEED_OF_GUST: ObservedProperty(
-        name=StandardNames.WIND_SPEED_OF_GUST.value,
-        unit=StandardUnits.SPEED.value,
+        name=StandardNames.WIND_SPEED_OF_GUST,
+        units=StandardUnits.SPEED,
         weather_link=Source(
             name="Hi Speed", transform=lambda x: x * KNOTS_TO_SPEED
         ),
         weewx=Source(name="windGust", transform=lambda x: x * MILES_PER_HOUR_TO_SPEED),
     ),
     StandardNames.WIND_GUST_FROM_DIRECTION: ObservedProperty(
-        name=StandardNames.WIND_GUST_FROM_DIRECTION.value,
-        unit=StandardUnits.DIRECTION.value,
+        name=StandardNames.WIND_GUST_FROM_DIRECTION,
+        units=StandardUnits.DIRECTION,
         weather_link=Source(name="Hi Dir", transform=lambda x: x),
         weewx=Source(name="windGustDir", transform=cardinal_direction_to_degrees),
     ),
     StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE: ObservedProperty(
-        name=StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE.value,
-        unit=StandardUnits.TEMPERATURE.value,
+        name=StandardNames.WIND_CHILL_OF_AIR_TEMPERATURE,
+        units=StandardUnits.TEMPERATURE,
         weather_link=Source(name="Wind Chill", transform=fahrenheit_to_kelvin),
         weewx=Source(name="windchill", transform=fahrenheit_to_kelvin),
     ),
     StandardNames.SOLAR_IRRADIANCE: ObservedProperty(
-        name=StandardNames.SOLAR_IRRADIANCE.value,
-        unit=StandardUnits.ENERGY.value,
+        name=StandardNames.SOLAR_IRRADIANCE,
+        units=StandardUnits.ENERGY,
         weather_link=Source(name="Solar Rad.", transform=lambda x: x),
         weewx=Source(name="radiation", transform=lambda x: x),
     ),
     StandardNames.ULTRAVIOLET_INDEX: ObservedProperty(
-        name=StandardNames.ULTRAVIOLET_INDEX.value,
-        unit="",
+        name=StandardNames.ULTRAVIOLET_INDEX,
+        units=StandardUnits.NONE,
         weather_link=Source(name="UV Index", transform=lambda x: x),
         weewx=Source(name="UV", transform=lambda x: x),
     ),
     StandardNames.RAINFALL_AMOUNT: ObservedProperty(
-        name=StandardNames.RAINFALL_AMOUNT.value,
-        unit=StandardUnits.AMOUNT.value,
+        name=StandardNames.RAINFALL_AMOUNT,
+        units=StandardUnits.AMOUNT,
         weather_link=Source(name="Rain", transform=lambda x: x * INCHES_TO_MILLIMETERS),
         weewx=Source(name="rain", transform=lambda x: x * INCHES_TO_MILLIMETERS),
     ),
     StandardNames.RAINFALL_RATE: ObservedProperty(
-        name=StandardNames.RAINFALL_RATE.value,
-        unit=StandardUnits.FLUX.value,
+        name=StandardNames.RAINFALL_RATE,
+        units=StandardUnits.FLUX,
         weather_link=Source(
             name="Rain Rate",
             transform=lambda x: x
@@ -221,20 +222,20 @@ CF_STANDARDS = {
         ),
     ),
     StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE: ObservedProperty(
-        name=StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE.value,
-        unit=StandardUnits.TEMPERATURE.value,
+        name=StandardNames.HEAT_INDEX_OF_AIR_TEMPERATURE,
+        units=StandardUnits.TEMPERATURE,
         weather_link=Source(name="Heat Index", transform=fahrenheit_to_kelvin),
         weewx=Source(name="heatindex", transform=fahrenheit_to_kelvin),
     ),
     StandardNames.DEW_POINT_TEMPERATURE: ObservedProperty(
-        name=StandardNames.DEW_POINT_TEMPERATURE.value,
-        unit=StandardUnits.TEMPERATURE.value,
+        name=StandardNames.DEW_POINT_TEMPERATURE,
+        units=StandardUnits.TEMPERATURE,
         weather_link=Source(name="Dew Pt.", transform=fahrenheit_to_kelvin),
         weewx=Source(name="dewpoint", transform=fahrenheit_to_kelvin),
     ),
     StandardNames.WATER_EVAPOTRANSPIRATION_FLUX: ObservedProperty(
         name=StandardNames.WATER_EVAPOTRANSPIRATION_FLUX.value,
-        unit=StandardUnits.FLUX.value,
+        units=StandardUnits.FLUX,
         weewx=Source(
             name="ET",
             transform=lambda x: x
@@ -249,15 +250,15 @@ CF_STANDARDS = {
 }
 
 
-class StationName(Enum):
+class StationName(StrEnum):
     """
     Valid station names. For now just includes weather
     stations, but these could be used to refer to all
     sensing platforms and systems at a single location.
     """
 
-    APPRENTICESHOP = "apprenticeshop"
-    DEV = "dev"
+    APPRENTICESHOP = auto()
+    DEV = auto()
 
 
 @click.group(name="weather")
@@ -349,8 +350,8 @@ class WeatherLinkArchive:
         lookup = {}
         transforms = {}
         for key, value in CF_STANDARDS.items():
-            lookup[value.weather_link.name] = key.value
-            transforms[key.value] = value.weather_link.transform
+            lookup[value.weather_link.name] = key
+            transforms[key] = value.weather_link.transform
 
         for items in zip(*rows):
             header = ""
@@ -392,22 +393,23 @@ class WeeWxInfluxArchive:
         Get data from InfluxDB and format as a DataFrame.
         """
         client = InfluxDBClient3(host=host, database=database, token=token)
-        df: DataFrame = client.query(
+        result = client.query(
             f"SELECT * FROM {measurement} WHERE binding IN ('archive') ORDER BY {time}",
             mode="pandas",
         )
+        df = cast(DataFrame, result)
         # Invert the dictionary, keeping the second value as key
         columns = {}
         transforms = {}
         for key, value in CF_STANDARDS.items():
-            columns[value.weewx.name] = key.value
-            transforms[key.value] = value.weewx.transform
+            columns[value.weewx.name] = key
+            transforms[key] = value.weewx.transform
         df.rename(columns=columns, inplace=True)
         df.set_index(time, inplace=True)
         self.df = df.transform(transforms)
 
 
-@weather.command(name=ClickCommands.DESCRIBE.value)
+@weather.command(name=ClickCommands.DESCRIBE)
 @source_options
 @influx_options
 def weather_describe_series(
@@ -420,15 +422,15 @@ def weather_describe_series(
     """
     Compare local and database data before merging or backfilling.
     """
-    remote: Series = WeeWxInfluxArchive(measurement, token, host).df[series.value]
+    remote: Series = WeeWxInfluxArchive(measurement, token, host).df[series]
     remote.name = "influx"
-    local: Series = WeatherLinkArchive(station.value).df[series.value]
+    local: Series = WeatherLinkArchive(station).df[series]
     local.name = "local"
     summary = concat([remote, local], axis=1).describe()
     print(summary)
 
 
-@plot.command(name=ClickCommands.TAIL.value)
+@plot.command(name=ClickCommands.TAIL)
 @source_options
 @influx_options
 @plot_options
@@ -460,14 +462,14 @@ def weather_plot_tail(
 
     Keyword arguments are passed through to the rendering function
     """
-    remote: Series = WeeWxInfluxArchive(measurement, token, host).df[series.value]
-    local: Series = WeatherLinkArchive(station.value).df[series.value]
-    prefix = f"{FIGURES_DIR}/{ClickCommands.TAIL.value}"
-    unit = CF_STANDARDS.get(series).unit
-    plot_tail(local, remote, station.value, series.value, prefix, units=unit, **kwargs)
+    remote: Series = WeeWxInfluxArchive(measurement, token, host).df[series]
+    local: Series = WeatherLinkArchive(station).df[series]
+    prefix = f"{FIGURES_DIR}/{ClickCommands.TAIL}"
+    units = cast(ObservedProperty, CF_STANDARDS.get(series)).units
+    plot_tail(local, remote, station, series, prefix, units=units, **kwargs)
 
 
-@plot.command(name=ClickCommands.DAILY.value)
+@plot.command(name=ClickCommands.DAILY)
 @source_options
 @influx_options
 @plot_options
@@ -483,40 +485,40 @@ def weather_plot_daily(
     """
     Display a single `DataStream` aggregated by day.
     """
-    remote = WeeWxInfluxArchive(measurement, token, host).df[series.value]
-    local = WeatherLinkArchive(station.value).df[series.value]
+    remote = WeeWxInfluxArchive(measurement, token, host).df[series]
+    local = WeatherLinkArchive(station).df[series]
     df = concat([local, remote], axis=0)
     mask = ~df.index.duplicated(keep="first")
     unique = df[mask].sort_index()
-    units = CF_STANDARDS.get(series).unit
-    prefix = f"{FIGURES_DIR}/{ClickCommands.DAILY.value}"
-    boxplot(unique, station.value, series.value, prefix, units, **kwargs)
+    units = cast(ObservedProperty, CF_STANDARDS.get(series)).units
+    prefix = FIGURES_DIR / ClickCommands.DAILY
+    boxplot(unique, station, series, prefix, units, **kwargs)
 
 
-@file.command(name=ClickCommands.DESCRIBE.value)
+@file.command(name=ClickCommands.DESCRIBE)
 @click.argument("station", type=click.Choice(StationName, case_sensitive=False))
 def weather_file_describe(station: StationName):
     """
     Parse and normalize weather station data for display
     """
-    df = WeatherLinkArchive(station.value).df
+    df = WeatherLinkArchive(station).df
     summary = df.describe().T.drop(columns=["25%", "50%", "75%", "std", "mean"])
     print("\nSamples:\n")
     print(summary)
 
 
-@file.command(name=ClickCommands.EXPORT.value)
+@file.command(name=ClickCommands.EXPORT)
 @click.argument("station", type=click.Choice(StationName, case_sensitive=False))
 def weather_file_export(station: StationName):
     """
     Export normalized weather station data to CSV.
     """
-    df = WeatherLinkArchive(station.value).df
-    filename = DATA_DIR / f"{station.value}.csv"
+    df = WeatherLinkArchive(station).df
+    filename = DATA_DIR / f"{station}.csv"
     df.to_csv(filename)
 
 
-@database.command(name=ClickCommands.DESCRIBE.value)
+@database.command(name=ClickCommands.DESCRIBE)
 @influx_options
 def weather_db_describe(host: str, measurement: str, token: str):
     """
@@ -528,25 +530,25 @@ def weather_db_describe(host: str, measurement: str, token: str):
     print(summary)
 
 
-@database.command(name=ClickCommands.BACKFILL.value)
+@database.command(name=ClickCommands.BACKFILL)
 @click.argument("station", type=click.Choice(StationName, case_sensitive=False))
 @influx_options
 def weather_db_backfill(station: StationName, host: str, measurement: str, token: str):
     """
     Backfill missing data from local to database.
     """
-    local = WeatherLinkArchive(station.value).df
+    local = WeatherLinkArchive(station).df
     remote = WeeWxInfluxArchive(measurement, token, host).df
-    selected = [each.value for each in StandardNames]
+    selected = [each for each in StandardNames]
     filtered = local[selected]
     remote_filtered = remote[selected]
-    filtered["station"] = station.value
-    filtered["device"] = Device.DAVIS_VANTAGE_PRO_2.value
-    filtered["source"] = Middleware.WEATHER_LINK.value
+    filtered["station"] = station
+    filtered["device"] = Device.DAVIS_VANTAGE_PRO_2
+    filtered["source"] = Middleware.WEATHER_LINK
 
-    remote_filtered["station"] = station.value
-    remote_filtered["device"] = Device.DAVIS_VANTAGE_PRO_2.value
-    remote_filtered["source"] = Middleware.WEEWX.value
+    remote_filtered["station"] = station
+    remote_filtered["device"] = Device.DAVIS_VANTAGE_PRO_2
+    remote_filtered["source"] = Middleware.WEEWX
 
     df = concat([filtered, remote_filtered]).drop_duplicates(
         keep="first", ignore_index=False
