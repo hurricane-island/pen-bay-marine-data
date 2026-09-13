@@ -2,7 +2,7 @@ from click import argument, group, echo, option, Choice
 from typing import cast
 from matplotlib.dates import DateFormatter
 from datetime import datetime, timezone
-from enum import Enum
+from enum import Enum, StrEnum, auto
 from pathlib import Path
 from io import StringIO
 from matplotlib.pyplot import subplots
@@ -12,7 +12,7 @@ FIGURES = Path(__file__).parent / "figures"
 DATA = Path(__file__).parent / "data" 
 FIGURES.mkdir(exist_ok=True)
 
-class Dimension(Enum):
+class Dimension(StrEnum):
     """
     Dimensions for logger data columns.
     """
@@ -60,12 +60,12 @@ def loggers(dim: Dimension):
         df = cast(DataFrame, concat(frames)).sort_index()
         df.index = df.index.tz_localize(None)
         df = df[(df.index > after) & (df.index < before)]
-        ax.plot(df.index, df[dim.value], color=color, label=label, linewidth=1)
-    ax.set_title(f"Lobster Trap Sensors - {dim.value}")
-    ax.set_xlabel(Dimension.TIME.value)
+        ax.plot(df.index, df[dim], color=color, label=label, linewidth=1)
+    ax.set_title(f"Lobster Trap Sensors - {dim}")
+    ax.set_xlabel(Dimension.TIME)
     date_form = DateFormatter("%m-%d %H:%M")
     ax.xaxis.set_major_formatter(date_form)
-    ax.set_ylabel(dim.value)
+    ax.set_ylabel(dim)
     ax.legend(loc="best")
     fig.autofmt_xdate()
     fig.tight_layout()
@@ -96,7 +96,7 @@ def acoustic_release():
     df = df[(df.index > after) & (df.index < before)]
     ax.plot(df.index, df[temp_col], color="black", label="Temperature", linewidth=1)
     ax.set_title(f"Acoustic Release Sensors")
-    ax.set_xlabel(Dimension.TIME.value)
+    ax.set_xlabel(Dimension.TIME)
     date_form = DateFormatter("%m-%d")
     ax.xaxis.set_major_formatter(date_form)
     ax.set_ylabel("Temp deg C")

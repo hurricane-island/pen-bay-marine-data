@@ -3,7 +3,7 @@ Command line interface for working with buoy database.
 """
 
 from typing import cast
-from enum import Enum
+from enum import StrEnum, auto
 from pandas import DataFrame
 from influxdb_client_3 import InfluxDBClient3
 from click import group
@@ -24,24 +24,24 @@ from buoys.options import (
 )
 
 
-class DatabaseCommands(Enum):
+class DatabaseCommands(StrEnum):
     """
     Group and commands for interacting with the buoy database.
     """
 
     DATABASE = "db"
-    DESCRIBE = "describe"
-    UPLOAD = "upload"
+    DESCRIBE = auto()
+    UPLOAD = auto()
 
 
-@group(name=DatabaseCommands.DATABASE.value)
+@group(name=DatabaseCommands.DATABASE)
 def database():
     """
     Commands that interact with the buoy database.
     """
 
 
-@database.command(DatabaseCommands.DESCRIBE.value)
+@database.command(DatabaseCommands.DESCRIBE)
 @influx_options
 def buoys_db_describe(
     host: str, measurement: str, token: str
@@ -60,7 +60,7 @@ def buoys_db_describe(
     print(read_back.head())
 
 
-@database.command(name="upload")
+@database.command(name=DatabaseCommands.UPLOAD)
 @station_name
 @data_table
 @influx_host
@@ -72,10 +72,10 @@ def buoys_db_upload(name: StationName, table: TableName, host: str, token: str):
     files = list(filter_buoy_flat_files(name, table))
     client = InfluxDBClient3(host=host, database="buoy-test-3", token=token)
     columns = [VendoredNames.SEA_WATER_TEMPERATURE]
-    rename = [StandardNames[key.name].value for key in columns]
+    rename = [StandardNames[key.name] for key in columns]
     for each in files:
         df = read_single_campbell_logger_file(each)
-        subset = df[[key.value for key in columns]]
+        subset = df[columns]
         subset.columns = rename
         subset.index.name = "time"
         with open(each, "r", encoding="utf-8") as fid:
@@ -85,6 +85,6 @@ def buoys_db_upload(name: StationName, table: TableName, host: str, token: str):
         subset.insert(column="firmware", value=metadata[5][5:-1], loc=2)
         client.write(
             subset,
-            data_frame_measurement_name=table.value,
+            data_frame_measurement_name=table,
             data_frame_tag_columns=["location", "thing", "firmware"],
         )

@@ -4,7 +4,7 @@ Quality assurance and quality control (QA/QC) for buoy data using QARTOD tests.
 
 from datetime import datetime
 from typing import cast
-from enum import Enum
+from enum import Enum, StrEnum, auto
 from pathlib import Path
 from click import option, Choice
 from yaml import safe_load
@@ -16,19 +16,19 @@ from ioos_qc.streams import PandasStream
 from ioos_qc.stores import PandasStore
 
 
-class TestTypes(Enum):
+class TestTypes(StrEnum):
     """
     Supported QARTOD test types.
     """
 
-    GROSS_RANGE = "gross_range"
-    RATE_OF_CHANGE = "rate_of_change"
-    SPIKE = "spike"
-    CLIMATOLOGY = "climatology"
-    FLAT_LINE = "flat_line"
-    ROLLUP = "rollup"
-    GAP = "gap"
-    LOCATION = "location"
+    GROSS_RANGE = auto()
+    RATE_OF_CHANGE = auto()
+    SPIKE = auto()
+    CLIMATOLOGY = auto()
+    FLAT_LINE = auto()
+    ROLLUP = auto()
+    GAP = auto()
+    LOCATION = auto()
 
 
 qartod_configs_option = option(
@@ -110,7 +110,7 @@ def test_observed_property(
         for test in tests
     }
     df = result[columns.keys()].rename(columns=columns).replace(9, -1)
-    df[TestTypes.ROLLUP.value] = df.max(axis=1).astype("object")
+    df[TestTypes.ROLLUP] = df.max(axis=1).astype("object")
     for col in df.columns:
         df[col] = df[col].astype("object")
     df[group_by_key] = observed_property
@@ -156,7 +156,7 @@ def run_qartod_tests(
     group_by_key = "observed_property"
     for key, tests in frames.items():
         flags = test_observed_property(result, key, tests, group_by_key)
-        flags[TestTypes.GAP.value] = where(df[key].isna(), 3, 1)
+        flags[TestTypes.GAP] = where(df[key].isna(), 3, 1)
         by_observed_property.append(flags)
     result = cast(DataFrame, concat(by_observed_property, axis=0))
     return result.groupby(group_by_key)

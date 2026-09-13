@@ -11,7 +11,7 @@ from buoys.firmware import buoys_firmware_template, buoys_firmware_library
 
 by_station = pytest.mark.parametrize("name", ["wynken", "blynken"])
 by_observed_property = pytest.mark.parametrize("observed_property", ["sea_water_salinity", "sea_water_temperature", "sea_water_chlorophyll_rfu", "sea_water_phycoerythrin_rfu"])
-by_qartod_test = pytest.mark.parametrize("qartod_test", [each.value for each in set(TestTypes) if each != TestTypes.GAP])
+by_qartod_test = pytest.mark.parametrize("qartod_test", [each for each in set(TestTypes) if each != TestTypes.GAP])
 runner = CliRunner()
 
 def test_cli_buoys_file_list():
