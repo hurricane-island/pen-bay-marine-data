@@ -3,6 +3,7 @@ Command line interfaces for working with vertical profiles of water column data,
 such as temperature, salinity, and density.
 """
 from enum import Enum
+import json
 from typing import Optional, cast
 from pathlib import Path
 from click import group, argument, option, Choice, echo
@@ -10,10 +11,16 @@ from pandas import read_csv, DataFrame, cut
 from numpy import arange, array, column_stack, meshgrid, linspace, interp, nan
 from matplotlib.pyplot import subplots, close
 from scipy.interpolate import griddata
+from pyproj import Transformer
 from gsw import rho
 from lib import haversine
 
+
+
+transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
+
 DATA_DIR = Path(__file__).parent / "data"
+TMP_DIR = Path(__file__).parent / "tmp"
 FIGURES_DIR = Path(__file__).parent / "figures"
 
 class Dimension(Enum):
@@ -246,3 +253,52 @@ def profiles_plot_transect(prefix: str, dim: Dimension, levels: Optional[int]):
     ax.grid(True, linestyle='--', alpha=0.5)
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / f'{prefix}_{dim.name.lower()}_transect.png')
+
+
+@plot.command(name="map")
+@argument("prefix")
+def profiles_plot_map(prefix: str):
+    """
+    Create a map
+    """
+    with open(TMP_DIR / "tide-line.geojson") as f:
+        geojson_data = json.load(f)
+
+    fig, ax = subplots(figsize=(3, 6))
+    for feature in geojson_data["features"]:
+       
+        geom_type = feature["geometry"]["type"]
+        coordinates = feature["geometry"]["coordinates"]
+        print(f"Type: {geom_type}, Coordinates: {len(coordinates)}")
+        if geom_type == "LineString":
+            x, y = transformer.transform(*zip(*coordinates))
+            ax.plot(x, y, color="grey", linewidth=1)
+        elif geom_type == "MultiLineString":
+            for line in coordinates:
+                x, y = transformer.transform(*zip(*line))
+                ax.plot(x, y, color="grey", linewidth=1)
+
+    x_lim, y_lim = transformer.transform((-68.9, -68.85), (44.0, 44.1))
+
+    files = list(DATA_DIR.glob(f"{prefix}*.csv"))
+    for file in sorted(files):
+        df = load_profile_downcast(file)
+        lat = df[Dimension.LATITUDE.value].mean()
+        lon = df[Dimension.LONGITUDE.value].mean()
+        x, y = transformer.transform(lon, lat)
+        ax.scatter(x, y, color="black", s=40)
+
+    lx, ly = transformer.transform((-68.887828, -68.871323), (44.044788, 44.031605))
+    ax.scatter(lx, ly, color="red", s=40)
+    bx, by = transformer.transform(-68.89224, 44.04357)
+    ax.scatter(bx, by, color="blue", s=40)
+
+    ax.set_title("Map")
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xlim(x_lim)
+    ax.set_ylim(y_lim)
+    ax.grid(True, linestyle='--', alpha=0.5)
+    fig.tight_layout()
+    fig.savefig(FIGURES_DIR / 'map.png', bbox_inches='tight', dpi=300)
