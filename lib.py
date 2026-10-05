@@ -4,7 +4,7 @@ to processing Pandas DataFrames and plotting with Matplotlib.
 """
 
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum, auto
 from math import radians, sin, cos, atan2, sqrt
 from pathlib import Path
 from typing import Optional, Callable, cast
@@ -15,7 +15,7 @@ from pandas import DataFrame, Grouper, Series
 from numpy import array, float32, diff
 from numpy.typing import NDArray
 
-class ImageFormat(Enum):
+class ImageFormat(StrEnum):
     """
     Valid image file formats for writing figures.
     Add values if there is a need, but Portable
@@ -24,11 +24,11 @@ class ImageFormat(Enum):
     wide support across browsers.
     """
 
-    PNG = "png"
-    PDF = "pdf"
+    PNG = auto()
+    PDF = auto()
 
 
-class StandardUnits(Enum):
+class StandardUnits(StrEnum):
     """
     CF Metadata Standard Units. These are all of the Davis Vantage Pro2
     observed properties that have Climate and Forecast (CF) metadata standard
@@ -42,6 +42,7 @@ class StandardUnits(Enum):
     ENERGY = "$ W / m^2 $"
     FLUX = "$ kg / m^2 / s $"
     AMOUNT = "$ kg / m^2 $"
+    NONE = ""
 
 
 # pylint: disable=too-few-public-methods
@@ -225,7 +226,7 @@ def plot_tail(
         ax.set_ylabel(f"{units}")
     fig.legend(loc="outside upper right")
     fig.tight_layout()
-    filename = f"{prefix}/{thing}/{observed_property}.{image_format.value}"
+    filename = f"{prefix}/{thing}/{observed_property}.{image_format}"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filename)
 
@@ -257,7 +258,7 @@ def group_observations_by_time(
     return bins, positions, years
 
 
-class Frequency(Enum):
+class Frequency(StrEnum):
     """
     Supported aggregation frequencies for plotting.
     """
@@ -283,7 +284,7 @@ def boxplot(
     by time window.
     """
     fig, ax = plt.subplots(figsize=figsize)
-    bins, positions, years = group_observations_by_time(df, freq=freq.value)
+    bins, positions, years = group_observations_by_time(df, freq=freq)
     # hack for buoys...
     if isinstance(bins[0], DataFrame):
         col = bins[0].columns[0]
@@ -316,7 +317,7 @@ def boxplot(
         display_name += f" ({units})"  # note: overloading display_name
     ax.set_ylabel(display_name)
     fig.tight_layout()
-    filepath = prefix / thing / f"{observed_property}_{freq.name.lower()}.{image_format.value}"
+    filepath = prefix / thing / f"{observed_property}_{freq.name.lower()}.{image_format}"
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath)
 

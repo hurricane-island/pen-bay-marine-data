@@ -2,7 +2,7 @@
 Commands for working with buoy firmware.
 """
 
-from enum import Enum
+from enum import StrEnum, auto
 from pathlib import Path
 from hashlib import md5
 from click import group, option
@@ -12,13 +12,13 @@ FIRMWARE_DIR = Path(__file__).parent / "programs"
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 
-class FirmwareCommands(Enum):
+class FirmwareCommands(StrEnum):
     """
     Enum for firmware commands.
     """
 
-    FIRMWARE = "firmware"
-    TEMPLATE = "template"
+    FIRMWARE = auto()
+    TEMPLATE = auto()
 
 
 def checksum(contents: str) -> str:
@@ -32,14 +32,14 @@ def checksum(contents: str) -> str:
     return hasher.hexdigest()
 
 
-@group(name=FirmwareCommands.FIRMWARE.value)
+@group(name=FirmwareCommands.FIRMWARE)
 def firmware():
     """
     Create firmware programs from a template.
     """
 
 
-@firmware.command(name=FirmwareCommands.TEMPLATE.value)
+@firmware.command(name=FirmwareCommands.TEMPLATE)
 @station_name
 @option("--address", required=True, help="Pakbus address")
 @option("--client", required=True, help="Client ID")
@@ -62,7 +62,7 @@ def buoys_firmware_template(
         filedata = fid.read()
 
     for var, value in {
-        "STATION_NAME": name.value,
+        "STATION_NAME": name,
         "PAKBUS_ADDRESS": address,
         "CLIENT_ID": client,
         "LATITUDE": latitude,
@@ -71,7 +71,7 @@ def buoys_firmware_template(
         slug = "$" + var
         filedata = filedata.replace(slug, value)
 
-    prefix = name.value.lower()
+    prefix = name.lower()
     filename = FIRMWARE_DIR / f"{prefix}.{checksum(filedata)}.dld"
     filename.parent.mkdir(parents=True, exist_ok=True)
     with open(filename, "w", encoding="utf-8") as fid:

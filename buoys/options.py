@@ -2,7 +2,7 @@
 Common imports used in nested commands and the top-level group.
 """
 
-from enum import Enum
+from enum import StrEnum, auto
 from pathlib import Path
 from datetime import datetime
 from click import argument, Choice, option
@@ -15,16 +15,16 @@ EXPORT_DIR = Path(__file__).parent / "export"
 CABLE_DIR = Path(__file__).parent / "cable"
 
 
-class StationName(Enum):
+class StationName(StrEnum):
     """
     Supported buoy station names.
     """
 
-    WYNKEN = "wynken"
-    BLYNKEN = "blynken"
+    WYNKEN = auto()
+    BLYNKEN = auto()
 
 
-class TableName(Enum):
+class TableName(StrEnum):
     """
     Supported data table names.
     """
@@ -33,7 +33,7 @@ class TableName(Enum):
     SONDE = "SondeValues"
 
 
-class VendoredNames(Enum):
+class VendoredNames(StrEnum):
     """
     Names that are used in the raw data but don't conform to CF Metadata standards.
     These are mapped to `StandardNames` for use in the CLI and plotting functions.
@@ -50,7 +50,7 @@ class VendoredNames(Enum):
     DISSOLVED_OXYGEN_SATURATION = "ODO_Sat"
 
 
-class StandardNames(Enum):
+class StandardNames(StrEnum):
     """
     Supported data series names.
     """
@@ -132,8 +132,8 @@ def filter_buoy_flat_files(name: StationName, table: TableName):
 
     def filter_prefix(f: Path) -> bool:
         lower_name = f.stem.lower()
-        station_match = name.value.lower() in lower_name
-        table_match = table.value.lower() in lower_name
+        station_match = name.lower() in lower_name
+        table_match = table.lower() in lower_name
         return station_match and table_match
 
     return filter(filter_prefix, DATA_DIR.glob("*.dat"))

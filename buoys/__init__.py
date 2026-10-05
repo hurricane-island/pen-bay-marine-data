@@ -14,7 +14,7 @@ import re
 from typing import cast, Optional
 from warnings import simplefilter
 from pathlib import Path
-from enum import Enum
+from enum import StrEnum, auto
 from datetime import datetime, timedelta
 from numpy import concatenate, array, argsort
 from pandas import DataFrame
@@ -67,22 +67,22 @@ from buoys.options import (
 transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
 
 
-class ClickOptions(Enum):
+class ClickOptions(StrEnum):
     """
     Available commands for buoy data processing.
     """
 
     # file and firmware commands
-    LIST = "list"
-    DESCRIBE = "describe"
-    EXPORT = "export"
+    LIST = auto()
+    DESCRIBE = auto()
+    EXPORT = auto()
     # groups
-    FILE = "file"
-    BUOYS = "buoys"
-    PLOT = "plot"
+    FILE = auto()
+    BUOYS = auto()
+    PLOT = auto()
     # plotting commands
-    TAIL = "tail"
-    DATASTREAM = "datastream"
+    TAIL = auto()
+    DATASTREAM = auto()
 
 
 # pylint: disable=too-few-public-methods
@@ -103,21 +103,21 @@ class ObservedProperty:
         self.campbell_scientific = campbell_scientific
 
 
-@click.group(name=ClickOptions.BUOYS.value)
+@click.group(name=ClickOptions.BUOYS)
 def buoys():
     """
     Interface for working with buoy data and firmware.
     """
 
 
-@click.group(name=ClickOptions.PLOT.value)
+@click.group(name=ClickOptions.PLOT)
 def plot():
     """
     Generate plots using buoy data.
     """
 
 
-@click.group(name=ClickOptions.FILE.value)
+@click.group(name=ClickOptions.FILE)
 def file_group():
     """
     Interact with the buoy data file system.
@@ -131,7 +131,7 @@ buoys.add_command(firmware)
 buoys.add_command(plot)
 
 
-@file_group.command(name=ClickOptions.LIST.value)
+@file_group.command(name=ClickOptions.LIST)
 def buoys_file_list():
     """
     List available stations from static data.
@@ -147,7 +147,7 @@ def buoys_file_list():
 
 
 
-@file_group.command(name=ClickOptions.DESCRIBE.value)
+@file_group.command(name=ClickOptions.DESCRIBE)
 @station_name
 @data_table
 def buoys_file_describe(name: StationName, table: TableName):
@@ -209,11 +209,11 @@ def format_column_standard_name(col: str) -> str:
     try:
         vendor_name = VendoredNames(col[0])
         std_name = StandardNames[vendor_name.name]
-        return std_name.value
+        return std_name
     except (KeyError, ValueError):
         return col[0]
 
-@file_group.command(name=ClickOptions.EXPORT.value)
+@file_group.command(name=ClickOptions.EXPORT)
 @station_name
 @qartod_configs_option
 @qartod_test_option
@@ -253,19 +253,19 @@ def buoys_file_export(
     config_key_value = load_and_merge_qa_configs(qartod)
     qa = run_qartod_tests(df, config_key_value)
     for group in qa.groups.keys():
-        flags = qa.get_group(group)[test.value]
+        flags = qa.get_group(group)[test]
         df[group] = df[group].where((flags < flag) | (flags == 9))
     df.columns = unit_names  # revert to original headers for export
     start = df.index.min()
     end = df.index.max()
     filepath = (
         EXPORT_DIR
-        / name.value
+        / name
         / (
             f"{start:%Y-%m-%d}_"
             f"{end:%Y-%m-%d}_"
             f"{'-'.join(Path(each).stem for each in qartod)}"
-            f"-{test.value}"
+            f"-{test}"
         )
     ).with_suffix(".csv")
     filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -273,7 +273,7 @@ def buoys_file_export(
     click.echo(f"Saved file to {filepath}")
 
 
-@plot.command(name=ClickOptions.TAIL.value)
+@plot.command(name=ClickOptions.TAIL)
 @source_options
 @plot_options
 @qartod_configs_option
@@ -321,21 +321,21 @@ def buoys_plot_tail(
     df, dropped = load_and_subset_multifile_table(name, table, start, end)
     if df.empty:
         raise click.ClickException(
-            f"No local data for {name.value} {table.value} between {start} and {end}."
+            f"No local data for {name} {table} between {start} and {end}."
         )
     gps, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, start, end)
     df = df.drop(columns=["RECORD"]).join(gps, how="left")
     renamed = list(map(format_column_standard_name, df.columns))
     units = {each: col[1] for each, col in zip(renamed, df.columns)}
     df.columns = renamed
-    df = df[["Latitude", "Longitude", series.value]]
+    df = df[["Latitude", "Longitude", series]]
     config_key_value = load_and_merge_qa_configs(qartod)
 
     # Begin plotting
     fig, ax = plt.subplots(figsize=figsize)
     ax.plot(
         df.index,
-        df[series.value],
+        df[series],
         color="grey",
         linestyle="dashed",
         linewidth=1,
@@ -343,17 +343,17 @@ def buoys_plot_tail(
         label="raw",
     )
     ylim = (None, None)
-    if series.value in config_key_value["streams"]:
+    if series in config_key_value["streams"]:
         qa = run_qartod_tests(df, {
             "streams": {
-                series.value: config_key_value["streams"][series.value]
+                series: config_key_value["streams"][series]
             }
-        }).get_group(series.value)
-        gaps = cast(DataFrame, df.loc[qa["gap"] == 3, series.value])
-        qa = qa[test.value]
-        suspect = cast(DataFrame, df.loc[qa == 3, series.value])
-        failed = cast(DataFrame, df.loc[qa == 4, series.value])
-        remaining = df.loc[((qa < 3) | (qa == 9)), series.value].asfreq("h")
+        }).get_group(series)
+        gaps = cast(DataFrame, df.loc[qa["gap"] == 3, series])
+        qa = qa[test]
+        suspect = cast(DataFrame, df.loc[qa == 3, series])
+        failed = cast(DataFrame, df.loc[qa == 4, series])
+        remaining = df.loc[((qa < 3) | (qa == 9)), series].asfreq("h")
 
         ax.vlines(
             gaps.index,
@@ -366,7 +366,7 @@ def buoys_plot_tail(
             zorder=0
         )
         ax.vlines(
-            get_climatology_breakpoints(config_key_value, series.value),
+            get_climatology_breakpoints(config_key_value, series),
             ymin=0,
             ymax=1,
             color="black",
@@ -412,12 +412,12 @@ def buoys_plot_tail(
     _start = df.index.min()
     _end = df.index.max()
     _days = (_end - _start).days
-    display_name = series.value.replace("_", " ").title()
+    display_name = series.replace("_", " ").title()
     if _start.year == _end.year:
         year_range = f"{_start.year}"
     else:
         year_range = f"{_start.year}-{_end.year}"
-    ax.set_title(f"{name.value} {display_name} {year_range} ({test.value.replace('_', ' ')})".title())
+    ax.set_title(f"{name} {display_name} {year_range} ({test.replace('_', ' ')})".title())
     ax.set_xlabel("Date")
     ax.xaxis.set_tick_params(rotation=45)
     ax.set_xlim(_start, _end)
@@ -426,22 +426,22 @@ def buoys_plot_tail(
     ax.xaxis.set_minor_locator(mdates.DayLocator(interval=1))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))  # Customize format
     if units is not None:
-        ax.set_ylabel(f"{units[series.value]}")
+        ax.set_ylabel(f"{units[series]}")
     ax.legend(bbox_to_anchor=(1, 1), loc='upper left')
     fig.tight_layout()
     filepath = (
         FIGURES_DIR
-        / ClickOptions.TAIL.value
-        / name.value
-        / table.value
-        / series.value
+        / ClickOptions.TAIL
+        / name
+        / table
+        / series
         / (
             f"{_start:%Y-%m-%d}_"
             f"{_end:%Y-%m-%d}_"
             f"{'-'.join(Path(each).stem for each in qartod)}"
-            f"-{test.value}"
+            f"-{test}"
         )
-    ).with_suffix(f".{image_format.value}")
+    ).with_suffix(f".{image_format}")
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath, dpi=300, bbox_inches="tight")
     click.echo(f"Saved plot to {filepath}")
@@ -454,11 +454,11 @@ def buoys_plot_cable(name: StationName):
     """
     Plot the mooring tension diagram from the WHOI cable simulation.
     """
-    low = CABLE_DIR / f"{name.value}-low.mat"
-    high = CABLE_DIR / f"{name.value}-high.mat"
+    low = CABLE_DIR / f"{name}-low.mat"
+    high = CABLE_DIR / f"{name}-high.mat"
     if not low.exists() or not high.exists():
         raise click.ClickException(
-            f"Missing cable simulation .mat files for station '{name.value}' (expected {low.name} and {high.name} under {CABLE_DIR})"
+            f"Missing cable simulation .mat files for station '{name}' (expected {low.name} and {high.name} under {CABLE_DIR})"
         )
     low_data = loadmat(low)
     high_data = loadmat(high)
@@ -504,7 +504,7 @@ def buoys_plot_cable(name: StationName):
     ax.set_xlabel("Displacement (m)")
     ax.set_ylabel("Water Level (m)")
     ax.legend(loc="best")
-    filename = FIGURES_DIR / "cable" / name.value / "mooring-tension.png"
+    filename = FIGURES_DIR / "cable" / name / "mooring-tension.png"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
     fig.savefig(filename, bbox_inches="tight", dpi=300)
@@ -522,7 +522,7 @@ def predicted_watch_circle(
     """
     predicted: list[Circle] = []
     for each, circle_label, ls in [("low", label, "solid"), ("high", None, "dashed")]:
-        mat_path = CABLE_DIR / f"{station.value}-{each}.mat"
+        mat_path = CABLE_DIR / f"{station}-{each}.mat"
         if not mat_path.exists():
             raise click.ClickException(f"Missing cable simulation file: {mat_path}")
         data = loadmat(mat_path)
@@ -645,7 +645,7 @@ def buoys_plot_locations(
     ax.set_xlabel("UTM Easting Δ (m)")
     ax.set_aspect(1.0)
 
-    filename = FIGURES_DIR / "locations" / name.value / "watch-circle.png"
+    filename = FIGURES_DIR / "locations" / name / "watch-circle.png"
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
     ax.ticklabel_format(axis="both", style="plain")
@@ -654,7 +654,7 @@ def buoys_plot_locations(
     fig.savefig(filename, dpi=300, bbox_inches="tight")
 
 
-@plot.command(name=ClickOptions.DATASTREAM.value)
+@plot.command(name=ClickOptions.DATASTREAM)
 @source_options
 @click.option(
     "--aggregate",
@@ -702,7 +702,7 @@ def buoys_plot_datastream(
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
     vendor_name = VendoredNames[series.name]
-    local = DataFrame(df[vendor_name.value])
+    local = DataFrame(df[vendor_name])
     units = local.columns[0][0]
     mask = ~df.index.duplicated(keep=False)
     if start is not None:
@@ -713,8 +713,8 @@ def buoys_plot_datastream(
     unique.index.rename("time", inplace=True)
     boxplot(
         unique,
-        name.value,
-        series.value,
+        name,
+        series,
         FIGURES_DIR / "datastream",
         units=units,
         freq=aggregate,
@@ -754,8 +754,8 @@ def buoys_file_gpx(name: StationName):
 
     # You can add routes and waypoints, too...
 
-    parts = list(filter(None, re.split(r"([A-Z][^A-Z]*)", table.value)))
-    parts.insert(0, name.value)
+    parts = list(filter(None, re.split(r"([A-Z][^A-Z]*)", table)))
+    parts.insert(0, name)
     path = EXPORT_DIR / ("-".join(parts).lower() + ".gpx")
     with open(path, "w", encoding="utf-8") as fid:
         fid.write(gpx.to_xml())
@@ -792,7 +792,7 @@ def buoys_file_first_and_second_derivative(
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
     vendor_name = VendoredNames[series.name]
-    ds = df[vendor_name.value]
+    ds = df[vendor_name]
     ds = ds.sort_index()
     ds = ds[~ds.index.duplicated(keep="first")].asfreq("h")  # resample filling gaps with NaN
     slope = ds.diff()

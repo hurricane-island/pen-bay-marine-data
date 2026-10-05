@@ -1,7 +1,7 @@
 """
 LoRaWAN CLI commands.
 """
-from enum import Enum
+from enum import Enum, StrEnum, auto
 from os import getenv
 from pathlib import Path
 from uuid import uuid4
@@ -15,19 +15,19 @@ from pyproj import Transformer
 from pandas import json_normalize, to_datetime
 
 
-class SignalMetric(Enum):
+class SignalMetric(StrEnum):
     """Signal metrics to plot."""
-    RSSI = "rssi"
-    SNR = "snr"
+    RSSI = auto()
+    SNR = auto()
 
 
-class LoraWANCommand(Enum):
+class LoraWANCommand(StrEnum):
     """LoRaWAN CLI commands."""
-    SYNC = "sync"
-    TAIL = "tail"
-    MOCK = "mock"
-    SECRET = "secret"
-    SIGNAL = "signal"
+    SYNC = auto()
+    TAIL = auto()
+    MOCK = auto()
+    SECRET = auto()
+    SIGNAL = auto()
 
 # Create a transformer from WGS84 3D Ellipsoidal to WGS84 + EGM96 Sea Level Altitude
 # EPSG:4979 is Latitude/Longitude/Ellipsoidal height (3D)
@@ -118,7 +118,7 @@ def fetch_uplink_messages(
     items = result.text.split("\n\n")
     return list(map(json.loads, filter(None, items)))
 
-@describe.command(name=LoraWANCommand.SIGNAL.value)
+@describe.command(name=LoraWANCommand.SIGNAL)
 @click.option("--application-id", default=APPLICATION_ID, help="TTN application ID.")
 @click.option("--device-id", default=DEVICE_ID, help="TTN device ID.")
 def signal(application_id: str, device_id: str):
@@ -133,7 +133,7 @@ def signal(application_id: str, device_id: str):
     df = df[["latitude", "longitude", "altitude", "sats", "rssi", "snr"]]
     print(df)
 
-@describe.command(name=LoraWANCommand.TAIL.value)
+@describe.command(name=LoraWANCommand.TAIL)
 @click.argument("application_id", default=APPLICATION_ID)
 @click.argument("device_id", default=DEVICE_ID)
 def lorawan_describe_tail(application_id, device_id):
@@ -144,7 +144,7 @@ def lorawan_describe_tail(application_id, device_id):
     data = list(map(parse_uplink_message, fetch_uplink_messages(application_id, device_id, limit=1)))
     click.echo(json.dumps(data, indent=4))
 
-@db.command(name=LoraWANCommand.SECRET.value)
+@db.command(name=LoraWANCommand.SECRET)
 def lorawan_db_secret():
     """
     Create a secret to add to TTN and Cloudflare Workers.
@@ -194,7 +194,7 @@ def create_mock_message(device_id: str):
     }
     return message
 
-@db.command(name=LoraWANCommand.MOCK.value)
+@db.command(name=LoraWANCommand.MOCK)
 @click.argument("device_id", default="mock-device")
 @click.option("--secret", default=None, help="Webhook secret to use. If not provided, will use WEBHOOK_SECRET from environment.")
 def lorawan_db_mock(device_id: str, secret: Optional[str]):
@@ -220,7 +220,7 @@ def lorawan_db_mock(device_id: str, secret: Optional[str]):
         click.echo(f"Response: {response.text}")
 
 
-@db.command(name=LoraWANCommand.SYNC.value)
+@db.command(name=LoraWANCommand.SYNC)
 @click.option("--application-id", default=APPLICATION_ID, help="TTN application ID.")
 @click.option("--device-id", default=DEVICE_ID, help="TTN device ID.")
 def lorawan_db_sync(application_id: str, device_id: str):
