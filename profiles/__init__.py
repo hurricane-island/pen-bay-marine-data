@@ -2,29 +2,25 @@
 Command line interfaces for working with vertical profiles of water column data,
 such as temperature, salinity, and density.
 """
+
 from enum import StrEnum, auto
-import json
 from typing import Optional, cast
 from pathlib import Path
 from click import group, argument, option, Choice, echo
 from pandas import read_csv, DataFrame, cut
 from numpy import arange, array, column_stack, meshgrid, linspace, interp, nan
-from matplotlib.pyplot import subplots, close, Axes
-from pydantic import BaseModel
+from matplotlib.pyplot import subplots, close
 from scipy.interpolate import griddata
 from pyproj import Transformer
 from gsw import rho
-from lib import haversine
-from lib.geo import plot_map
-from geojson_pydantic import FeatureCollection, Feature, LineString, MultiLineString, Polygon, MultiPolygon
-
-
+from lib.geo import Scale, plot_map, haversine, to_utm
 
 transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
 
 DATA_DIR = Path(__file__).parent / "data"
 TMP_DIR = Path(__file__).parent.parent / "tmp"
 FIGURES_DIR = Path(__file__).parent / "figures"
+
 
 class Dimension(StrEnum):
     """
@@ -42,6 +38,7 @@ class Dimension(StrEnum):
     PYCOERYTHRIN = "BGA-PE RFU"
     DENSITY = auto()
     PRESSURE = "DEP psia"
+
 
 @group()
 def profiles():
@@ -66,24 +63,19 @@ def load_profile_downcast(filepath: Path, encoding="utf-16"):
                 break
             skiprows += 1
     df: DataFrame = read_csv(
-        filepath,
-        skiprows=skiprows,
-        encoding=encoding,
-        index_col=False
+        filepath, skiprows=skiprows, encoding=encoding, index_col=False
     )
     df[Dimension.DENSITY] = rho(
         df[Dimension.SALINITY],
         df[Dimension.TEMPERATURE],
-        df[Dimension.PRESSURE] * 0.689476
+        df[Dimension.PRESSURE] * 0.689476,
     )
     stop = cast(int, df[Dimension.DEPTH].idxmax()) + 1
     return df[:stop]
 
 
 @plot.command(name="single")
-@argument(
-    "filename"
-)
+@argument("filename")
 @option(
     "--dim",
     default=Dimension.TEMPERATURE,
@@ -91,19 +83,16 @@ def load_profile_downcast(filepath: Path, encoding="utf-16"):
     required=True,
     help="Dimension for analysis.",
 )
-@option(
-    "--step",
-    default=1.0,
-    help="Step size for depth binning.",
-    type=float
-)
+@option("--step", default=1.0, help="Step size for depth binning.", type=float)
 @option(
     "--figsize",
     default=(3, 4),
     help="Figure size as a tuple (width, height).",
-    type=(float, float)
+    type=(float, float),
 )
-def profiles_plot_single(filename: str, dim: Dimension, step: float, figsize: tuple) -> None:
+def profiles_plot_single(
+    filename: str, dim: Dimension, step: float, figsize: tuple
+) -> None:
     """
     Plot a single depth profile, e.g., temperature, salinity, or density.
     """
@@ -128,18 +117,19 @@ def profiles_plot_single(filename: str, dim: Dimension, step: float, figsize: tu
                 break
             skiprows += 1
 
-
-    df: DataFrame = read_csv(filepath, skiprows=skiprows, encoding='utf-16',index_col=False)
+    df: DataFrame = read_csv(
+        filepath, skiprows=skiprows, encoding="utf-16", index_col=False
+    )
     df[Dimension.DENSITY] = rho(
         df[Dimension.SALINITY],
         df[Dimension.TEMPERATURE],
-        df[Dimension.PRESSURE] * 0.689476
+        df[Dimension.PRESSURE] * 0.689476,
     )
 
     max_depth = df[depth_col].max()
     loc_max = df[depth_col].idxmax()
-    upcast = df[loc_max+1:-1]
-    downcast = df[:loc_max+1]
+    upcast = df[loc_max + 1 : -1]
+    downcast = df[: loc_max + 1]
 
     start = 0.0
     stop = max_depth + step
@@ -149,27 +139,52 @@ def profiles_plot_single(filename: str, dim: Dimension, step: float, figsize: tu
     downcast["depth_bin"] = cut(downcast[depth_col], bins=bins)
 
     # Group by the bins and calculate the average
-    resampled_df = downcast.groupby("depth_bin", observed=False)[dim].mean().reset_index()
+    resampled_df = (
+        downcast.groupby("depth_bin", observed=False)[dim].mean().reset_index()
+    )
     resampled_df.columns = ["distance_interval", "average_value"]
-    depth = [x.left + step/2 for x in resampled_df["distance_interval"]]
+    depth = [x.left + step / 2 for x in resampled_df["distance_interval"]]
 
     fig, ax = subplots(figsize=figsize)
-    ax.plot(resampled_df["average_value"], depth, color="black", zorder=2, label=f"mean ({step} m)")
-    ax.scatter(downcast[dim], downcast[depth_col], marker="x", color="grey", zorder=1, label="downcast")
-    ax.scatter(upcast[dim], upcast[depth_col], marker="x", color="pink", zorder=0, label="upcast")
+    ax.plot(
+        resampled_df["average_value"],
+        depth,
+        color="black",
+        zorder=2,
+        label=f"mean ({step} m)",
+    )
+    ax.scatter(
+        downcast[dim],
+        downcast[depth_col],
+        marker="x",
+        color="grey",
+        zorder=1,
+        label="downcast",
+    )
+    ax.scatter(
+        upcast[dim],
+        upcast[depth_col],
+        marker="x",
+        color="pink",
+        zorder=0,
+        label="upcast",
+    )
     ax.set_xlabel(dim)
     ax.set_ylabel("Depth (m)")
     ax.invert_yaxis()
     ax.set_title(f"{site} {dim.name.lower()} (dt = {interval} s)")
     ax.legend(loc="best")
-    
+
     # Save the figure to the figures directory
-    outfile = (FIGURES_DIR / f"{Path(filename).stem}_{dim.name.lower()}").with_suffix('.png')
+    outfile = (FIGURES_DIR / f"{Path(filename).stem}_{dim.name.lower()}").with_suffix(
+        ".png"
+    )
     outfile.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
-    fig.savefig(outfile, dpi=300, bbox_inches='tight')
+    fig.savefig(outfile, dpi=300, bbox_inches="tight")
     echo(f"Figure saved to {outfile}")
     close(fig)
+
 
 @plot.command("transect")
 @argument("prefix")
@@ -180,12 +195,7 @@ def profiles_plot_single(filename: str, dim: Dimension, step: float, figsize: tu
     required=True,
     help="Dimension for analysis.",
 )
-@option(
-    "--levels",
-    default=None,
-    type=Optional[int],
-    help="Bins for colormap breaks."
-)
+@option("--levels", default=None, type=Optional[int], help="Bins for colormap breaks.")
 def profiles_plot_transect(prefix: str, dim: Dimension, levels: Optional[int]):
     """
     Create a plot of a transect, with value linearly interpolated between
@@ -230,16 +240,10 @@ def profiles_plot_transect(prefix: str, dim: Dimension, levels: Optional[int]):
 
     # Structured grid coordinate matrix
     x_pts = linspace(x_min, x_max, 200)
-    grid_x, grid_z = meshgrid(
-        x_pts,
-        linspace(z_min, z_max, 100)
-    )
+    grid_x, grid_z = meshgrid(x_pts, linspace(z_min, z_max, 100))
     points_coord = column_stack((x, z))
     grid_v = griddata(
-        points=points_coord,
-        values=h,
-        xi=(grid_x, grid_z),
-        method='linear'
+        points=points_coord, values=h, xi=(grid_x, grid_z), method="linear"
     )
 
     grid_seafloor_profile = interp(grid_x, x_interp, depth_max)
@@ -247,16 +251,15 @@ def profiles_plot_transect(prefix: str, dim: Dimension, levels: Optional[int]):
     grid_v[out_of_bounds_mask] = nan
 
     fig, ax = subplots(figsize=(10, 6))
-    contour = ax.contourf(grid_x, grid_z, grid_v, cmap='cool', levels=levels)
+    contour = ax.contourf(grid_x, grid_z, grid_v, cmap="cool", levels=levels)
     cbar = fig.colorbar(contour, shrink=0.5)
     cbar.set_label(dim.name.lower())
-    ax.scatter(x, z, color='none', edgecolor='black', s=40)
-    ax.set_xlabel('distance (m)')
-    ax.set_ylabel('depth (m)')
-    ax.grid(True, linestyle='--', alpha=0.5)
+    ax.scatter(x, z, color="none", edgecolor="black", s=40)
+    ax.set_xlabel("distance (m)")
+    ax.set_ylabel("depth (m)")
+    ax.grid(True, linestyle="--", alpha=0.5)
     fig.tight_layout()
-    fig.savefig(FIGURES_DIR / f'{prefix}_{dim.name.lower()}_transect.png')
-
+    fig.savefig(FIGURES_DIR / f"{prefix}_{dim.name.lower()}_transect.png")
 
 
 @plot.command(name="map")
@@ -265,9 +268,18 @@ def profiles_plot_map(prefix: str):
     """
     Create a map
     """
-
+    scale = Scale.KM
+    lower_left = (-68.92, 44.0)
+    upper_right = (-68.85, 44.1)
     fig, ax = subplots(figsize=(3, 6))
-    plot_map(ax)
+    plot_map(
+        ax,
+        lower_left=lower_left,
+        upper_right=upper_right,
+        scale=scale,
+        linewidth=1.0,
+        color="grey",
+    )
 
     files = list(DATA_DIR.glob(f"{prefix}*.csv"))
     for file in sorted(files):
@@ -275,15 +287,23 @@ def profiles_plot_map(prefix: str):
         lat = df[Dimension.LATITUDE].mean()
         lon = df[Dimension.LONGITUDE].mean()
         x, y = transformer.transform(lon, lat)
-        ax.scatter(x, y, color="black", s=40)
+        ax.scatter(x * scale.value, y * scale.value, color="black", facecolor="none", marker="v", s=40, zorder=3)
 
-    lx, ly = transformer.transform((-68.887828, -68.871323), (44.044788, 44.031605))
-    ax.scatter(lx, ly, color="red", s=40)
-    bx, by = transformer.transform(-68.89224, 44.04357)
-    ax.scatter(bx, by, color="blue", s=40)
+    # # loggers
+    # lx, ly = to_utm(array([-68.887828, -68.871323]), array([44.044788, 44.031605]))
+    # ax.scatter(lx * scale.value, ly * scale.value, color="red", s=40)
 
-    # x_lim, y_lim = transformer.transform((-68.9, -68.85), (44.0, 44.1))
-    # ax.set_xlim(x_lim)
-    # ax.set_ylim(y_lim)
+    # # wynken
+    # bx, by = to_utm(-68.89224, 44.04357)
+    # ax.scatter(bx * scale.value, by * scale.value, color="blue", s=40)
+
+    # # scallops
+    # sx, sy = to_utm(-68.885639, 44.034806)
+    # ax.scatter(sx * scale.value, sy * scale.value, color="green", s=40)
+
+    # # farm
+    # fx, fy = to_utm(-68.891278, 44.039667)
+    # ax.scatter(fx * scale.value, fy * scale.value, color="green", s=40)
+
     fig.tight_layout()
-    fig.savefig(FIGURES_DIR / 'map.png', bbox_inches='tight', dpi=300)
+    fig.savefig(FIGURES_DIR / "map.png", bbox_inches="tight", dpi=300)

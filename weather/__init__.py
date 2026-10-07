@@ -24,7 +24,7 @@ Questions:
 from pathlib import Path
 from enum import StrEnum, auto
 from typing import cast
-import click
+from click import argument, group, Choice, option
 from pandas import read_csv, to_datetime, DataFrame, Series, concat
 from influxdb_client_3 import InfluxDBClient3
 from lib import (
@@ -261,28 +261,28 @@ class StationName(StrEnum):
     DEV = auto()
 
 
-@click.group(name="weather")
+@group(name="weather")
 def weather():
     """
     Weather station commands.
     """
 
 
-@click.group(name="plot")
+@group(name="plot")
 def plot():
     """
     Commands that generate plots using weather data.
     """
 
 
-@click.group(name="db")
+@group(name="db")
 def database():
     """
     Commands that interact with the weather database.
     """
 
 
-@click.group(name="file")
+@group(name="file")
 def file():
     """
     Commands that interact with the weather file system.
@@ -300,11 +300,11 @@ def source_options(function):
     Choose weather station and observation series. Re-usable decorator
     for commands that need to select a station and series.
     """
-    function = click.argument(
-        "series", type=click.Choice(StandardNames, case_sensitive=False)
+    function = argument(
+        "series", type=Choice(StandardNames, case_sensitive=False)
     )(function)
-    function = click.argument(
-        "station", type=click.Choice(StationName, case_sensitive=False)
+    function = argument(
+        "station", type=Choice(StationName, case_sensitive=False)
     )(function)
     return function
 
@@ -434,17 +434,17 @@ def weather_describe_series(
 @source_options
 @influx_options
 @plot_options
-@click.option(
+@option(
     "--days",
     default=60,
     help="The time range to include in the plot (e.g., 7, 14).",
 )
-@click.option(
+@option(
     "--resample",
     default=None,
     help="How to resample the data (e.g., 1d, 1h).",
 )
-@click.option(
+@option(
     "--qartod",
     default=None,
     help="Path to the QARTOD configuration file.",
@@ -489,14 +489,14 @@ def weather_plot_daily(
     local = WeatherLinkArchive(station).df[series]
     df = concat([local, remote], axis=0)
     mask = ~df.index.duplicated(keep="first")
-    unique = df[mask].sort_index()
-    units = cast(ObservedProperty, CF_STANDARDS.get(series)).units
+    unique = cast(DataFrame, df[mask]).sort_index()
+    units = CF_STANDARDS[series].units
     prefix = FIGURES_DIR / ClickCommands.DAILY
     boxplot(unique, station, series, prefix, units, **kwargs)
 
 
 @file.command(name=ClickCommands.DESCRIBE)
-@click.argument("station", type=click.Choice(StationName, case_sensitive=False))
+@argument("station", type=Choice(StationName, case_sensitive=False))
 def weather_file_describe(station: StationName):
     """
     Parse and normalize weather station data for display
@@ -508,7 +508,7 @@ def weather_file_describe(station: StationName):
 
 
 @file.command(name=ClickCommands.EXPORT)
-@click.argument("station", type=click.Choice(StationName, case_sensitive=False))
+@argument("station", type=Choice(StationName, case_sensitive=False))
 def weather_file_export(station: StationName):
     """
     Export normalized weather station data to CSV.
@@ -531,7 +531,7 @@ def weather_db_describe(host: str, measurement: str, token: str):
 
 
 @database.command(name=ClickCommands.BACKFILL)
-@click.argument("station", type=click.Choice(StationName, case_sensitive=False))
+@argument("station", type=Choice(StationName, case_sensitive=False))
 @influx_options
 def weather_db_backfill(station: StationName, host: str, measurement: str, token: str):
     """

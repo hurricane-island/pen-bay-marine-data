@@ -16,7 +16,7 @@ from warnings import simplefilter
 from pathlib import Path
 from enum import StrEnum, auto
 from datetime import datetime, timedelta
-from numpy import concatenate, array, argsort
+from numpy import concatenate, argsort
 from pandas import DataFrame
 from pandas.errors import PerformanceWarning
 from matplotlib import pyplot as plt, dates as mdates
@@ -24,18 +24,15 @@ from matplotlib.patches import Circle
 from matplotlib.markers import MarkerStyle
 from scipy.io import loadmat
 from scipy.stats import median_abs_deviation
-from pyproj import Transformer
-import gpxpy
-import gpxpy.gpx
 import click
 from lib import (
     Source,
     plot_options,
     boxplot,
     Frequency,
-    ImageFormat,
-    haversine
+    ImageFormat
 )
+from lib.geo import to_utm, df_to_gpx_xml, distance_mask
 from buoys.database import database
 from buoys.firmware import firmware
 from buoys.qartod import (
@@ -60,11 +57,7 @@ from buoys.options import (
     DATA_DIR,
     FIGURES_DIR,
     EXPORT_DIR,
-    CABLE_DIR,
 )
-
-
-transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
 
 
 class ClickOptions(StrEnum):
@@ -454,11 +447,11 @@ def buoys_plot_cable(name: StationName):
     """
     Plot the mooring tension diagram from the WHOI cable simulation.
     """
-    low = CABLE_DIR / f"{name}-low.mat"
-    high = CABLE_DIR / f"{name}-high.mat"
+    low = DATA_DIR / f"{name}-low.mat"
+    high = DATA_DIR / f"{name}-high.mat"
     if not low.exists() or not high.exists():
         raise click.ClickException(
-            f"Missing cable simulation .mat files for station '{name}' (expected {low.name} and {high.name} under {CABLE_DIR})"
+            f"Missing cable simulation .mat files for station '{name}' (expected {low.name} and {high.name} under {DATA_DIR})"
         )
     low_data = loadmat(low)
     high_data = loadmat(high)
@@ -522,7 +515,7 @@ def predicted_watch_circle(
     """
     predicted: list[Circle] = []
     for each, circle_label, ls in [("low", label, "solid"), ("high", None, "dashed")]:
-        mat_path = CABLE_DIR / f"{station}-{each}.mat"
+        mat_path = DATA_DIR / f"{station}-{each}.mat"
         if not mat_path.exists():
             raise click.ClickException(f"Missing cable simulation file: {mat_path}")
         data = loadmat(mat_path)
@@ -590,13 +583,9 @@ def buoys_plot_locations(
     satellite_count = df[sat_name].to_numpy().flatten()
     planned_gps = (longitude, latitude)  # original
 
-    def compute_distance(gps):
-        return haversine(*planned_gps, *gps)
+    mask = distance_mask(planned_gps, lon, lat, distance)
+    mask &= satellite_count >= satellites
 
-    mask = (
-        (array(list(map(compute_distance, zip(lon, lat)))) < distance)
-        & (satellite_count >= satellites)
-    )
     if start is not None:
         mask &= df.index >= start
     if end is not None:
@@ -607,7 +596,7 @@ def buoys_plot_locations(
         raise click.ClickException(
             "No GPS points remain after filtering; try increasing --distance, lowering --satellites, or adjusting the date filter."
         )
-    cx, cy = transformer.transform(filtered_lon.mean(), filtered_lat.mean())
+    cx, cy = to_utm(filtered_lon.mean(), filtered_lat.mean())
     filtered_sat = satellite_count[mask]
 
     fig, ax = plt.subplots(figsize=(3, 4))
@@ -615,7 +604,7 @@ def buoys_plot_locations(
     sort_ind = argsort(
         filtered_sat
     )  # Sort indices based on satellite count for plotting
-    xx, yy = transformer.transform(filtered_lon[sort_ind], filtered_lat[sort_ind])
+    xx, yy = to_utm(filtered_lon[sort_ind], filtered_lat[sort_ind])
     handle = ax.scatter(
         xx - cx,
         yy - cy,
@@ -629,7 +618,7 @@ def buoys_plot_locations(
     )
     fig.colorbar(handle, label="Satellites", shrink=0.5)
 
-    px, py = transformer.transform(*planned_gps)
+    px, py = to_utm(*planned_gps)
 
     if cable:
         planned_xy = predicted_watch_circle(
@@ -735,30 +724,16 @@ def buoys_file_gpx(name: StationName):
     mask = ~df.index.duplicated(keep=False)
     unique = df[mask].sort_index()
     unique.index.rename("time", inplace=True)
-    gpx = gpxpy.gpx.GPX()
-
-    # Create first track in our GPX:
-    gpx_track = gpxpy.gpx.GPXTrack()
-    gpx.tracks.append(gpx_track)
-
-    # Create first segment in our GPX track:
-    gpx_segment = gpxpy.gpx.GPXTrackSegment()
-    gpx_track.segments.append(gpx_segment)
-
-    for time, row in unique.tail(24).iterrows():
-        latitude = row[("Latitude", "Decimal Degrees (N=+,S=-)", "Smp")]
-        longitude = row[("Longitude", "Decimal Degrees (E=+,W=-)", "Smp")]
-        gpx_segment.points.append(
-            gpxpy.gpx.GPXTrackPoint(latitude, longitude, elevation=0, time=time)
-        )
-
-    # You can add routes and waypoints, too...
-
+    gpx = df_to_gpx_xml(
+        unique.tail(24),
+        lon=("Longitude", "Decimal Degrees (E=+,W=-)", "Smp"),
+        lat=("Latitude", "Decimal Degrees (N=+,S=-)", "Smp")
+    )
     parts = list(filter(None, re.split(r"([A-Z][^A-Z]*)", table)))
     parts.insert(0, name)
-    path = EXPORT_DIR / ("-".join(parts).lower() + ".gpx")
+    path = (EXPORT_DIR / ("-".join(parts).lower())).with_suffix(".gpx")
     with open(path, "w", encoding="utf-8") as fid:
-        fid.write(gpx.to_xml())
+        fid.write(gpx)
 
 
 @file_group.command(name="derivatives")

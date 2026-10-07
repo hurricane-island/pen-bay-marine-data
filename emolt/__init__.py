@@ -1,15 +1,19 @@
-from click import argument, group, echo, option, Choice
+"""
+Commands for working with eMOLT (Environmental Monitors on Lobster Traps) logger data,
+and other similar platforms.
+"""
 from typing import cast
-from matplotlib.dates import DateFormatter
-from datetime import datetime, timezone
-from enum import Enum, StrEnum, auto
+from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 from io import StringIO
-from matplotlib.pyplot import subplots
 from pandas import DataFrame, concat, read_csv
+from matplotlib.dates import DateFormatter
+from matplotlib.pyplot import subplots
+from click import argument, group, Choice
 
 FIGURES = Path(__file__).parent / "figures"
-DATA = Path(__file__).parent / "data" 
+DATA = Path(__file__).parent / "data"
 FIGURES.mkdir(exist_ok=True)
 
 class Dimension(StrEnum):
@@ -47,11 +51,11 @@ def loggers(dim: Dimension):
     after = datetime(2026, 8, 25)
     before = datetime(2026, 8, 27)
     date_col = "ISO 8601 Time"
-    loggers = ["2503604", "2305707"]
+    _loggers = ["2503604", "2305707"]
     labels = ["Green's (SE)", "Hurricane (NW)"]
     colors = ["grey", "red"]
     fig, ax = subplots(figsize=(10, 3))
-    for serial_number, color, label in zip(loggers, colors, labels):
+    for serial_number, color, label in zip(_loggers, colors, labels):
         files = DATA.glob(f"{serial_number}*.csv")
         frames = []
         for file in files:
@@ -81,7 +85,7 @@ def acoustic_release():
     date_col = "Device Time (UTC)"
     temp_col = "Ambient (deg C)"
     fig, ax = subplots(figsize=(10, 3))
-    files = DATA.glob(f"VR2AR*.csv")
+    files = DATA.glob("VR2AR*.csv")
     str_data = ""
     for file in files:
         with open(file, encoding="utf-8") as fid:
@@ -91,11 +95,11 @@ def acoustic_release():
                 elif "TEMP," in line:
                     str_data += line
         df = read_csv(StringIO(str_data), index_col=date_col, parse_dates=[date_col])
+        df.index = df.index.tz_localize(None)
+        df = df[(df.index > after) & (df.index < before)]
+        ax.plot(df.index, df[temp_col], color="black", label="Temperature", linewidth=1)
 
-    df.index = df.index.tz_localize(None)
-    df = df[(df.index > after) & (df.index < before)]
-    ax.plot(df.index, df[temp_col], color="black", label="Temperature", linewidth=1)
-    ax.set_title(f"Acoustic Release Sensors")
+    ax.set_title("Acoustic Release Sensors")
     ax.set_xlabel(Dimension.TIME)
     date_form = DateFormatter("%m-%d")
     ax.xaxis.set_major_formatter(date_form)
@@ -103,4 +107,4 @@ def acoustic_release():
     ax.legend(loc="best")
     fig.autofmt_xdate()
     fig.tight_layout()
-    fig.savefig(FIGURES / f"release_temperature.png", bbox_inches="tight", dpi=300)
+    fig.savefig(FIGURES / "release_temperature.png", bbox_inches="tight", dpi=300)
