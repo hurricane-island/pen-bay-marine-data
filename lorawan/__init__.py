@@ -53,6 +53,12 @@ def lorawan():
 def plot():
     """Plot CLI commands."""
 
+@lorawan.group()
+def device():
+    """Device management"""
+
+    
+
 
 @lorawan.group()
 def db():
@@ -91,6 +97,16 @@ def parse_uplink_message(message: dict) -> dict:
         **metadata
     }
 
+def ttn_device_url(
+    subdomain: str,
+    region: str,
+    application_id: str,
+    device_id: str
+):
+    domain = f"https://{subdomain}.{region}.cloud.thethings.industries"
+    route = f"api/v3/as/applications/{application_id}/devices/{device_id}"
+    return "/".join([domain, route])
+
 
 def fetch_uplink_messages(
     application_id: str,
@@ -108,7 +124,8 @@ def fetch_uplink_messages(
         "Authorization": f"Bearer {api_key}",
         "Accept": "text/event-stream",
     }
-    url = f"https://{subdomain}.{region}.cloud.thethings.industries/api/v3/as/applications/{application_id}/devices/{device_id}/packages/storage/uplink_message"
+    device_url = ttn_device_url(subdomain, region, application_id, device_id)
+    url = device_url + "/packages/storage/uplink_message"
     if limit is not None:
         url += f"?limit={limit}"
     result = requests.get(url, headers=headers, timeout=10)
@@ -117,6 +134,59 @@ def fetch_uplink_messages(
         return []
     items = result.text.split("\n\n")
     return list(map(json.loads, filter(None, items)))
+
+
+@device.command(name="uplink")
+@click.option("--application-id", default=APPLICATION_ID, help="TTN application ID.")
+@click.option("--device-id", default=DEVICE_ID, help="TTN device ID.")
+@click.option("--api-key", envvar="TTN_API_KEY", help="TTN API key with write permissions on devices", required=True)
+def lorawan_device_uplink_decoder(
+    application_id: str,
+    device_id: str,
+    api_key: str,
+    region: str = "nam1",
+    subdomain: str = "neracoos"
+):
+    """
+    Use HTTP API to send a new decoder, so that we can keep the code in git
+    instead of manually uploading.
+
+    Reference: https://www.thethingsindustries.com/docs/api/reference/http/routes/#asapplications{end_device.ids.application_ids.application_id}devices{end_device.ids.device_id}-put
+    """
+    if len(api_key) == 0:
+        click.ClickException("Things Network API key is not in environment")
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Accept": "application/json",
+    }
+    url = ttn_device_url(subdomain, region, application_id, device_id)
+    filepath = Path(__file__).parent / "field-tester-uplink-decoder.js"
+    with open(filepath, "r", encoding="utf-8") as fid:
+        src_code = fid.read()
+    body = {
+        "end_device": {
+            "ids": {
+                "application_ids": {"application_id": application_id},
+                "device_id": device_id
+            },
+            "formatters": {
+                "up_formatter": "FORMATTER_JAVASCRIPT",
+                "up_formatter_parameter": src_code
+            }
+        },
+        "field_mask": {
+            "paths": [
+                "formatters.up_formatter",
+                "formatters.up_formatter_parameter"
+            ]
+        }
+    }
+    response = requests.put(
+        url,
+        headers=headers,
+        json=body
+    )
+    print(response.status_code, response.text)
 
 @describe.command(name=LoraWANCommand.SIGNAL)
 @click.option("--application-id", default=APPLICATION_ID, help="TTN application ID.")
