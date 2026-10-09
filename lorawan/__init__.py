@@ -160,7 +160,11 @@ def lorawan_device_uplink_decoder(
         "Accept": "application/json",
     }
     url = ttn_device_url(subdomain, region, application_id, device_id)
-    filepath = Path(__file__).parent / "field-tester-uplink-decoder.js"
+    filepath = Path(__file__).parent / f"{device_id}.js"
+    if not filepath.exists():
+        # This won't work once we have multiple of the same device
+        click.ClickException("Decoder file name should be equal to device ID")
+
     with open(filepath, "r", encoding="utf-8") as fid:
         src_code = fid.read()
     body = {
