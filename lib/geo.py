@@ -7,6 +7,7 @@ from enum import Enum
 from typing import cast, Optional
 from math import radians, sin, cos, atan2, sqrt
 from pathlib import Path
+from matplotlib.patches import Circle
 from numpy import array
 from numpy.typing import NDArray
 from matplotlib.pyplot import Axes
@@ -21,10 +22,60 @@ from geojson_pydantic import (
     MultiLineString,
     Polygon,
     MultiPolygon,
+    Point
 )
+from geojson_pydantic.types import Position2D
 
 TMP_DIR = Path(__file__).parent.parent / "tmp"
 transformer = Transformer.from_crs("EPSG:4326", "EPSG:32619", always_xy=True)
+
+class FeatureOfInterest():
+    """
+    Features of interest can be:
+    - Planned/deployed sensor locations
+    - Areas of environmental interest
+    """
+    name: str
+    description: str
+    encoding_type: str
+    feature: Point
+
+    _utm: None
+
+    def __init__(
+        self,
+        name: str,
+        longitude: float,
+        latitude: float,
+        description: str = "",
+    ):
+        self.name = name
+        self.description = description
+        self.encoding_type = "vendor/vnd.geo+json"
+        self.feature = Point(
+            type="Point",
+            coordinates=Position2D(longitude, latitude)
+        )
+
+    def utm_watch_circle(
+        self,
+        radius: float,
+        label: str,
+        linestyle: str="solid",
+        color: str="black",
+    ) -> Circle:
+        """
+        Create a circular patch representing the watch area around the feature.
+        """
+        return Circle(
+            to_utm(*self.feature.coordinates),
+            radius=radius,
+            color=color,
+            fill=False,
+            linestyle=linestyle,
+            label=label,
+        )
+
 
 # Create a transformer from WGS84 3D Ellipsoidal to WGS84 + EGM96 Sea Level Altitude
 # EPSG:4979 is Latitude/Longitude/Ellipsoidal height (3D)
@@ -72,7 +123,6 @@ def distance_mask(
 
     def compute_distance(gps):
         return haversine(*center, *gps)
-
     return array(list(map(compute_distance, zip(lon, lat)))) < distance
 
 
