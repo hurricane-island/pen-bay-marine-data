@@ -6,7 +6,7 @@ from enum import StrEnum, auto
 from pathlib import Path
 from hashlib import md5
 from typing import Optional
-from click import group, option
+from click import group, option, FloatRange
 from buoys.options import FEATURES_OF_INTEREST, station_name, StationName
 
 FIRMWARE_DIR = Path(__file__).parent / "programs"
@@ -45,19 +45,31 @@ def firmware():
 @option("--address", required=True, help="Pakbus address, specific to hardware items.")
 @option("--client", required=True, help="Client ID, specific to geographic location")
 @option("--file", default="buoy.dld", help="Template file")
-@option("--latitude", required=False, help="Latitude of the station", default=None)
-@option("--longitude", required=False, help="Longitude of the station", default=None)
+@option(
+    "--latitude",
+    required=False,
+    type=FloatRange(-90.0, 90.0),
+    help="Latitude of the station",
+    default=None,
+)
+@option(
+    "--longitude",
+    required=False,
+    type=FloatRange(-180.0, 180.0),
+    help="Longitude of the station",
+    default=None,
+)
 def buoys_firmware_template(
     name: StationName,
     address: str,
     client: str,
     file: str,
-    latitude: Optional[str],
-    longitude: Optional[str],
+    latitude: Optional[float],
+    longitude: Optional[float],
 ):
     """
     Fill in a firmware template with options for a specific buoy station.
-    Latitude and longitude are automatically filled based on expected 
+    Latitude and longitude are automatically filled based on expected
     station coordinates if not provided.
     """
     with open(TEMPLATE_DIR / file, "r", encoding="utf-8") as fid:
@@ -71,7 +83,7 @@ def buoys_firmware_template(
         "LONGITUDE": longitude or coordinates.longitude,
     }.items():
         slug = "$" + var
-        filedata = filedata.replace(slug, value)
+        filedata = filedata.replace(slug, f"{value}")
 
     prefix = name.lower()
     filename = FIRMWARE_DIR / f"{prefix}.{checksum(filedata)}.dld"
