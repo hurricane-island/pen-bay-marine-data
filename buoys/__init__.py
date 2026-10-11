@@ -16,13 +16,9 @@ from warnings import simplefilter
 from pathlib import Path
 from enum import StrEnum, auto
 from datetime import datetime, timedelta
-from numpy import concatenate, argsort
 from pandas import DataFrame
 from pandas.errors import PerformanceWarning
 from matplotlib import pyplot as plt, dates as mdates
-from matplotlib.patches import Circle
-from matplotlib.markers import MarkerStyle
-from scipy.io import loadmat
 from scipy.stats import median_abs_deviation
 import click
 from lib import (
@@ -32,9 +28,10 @@ from lib import (
     Frequency,
     ImageFormat
 )
-from lib.geo import to_utm, df_to_gpx_xml, distance_mask
+from lib.geo import to_utm, df_to_gpx_xml
 from buoys.database import database
 from buoys.firmware import firmware
+from buoys.moorings import moorings
 from buoys.qartod import (
     run_qartod_tests,
     TestTypes,
@@ -56,7 +53,7 @@ from buoys.options import (
     filter_buoy_flat_files,
     DATA_DIR,
     FIGURES_DIR,
-    EXPORT_DIR,
+    EXPORT_DIR
 )
 
 
@@ -122,6 +119,7 @@ buoys.add_command(database)
 buoys.add_command(file_group)
 buoys.add_command(firmware)
 buoys.add_command(plot)
+buoys.add_command(moorings)
 
 
 @file_group.command(name=ClickOptions.LIST)
@@ -185,6 +183,7 @@ def load_and_subset_multifile_table(
     df = df[~duplicates].sort_index(kind="stable")
     resampled = df.asfreq("h")  # Resample and fill gaps with NaN to force gaps when plotting
     return resampled, dropped
+
 
 def format_column_name_with_units(col: str) -> str:
     """
@@ -439,208 +438,6 @@ def buoys_plot_tail(
     fig.savefig(filepath, dpi=300, bbox_inches="tight")
     click.echo(f"Saved plot to {filepath}")
     plt.close(fig)  # clean up when testing to avoid memory issues with pytest and matplotlib
-
-
-@plot.command(name="cable")
-@station_name
-def buoys_plot_cable(name: StationName):
-    """
-    Plot the mooring tension diagram from the WHOI cable simulation.
-    """
-    low = DATA_DIR / f"{name}-low.mat"
-    high = DATA_DIR / f"{name}-high.mat"
-    if not low.exists() or not high.exists():
-        raise click.ClickException(
-            f"Missing cable simulation .mat files for station '{name}' (expected {low.name} and {high.name} under {DATA_DIR})"
-        )
-    low_data = loadmat(low)
-    high_data = loadmat(high)
-    fig, ax = plt.subplots(figsize=(4, 3))
-    x = concatenate([low_data["x"], high_data["x"]])
-    y = concatenate([low_data["z"], high_data["z"]])
-    z = concatenate([low_data["T"], high_data["T"]])
-    handle = ax.scatter(x, y, c=z, s=2, cmap="spring", label="Mooring")
-    ax.vlines(
-        low_data["x"].max(),
-        ymin=0.0,
-        ymax=low_data["z"].max(),
-        colors="black",
-        linestyles="solid",
-        label="Low Tide",
-    )
-    ax.vlines(
-        high_data["x"].max(),
-        ymin=0.0,
-        ymax=high_data["z"].max(),
-        colors="black",
-        linestyles="dashed",
-        label="High Tide",
-    )
-    ax.hlines(
-        high_data["depth"],
-        xmin=0.0,
-        xmax=high_data["x"].max(),
-        colors="black",
-        linestyles="dashed",
-    )
-    ax.hlines(
-        low_data["depth"],
-        xmin=0.0,
-        xmax=low_data["x"].max(),
-        colors="black",
-        linestyles="solid",
-    )
-    ax.set_aspect(1.0)
-    fig.colorbar(handle, label="Tension (N)", shrink=0.5)
-    ax.set_ylim(y.min(), None)
-    ax.set_xlim(x.min(), None)
-    ax.set_xlabel("Displacement (m)")
-    ax.set_ylabel("Water Level (m)")
-    ax.legend(loc="best")
-    filename = FIGURES_DIR / "cable" / name / "mooring-tension.png"
-    Path(filename).parent.mkdir(parents=True, exist_ok=True)
-    fig.tight_layout()
-    fig.savefig(filename, bbox_inches="tight", dpi=300)
-
-
-def predicted_watch_circle(
-    center_xy: tuple[float, float],
-    station: StationName,
-    color: str,
-    scale: float = 1.0,
-    label: str | None = None,
-) -> list[Circle]:
-    """
-    Generate a predicted watch circle based on the planned deployment location.
-    """
-    predicted: list[Circle] = []
-    for each, circle_label, ls in [("low", label, "solid"), ("high", None, "dashed")]:
-        mat_path = DATA_DIR / f"{station}-{each}.mat"
-        if not mat_path.exists():
-            raise click.ClickException(f"Missing cable simulation file: {mat_path}")
-        data = loadmat(mat_path)
-        radius = float(data["x"].max()) * scale
-        predicted.append(
-            Circle(
-                center_xy,
-                radius=radius,
-                color=color,
-                fill=False,
-                linestyle=ls,
-                label=circle_label,
-            )
-        )
-    return predicted
-
-
-@plot.command(name="locations")
-@station_name
-@click.option("--latitude", required=True, type=float)
-@click.option("--longitude", required=True, type=float)
-@click.option(
-    "--distance",
-    required=True,
-    type=float,
-    help="filter GPS points by distance from planned deployment location (meters)",
-)
-@click.option(
-    "--satellites", required=True, type=int, help="minimum number of satellites"
-)
-@click.option(
-    "--start",
-    default=None,
-    type=click.DateTime(formats=["%Y-%m-%d"]),
-    help="Start date for filtering GPS points.",
-)
-@click.option(
-    "--end",
-    default=None,
-    type=click.DateTime(formats=["%Y-%m-%d"]),
-    help="End date for filtering GPS points.",
-)
-@click.option(
-    "--cable",
-    is_flag=True,
-    help="include predicted watch circle from WHOI cable simulation",
-)
-def buoys_plot_locations(
-    name, latitude, longitude, distance=100.0, satellites=4, start=None, end=None, cable=False,
-):
-    """
-    Plot the lat and long of the buoy hourly over the course of the deployment period.
-    This only uses historical data contained in local raw files. Compare it to the
-    deployment location of the anchor and the watch circle predicted by WHOI Cable
-    simulations.
-    """
-    table = TableName.DIAGNOSTIC
-    lat_name = "Latitude"
-    lon_name = "Longitude"
-    sat_name = "GPSSatellitesInView"
-    files = filter_buoy_flat_files(name, table)
-    df = read_campbell_logger_files(list(files))
-    lat = df[lat_name].to_numpy().flatten()
-    lon = df[lon_name].to_numpy().flatten()
-    satellite_count = df[sat_name].to_numpy().flatten()
-    planned_gps = (longitude, latitude)  # original
-
-    mask = distance_mask(planned_gps, lon, lat, distance)
-    mask &= satellite_count >= satellites
-
-    if start is not None:
-        mask &= df.index >= start
-    if end is not None:
-        mask &= df.index <= end
-    filtered_lon = lon[mask]
-    filtered_lat = lat[mask]
-    if filtered_lon.size == 0:
-        raise click.ClickException(
-            "No GPS points remain after filtering; try increasing --distance, lowering --satellites, or adjusting the date filter."
-        )
-    cx, cy = to_utm(filtered_lon.mean(), filtered_lat.mean())
-    filtered_sat = satellite_count[mask]
-
-    fig, ax = plt.subplots(figsize=(3, 4))
-
-    sort_ind = argsort(
-        filtered_sat
-    )  # Sort indices based on satellite count for plotting
-    xx, yy = to_utm(filtered_lon[sort_ind], filtered_lat[sort_ind])
-    handle = ax.scatter(
-        xx - cx,
-        yy - cy,
-        alpha=filtered_sat[sort_ind] / filtered_sat[sort_ind].max(),
-        marker=MarkerStyle("o"),
-        s=10,
-        c=filtered_sat[sort_ind],
-        edgecolors="none",
-        cmap="spring",
-        label="Location",
-    )
-    fig.colorbar(handle, label="Satellites", shrink=0.5)
-
-    px, py = to_utm(*planned_gps)
-
-    if cable:
-        planned_xy = predicted_watch_circle(
-            (px - cx, py - cy), name, "grey", label="Planned"
-        )
-        corrected_xy = predicted_watch_circle(
-            (0.0, 0.0), name, "black", label="Deployed"
-        )
-        for patch in planned_xy + corrected_xy:
-            ax.add_patch(patch)
-
-    ax.set_ylabel("UTM Northing Δ (m)")
-    ax.set_xlabel("UTM Easting Δ (m)")
-    ax.set_aspect(1.0)
-
-    filename = FIGURES_DIR / "locations" / name / "watch-circle.png"
-    Path(filename).parent.mkdir(parents=True, exist_ok=True)
-
-    ax.ticklabel_format(axis="both", style="plain")
-    ax.legend(loc="best")
-    fig.tight_layout()
-    fig.savefig(filename, dpi=300, bbox_inches="tight")
 
 
 @plot.command(name=ClickOptions.DATASTREAM)
