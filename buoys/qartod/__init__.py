@@ -4,7 +4,7 @@ Quality assurance and quality control (QA/QC) for buoy data using QARTOD tests.
 
 from datetime import datetime
 from typing import cast
-from enum import Enum, StrEnum, auto
+from enum import StrEnum, auto
 from pathlib import Path
 from click import option, Choice
 from yaml import safe_load
@@ -160,5 +160,3 @@ def run_qartod_tests(
         by_observed_property.append(flags)
     result = cast(DataFrame, concat(by_observed_property, axis=0))
     return result.groupby(group_by_key)
-
-
