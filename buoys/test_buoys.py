@@ -14,6 +14,8 @@ by_observed_property = pytest.mark.parametrize("observed_property", ["sea_water_
 by_qartod_test = pytest.mark.parametrize("qartod_test", [each for each in set(TestTypes) if each != TestTypes.GAP])
 runner = CliRunner()
 
+
+
 def test_cli_buoys_file_list():
     """
     List available stations
