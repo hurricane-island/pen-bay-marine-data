@@ -2,17 +2,19 @@
 Add cable related commands here, specific to buoys, and usually the
 only case of using geospatial information in this module, except for QA.
 """
+
 from enum import StrEnum, auto
-from typing import Optional
+from typing import Optional, cast
 from pathlib import Path
 from datetime import datetime
-from click import group, option, DateTime, ClickException, echo
+from click import group, option, DateTime, ClickException, echo, FloatRange, IntRange
 from pandas import DataFrame
 from numpy import array, concatenate
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.markers import MarkerStyle
 from scipy.io import loadmat
+from gpxpy.gpx import GPX, GPXTrack, GPXTrackSegment, GPXTrackPoint, Tuple
 
 from lib.geo import to_utm
 from buoys.options import (
@@ -25,29 +27,45 @@ from buoys.options import (
     FIGURES_DIR,
     FEATURES_OF_INTEREST,
     DATA_DIR,
+    EXPORT_DIR,
 )
+
 
 class ClickOptions(StrEnum):
     """
     Available commands for buoy moorings and cables.
     """
 
-    MOORINGS = auto()
-    PLOT = auto()
     LOCATIONS = auto()
-    SIMULATION = auto()
+    # plot
+    PLOT = auto()
+    PREDICT = auto()
+    MAP = auto()
+    # export
+    EXPORT = auto()
+    GPX = auto()
 
-@group(name=ClickOptions.MOORINGS)
-def moorings():
+
+@group(name=ClickOptions.LOCATIONS)
+def locations():
     """
-    Commands related to buoy moorings and cables.
+    Work with buoy location to assess mooring performance.
     """
+
 
 @group(name=ClickOptions.PLOT)
 def plot():
     """
-    Commands related to plotting buoy moorings and cables.
+    Visualize buoy location data.
     """
+
+
+@group(name=ClickOptions.EXPORT)
+def export():
+    """
+    Export buoy location data for use in other programs.
+    """
+
 
 def resolve_column(df: DataFrame, name: VendoredNames) -> tuple:
     """
@@ -60,10 +78,30 @@ def resolve_column(df: DataFrame, name: VendoredNames) -> tuple:
     if not matches:
         raise ValueError(f"No column found for {name}")
     if len(matches) > 1:
-        raise ValueError(
-            f"Ambiguous column {name}, matched {len(matches)}: {matches}"
-        )
+        raise ValueError(f"Ambiguous column {name}, matched {len(matches)}: {matches}")
     return matches[0]
+
+
+def df_to_gpx_xml(df: DataFrame, lon: Tuple[str, ...], lat: Tuple[str, ...]) -> str:
+    """
+    Convert a DataFrame with latitude and longitude columns to a GPX XML string.
+    """
+    gpx = GPX()
+
+    # Create first track in our GPX:
+    gpx_track = GPXTrack()
+    gpx.tracks.append(gpx_track)
+
+    # Create first segment in our GPX track:
+    gpx_segment = GPXTrackSegment()
+    gpx_track.segments.append(gpx_segment)
+
+    for time, row in df.iterrows():
+        point = GPXTrackPoint(
+            row[lat], row[lon], elevation=0, time=cast(datetime, time)
+        )
+        gpx_segment.points.append(point)
+    return gpx.to_xml()
 
 
 def predicted_watch_circle(
@@ -95,42 +133,81 @@ def predicted_watch_circle(
         )
     return predicted
 
+
+def date_range_options(function):
+    """
+    Add start and end date options to a Click command.
+    """
+    function = option(
+        "--start",
+        default=None,
+        type=DateTime(formats=["%Y-%m-%d"]),
+        help="Optional start date for filtering data.",
+    )(function)
+    function = option(
+        "--end",
+        default=None,
+        type=DateTime(formats=["%Y-%m-%d"]),
+        help="Optional end date for filtering data.",
+    )(function)
+    return function
+
+
+@export.command(name=ClickOptions.GPX)
+@station_name
+@option(
+    "--tail",
+    default=24,
+    type=IntRange(min=1, max=24*30),
+    help="Number of most recent records to include in the GPX export.",
+)
+def buoys_locations_export_gpx(name: StationName, tail: int):
+    """
+    Export buoy data to a different format.
+    """
+    table = TableName.DIAGNOSTIC
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(list(files))
+    mask = ~df.index.duplicated(keep=False)
+    unique = df[mask].sort_index()
+    unique.index.rename("time", inplace=True)
+    gpx = df_to_gpx_xml(
+        unique.tail(tail),
+        lon=resolve_column(df, VendoredNames.LONGITUDE),
+        lat=resolve_column(df, VendoredNames.LATITUDE),
+    )
+    path = (EXPORT_DIR / name).with_suffix(".gpx")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fid:
+        fid.write(gpx)
+    echo(f"GPX file written to {path}")
+
+
 @plot.command(name=ClickOptions.LOCATIONS)
 @station_name
+@date_range_options
 @option(
     "--distance",
     required=True,
     default=100.0,
-    type=float,
+    type=Optional[FloatRange(min=0.0, max=1000.0)],
     help="filter GPS points by distance from planned deployment location (meters)",
 )
 @option(
     "--satellites",
     required=True,
-    type=int,
+    type=IntRange(min=4, max=10),
     help="minimum number of satellites",
     default=4,
-)
-@option(
-    "--start",
-    default=None,
-    type=DateTime(formats=["%Y-%m-%d"]),
-    help="Start date for filtering GPS points.",
-)
-@option(
-    "--end",
-    default=None,
-    type=DateTime(formats=["%Y-%m-%d"]),
-    help="End date for filtering GPS points.",
 )
 @option(
     "--cable",
     is_flag=True,
     help="include predicted watch circle from WHOI cable simulation",
 )
-def locations(
+def buoys_locations_plot_map(
     name: StationName,
-    distance: float,
+    distance: Optional[float],
     satellites: int,
     start: Optional[datetime],
     end: Optional[datetime],
@@ -158,7 +235,7 @@ def locations(
     xx, yy = to_utm(lon, lat)
 
     mask = array(satellite_count >= satellites)
-    dxy = array(((xx - px) ** 2 + (yy - py) ** 2)**0.5)
+    dxy = array(((xx - px) ** 2 + (yy - py) ** 2) ** 0.5)
     mask &= dxy < distance
     if start is not None:
         mask &= df.index >= start
@@ -169,11 +246,12 @@ def locations(
             "No GPS points remain after filtering; try increasing --distance, lowering --satellites, or adjusting the date filter."
         )
 
-
     fig, ax = plt.subplots(figsize=(3, 4))
     sats = array(satellite_count.values[mask])
     time = df.index[mask]
-    alpha = (time - time.min()).total_seconds() / (time.max() - time.min()).total_seconds()
+    alpha = (time - time.min()).total_seconds() / (
+        time.max() - time.min()
+    ).total_seconds()
 
     handle = ax.scatter(
         xx[mask],
@@ -189,9 +267,7 @@ def locations(
     fig.colorbar(handle, label="Satellites", shrink=0.5)
 
     if cable:
-        planned_xy = predicted_watch_circle(
-            (px, py), name, "grey", label="Planned"
-        )
+        planned_xy = predicted_watch_circle((px, py), name, "grey", label="Planned")
         corrected_xy = predicted_watch_circle(
             (0.0, 0.0), name, "black", label="Deployed"
         )
@@ -212,9 +288,10 @@ def locations(
     fig.savefig(filename, dpi=300, bbox_inches="tight")
     echo(f"Saved to {filename}")
 
-@plot.command(name="simulation")
+
+@plot.command(name=ClickOptions.PREDICT)
 @station_name
-def buoys_plot_cable(name: StationName):
+def buoys_locations_plot_predict(name: StationName):
     """
     Plot the mooring tension diagram from the WHOI cable simulation.
     """

@@ -1,20 +1,16 @@
 """
 Geospatial and mapping utilities for plotting geographic data on a map.
 """
-
-from datetime import datetime
 from enum import Enum
-from typing import cast, Optional
+from typing import Optional
 from math import radians, sin, cos, atan2, sqrt
 from pathlib import Path
 from matplotlib.patches import Circle
 from numpy import array
 from numpy.typing import NDArray
 from matplotlib.pyplot import Axes
-from pandas import DataFrame
 from pydantic import BaseModel
 from pyproj import Transformer
-from gpxpy.gpx import GPX, GPXTrack, GPXTrackSegment, GPXTrackPoint, Tuple
 from geojson_pydantic import (
     FeatureCollection,
     Feature,
@@ -124,28 +120,6 @@ def distance_mask(
     def compute_distance(gps):
         return haversine(*center, *gps)
     return array(list(map(compute_distance, zip(lon, lat)))) < distance
-
-
-def df_to_gpx_xml(df: DataFrame, lon: Tuple[str, ...], lat: Tuple[str, ...]) -> str:
-    """
-    Convert a DataFrame with latitude and longitude columns to a GPX XML string.
-    """
-    gpx = GPX()
-
-    # Create first track in our GPX:
-    gpx_track = GPXTrack()
-    gpx.tracks.append(gpx_track)
-
-    # Create first segment in our GPX track:
-    gpx_segment = GPXTrackSegment()
-    gpx_track.segments.append(gpx_segment)
-
-    for time, row in df.iterrows():
-        point = GPXTrackPoint(
-            row[lat], row[lon], elevation=0, time=cast(datetime, time)
-        )
-        gpx_segment.points.append(point)
-    return gpx.to_xml()
 
 
 type AllowedGeometry = LineString | Polygon | MultiPolygon | MultiLineString
