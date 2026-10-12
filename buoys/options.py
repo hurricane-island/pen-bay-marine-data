@@ -7,13 +7,12 @@ from pathlib import Path
 from datetime import datetime
 from click import argument, Choice, option
 from pandas import read_csv, DataFrame, concat
+from lib.geo import FeatureOfInterest
 
 
 DATA_DIR = Path(__file__).parent / "data"
 FIGURES_DIR = Path(__file__).parent / "figures"
 EXPORT_DIR = Path(__file__).parent / "export"
-CABLE_DIR = Path(__file__).parent / "cable"
-
 
 class StationName(StrEnum):
     """
@@ -23,6 +22,23 @@ class StationName(StrEnum):
     WYNKEN = auto()
     BLYNKEN = auto()
 
+# Canonical/reference locations for the buoy stations are kept in
+# code rather than config as SensorThings Features of Interest, instead
+# of Locations.
+FEATURES_OF_INTEREST = {
+    StationName.WYNKEN: FeatureOfInterest(
+        name=StationName.WYNKEN,
+        description="Planned/deployed sensor location.",
+        latitude=44.0435,
+        longitude=-68.8925,
+    ),
+    StationName.BLYNKEN: FeatureOfInterest(
+        name=StationName.BLYNKEN,
+        description="Planned/deployed sensor location.",
+        latitude=44.318369,
+        longitude=-68.926953,
+    ),
+}
 
 class TableName(StrEnum):
     """
@@ -48,6 +64,9 @@ class VendoredNames(StrEnum):
     WATER_PRESSURE = "Pressure_abs"
     DISSOLVED_OXYGEN = "ODO"
     DISSOLVED_OXYGEN_SATURATION = "ODO_Sat"
+    LATITUDE = "Latitude"
+    LONGITUDE = "Longitude"
+    SATELLITES_IN_VIEW = "GPSSatellitesInView"
 
 
 class StandardNames(StrEnum):

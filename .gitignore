@@ -15,4 +15,5 @@ weather/weewx.conf
 www/
 github-pages/
 */figures/
+tmp/
 */tmp/

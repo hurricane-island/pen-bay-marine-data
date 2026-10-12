@@ -5,7 +5,6 @@ to processing Pandas DataFrames and plotting with Matplotlib.
 
 from datetime import datetime, timedelta
 from enum import StrEnum, auto
-from math import radians, sin, cos, atan2, sqrt
 from pathlib import Path
 from typing import Optional, Callable, cast
 from matplotlib import pyplot as plt, dates as mdates
@@ -320,14 +319,3 @@ def boxplot(
     filepath = prefix / thing / f"{observed_property}_{freq.name.lower()}.{image_format}"
     filepath.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filepath)
-
-
-def haversine(lon1, lat1, lon2, lat2):
-    R = 6371000.0  # Earth radius in meters
-
-    phi1, phi2 = radians(lat1), radians(lat2)
-    delta_phi = radians(lat2 - lat1)
-    delta_lambda = radians(lon2 - lon1)
-    a = sin(delta_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(delta_lambda / 2) ** 2
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    return R * c  # Distance in meters

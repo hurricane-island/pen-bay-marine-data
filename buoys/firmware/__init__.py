@@ -5,8 +5,9 @@ Commands for working with buoy firmware.
 from enum import StrEnum, auto
 from pathlib import Path
 from hashlib import md5
-from click import group, option
-from buoys.options import station_name, StationName
+from typing import Optional
+from click import group, option, FloatRange
+from buoys.options import FEATURES_OF_INTEREST, station_name, StationName
 
 FIRMWARE_DIR = Path(__file__).parent / "programs"
 TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -41,35 +42,48 @@ def firmware():
 
 @firmware.command(name=FirmwareCommands.TEMPLATE)
 @station_name
-@option("--address", required=True, help="Pakbus address")
-@option("--client", required=True, help="Client ID")
+@option("--address", required=True, help="Pakbus address, specific to hardware items.")
+@option("--client", required=True, help="Client ID, specific to geographic location")
 @option("--file", default="buoy.dld", help="Template file")
-@option("--latitude", required=True, help="Latitude")
-@option("--longitude", required=True, help="Longitude")
+@option(
+    "--latitude",
+    required=False,
+    type=FloatRange(-90.0, 90.0),
+    help="Latitude of the station",
+    default=None,
+)
+@option(
+    "--longitude",
+    required=False,
+    type=FloatRange(-180.0, 180.0),
+    help="Longitude of the station",
+    default=None,
+)
 def buoys_firmware_template(
     name: StationName,
     address: str,
     client: str,
     file: str,
-    latitude: str,
-    longitude: str,
+    latitude: Optional[float],
+    longitude: Optional[float],
 ):
     """
-    Fill in firmware template with options passed on
-    the command line.
+    Fill in a firmware template with options for a specific buoy station.
+    Latitude and longitude are automatically filled based on expected
+    station coordinates if not provided.
     """
     with open(TEMPLATE_DIR / file, "r", encoding="utf-8") as fid:
         filedata = fid.read()
-
+    coordinates = FEATURES_OF_INTEREST[name].feature.coordinates
     for var, value in {
         "STATION_NAME": name,
         "PAKBUS_ADDRESS": address,
         "CLIENT_ID": client,
-        "LATITUDE": latitude,
-        "LONGITUDE": longitude,
+        "LATITUDE": latitude or coordinates.latitude,
+        "LONGITUDE": longitude or coordinates.longitude,
     }.items():
         slug = "$" + var
-        filedata = filedata.replace(slug, value)
+        filedata = filedata.replace(slug, f"{value}")
 
     prefix = name.lower()
     filename = FIRMWARE_DIR / f"{prefix}.{checksum(filedata)}.dld"
