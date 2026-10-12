@@ -29,14 +29,14 @@ FEATURES_OF_INTEREST = {
     StationName.WYNKEN: FeatureOfInterest(
         name=StationName.WYNKEN,
         description="Planned/deployed sensor location.",
-        latitude=44.04357,
-        longitude=-68.89224,
+        latitude=44.0435,
+        longitude=-68.8925,
     ),
     StationName.BLYNKEN: FeatureOfInterest(
         name=StationName.BLYNKEN,
         description="Planned/deployed sensor location.",
-        latitude=0.0,
-        longitude=0.0,
+        latitude=44.318369,
+        longitude=-68.926953,
     ),
 }
 
