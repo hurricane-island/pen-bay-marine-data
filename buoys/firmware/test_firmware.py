@@ -2,16 +2,16 @@
 Firmware CLI command tests.
 """
 
-import pytest
 from click.testing import CliRunner
 from buoys.firmware import buoys_firmware_template
+from buoys.options import StationName
+from buoys.test_buoys import by_station
 
-by_station = pytest.mark.parametrize("name", ["wynken", "blynken"])
 runner = CliRunner()
 
 
 @by_station
-def test_cli_buoys_firmware_template(name):
+def test_cli_buoys_firmware_template(name: StationName):
     """
     Expect files to be written to disk
     """

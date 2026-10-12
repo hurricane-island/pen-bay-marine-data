@@ -10,7 +10,6 @@ Features:
 
 """
 
-import re
 from typing import cast, Optional
 from warnings import simplefilter
 from pathlib import Path
@@ -28,10 +27,9 @@ from lib import (
     Frequency,
     ImageFormat
 )
-from lib.geo import to_utm, df_to_gpx_xml
 from buoys.database import database
 from buoys.firmware import firmware
-from buoys.moorings import moorings
+from buoys.locations import locations
 from buoys.qartod import (
     run_qartod_tests,
     TestTypes,
@@ -63,7 +61,7 @@ class ClickOptions(StrEnum):
     """
 
     # file and firmware commands
-    LIST = auto()
+    NAMES = auto()
     DESCRIBE = auto()
     EXPORT = auto()
     # groups
@@ -119,18 +117,17 @@ buoys.add_command(database)
 buoys.add_command(file_group)
 buoys.add_command(firmware)
 buoys.add_command(plot)
-buoys.add_command(moorings)
+buoys.add_command(locations)
 
-
-@file_group.command(name=ClickOptions.LIST)
-def buoys_file_list():
+@buoys.command(name=ClickOptions.NAMES)
+def buoys_names():
     """
     List available stations from static data.
     """
     files = sorted(DATA_DIR.glob("*.dat"))
     seen = set()
     for f in files:
-        station = f.stem.split("_")[0]
+        station = f.stem.split("_")[0].lower()
         if station not in seen:
             seen.add(station)
     for each in sorted(seen):
@@ -143,7 +140,7 @@ def buoys_file_list():
 @data_table
 def buoys_file_describe(name: StationName, table: TableName):
     """
-    Summarize available data for a station.
+    Summarize available observations for a station.
     """
     files = filter_buoy_flat_files(name, table)
     df = read_campbell_logger_files(list(files))
@@ -228,15 +225,15 @@ def buoys_file_export(
     sonde, _ = load_and_subset_multifile_table(name, TableName.SONDE, None, None)
     diagnostic, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, None, None)
     df = sonde.drop(columns=["RECORD"]).join(diagnostic, how="left")[[
-        "Latitude",
-        "Longitude",
-        "External_Temp",
-        "Salinity",
-        "Chlorophyll_RFU",
-        "BGA_PE_RFU",
-        "ODO_Sat",
-        "ODO",
-        "Pressure_mH2O"
+        VendoredNames.LATITUDE,
+        VendoredNames.LONGITUDE,
+        VendoredNames.SEA_WATER_TEMPERATURE,
+        VendoredNames.SEA_WATER_SALINITY,
+        VendoredNames.SEA_WATER_CHLOROPHYLL_RFU,
+        VendoredNames.SEA_WATER_PHYCOERYTHRIN_RFU,
+        VendoredNames.DISSOLVED_OXYGEN_SATURATION,
+        VendoredNames.DISSOLVED_OXYGEN,
+        VendoredNames.BAROMETRIC_PRESSURE
     ]]
     df.index.rename("time", inplace=True)
     unit_names = list(map(format_column_name_with_units, df.columns))
@@ -262,7 +259,7 @@ def buoys_file_export(
     ).with_suffix(".csv")
     filepath.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(filepath, header=unit_names)
-    click.echo(f"Saved file to {filepath}")
+    click.echo(f"Saved CSV file to {filepath}")
 
 
 @plot.command(name=ClickOptions.TAIL)
@@ -507,30 +504,6 @@ def buoys_plot_datastream(
         figsize=size,
         **kwargs,
     )
-
-
-@file_group.command(name="gpx")
-@station_name
-def buoys_file_gpx(name: StationName):
-    """
-    Export buoy data to a different format.
-    """
-    table = TableName.DIAGNOSTIC
-    files = filter_buoy_flat_files(name, table)
-    df = read_campbell_logger_files(list(files))
-    mask = ~df.index.duplicated(keep=False)
-    unique = df[mask].sort_index()
-    unique.index.rename("time", inplace=True)
-    gpx = df_to_gpx_xml(
-        unique.tail(24),
-        lon=("Longitude", "Decimal Degrees (E=+,W=-)", "Smp"),
-        lat=("Latitude", "Decimal Degrees (N=+,S=-)", "Smp")
-    )
-    parts = list(filter(None, re.split(r"([A-Z][^A-Z]*)", table)))
-    parts.insert(0, name)
-    path = (EXPORT_DIR / ("-".join(parts).lower())).with_suffix(".gpx")
-    with open(path, "w", encoding="utf-8") as fid:
-        fid.write(gpx)
 
 
 @file_group.command(name="derivatives")
