@@ -1,0 +1,18 @@
+Public BattV
+
+Public WindUVStatus(3)
+Alias WindUVStatus(1) = U
+Alias WindUVStatus(2) = V
+Alias WindUVStatus(3) = Status
+
+Units BattV = Volts
+
+BeginProg
+  SW12(1)
+  Scan(10,Sec,1,0)
+    WriteIO(&B01000000, &B01000000)
+    Battery(BattV)
+    SDI12Recorder(WindUVStatus, C1, "0", "R1!", 1, 0)
+    WriteIO(&B01000000, 0)
+  NextScan
+EndProg

@@ -22,8 +22,7 @@ function parseTTNMessage(body) {
     const device = body.end_device_ids.device_id;
     const decoded = body.uplink_message.decoded_payload;
     const metadata = body.uplink_message.rx_metadata[0]
-    const message_id = metadata.packet_broker.message_id
-
+    const message_id = metadata.packet_broker?.message_id
     const time = new Date(metadata.time).getTime(); // Convert to milliseconds
     const received_at = new Date(metadata.received_at).getTime(); // Convert to milliseconds
 
