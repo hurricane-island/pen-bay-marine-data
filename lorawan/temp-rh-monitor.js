@@ -1,15 +1,13 @@
 /**
- * Qingping Temperature and Relative Humidity sesnor
+ * Qingping Temperature and Relative Humidity sensor. Needs to be
+ * in ES5 compatible format.
  */
 function Decoder(bytes, port) {
-
-  var i = 0;
-  var output = {};
   var device_address = bytes[0];
   var function_code = bytes[1];
   var data_length = bytes[2];
   var data_type = bytes[3];
-
+  var output = {};
   if (device_address == 0x01 && function_code == 0x41 && data_length == 0x10 && data_type == 0x01) {
     output.temperature = ((bytes[8] * 16) + (bytes[9] >> 4) - 500) / 10.0;
     output.humidity = (256 * (bytes[9] & 0x0F) + bytes[10]) / 10.0;

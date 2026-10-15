@@ -3,7 +3,6 @@ LoRaWAN CLI commands.
 """
 
 from enum import StrEnum, auto
-from os import getenv
 from pathlib import Path
 from uuid import uuid4
 from typing import Optional
@@ -11,7 +10,7 @@ from random import uniform, randint
 from datetime import datetime, timedelta, timezone
 import json
 import requests
-import click
+from click import IntRange, group, option, echo, argument
 from pandas import json_normalize, to_datetime
 
 
@@ -29,7 +28,18 @@ class LoraWANCommand(StrEnum):
     TAIL = auto()
     MOCK = auto()
     SECRET = auto()
-    SIGNAL = auto()
+
+
+class Dimension(StrEnum):
+    """Dimensions for plotting."""
+
+    ALTITUDE = auto()
+    LATITUDE = auto()
+    LONGITUDE = auto()
+    RSSI = auto()
+    SNR = auto()
+    SATS = auto()
+    HDOP = auto()
 
 
 FIGURES_DIR = Path(__file__).parent / "figures"
@@ -38,7 +48,7 @@ APPLICATION_ID = "hurricane-test-app"
 DEVICE_ID = "field-tester-hurricane-rak10701-p"
 
 
-@click.group()
+@group()
 def lorawan():
     """LoRaWAN CLI commands."""
 
@@ -47,11 +57,10 @@ def lorawan():
 def plot():
     """Plot CLI commands."""
 
+
 @lorawan.group()
 def device():
     """Device management"""
-
-    
 
 
 @lorawan.group()
@@ -72,7 +81,7 @@ def parse_uplink_message(message: dict) -> dict:
     result = message.get("result", {})
     uplink = result.get("uplink_message", {})
     payload = uplink.get("decoded_payload", {})
-    metadata = uplink.get("rx_metadata", [])[0]
+    metadata = uplink.get("rx_metadata", [{}])[0]
     broker = metadata.pop("packet_broker")
     message_id = broker.get("message_id")
     del metadata["gateway_ids"]
@@ -82,55 +91,94 @@ def parse_uplink_message(message: dict) -> dict:
     # corrected = to_altitude(latitude, longitude, altitude) if altitude is not None else None
     return {"id": message_id, "altitude": altitude, **payload, **metadata}
 
-def ttn_device_url(
-    subdomain: str,
-    region: str,
-    application_id: str,
-    device_id: str
-):
+
+def ttn_device_url(subdomain: str, region: str, application_id: str, device_id: str):
+    """Construct the URL for a TTN device."""
     domain = f"https://{subdomain}.{region}.cloud.thethings.industries"
     route = f"api/v3/as/applications/{application_id}/devices/{device_id}"
-    return "/".join([domain, route])
+    return f"{domain}/{route}"
 
 
 def fetch_uplink_messages(
     application_id: str,
     device_id: str,
-    subdomain: str = "neracoos",
-    region: str = "nam1",
-    limit: Optional[int] = None,
+    api_key: str,
+    limit: int,
+    timeout: int,
+    subdomain: str,
+    region: str,
+    after: Optional[datetime] = None,
+    before: Optional[datetime] = None,
 ) -> list[dict]:
     """
     Fetch uplink messages from TTN API.
-    """
 
-    api_key = getenv("TTN_API_KEY")
+    """
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Accept": "text/event-stream",
     }
     device_url = ttn_device_url(subdomain, region, application_id, device_id)
-    url = device_url + "/packages/storage/uplink_message"
-    if limit is not None:
-        url += f"?limit={limit}"
-    result = requests.get(url, headers=headers, timeout=10)
+    url = f"{device_url}/packages/storage/uplink_message"
+    url += f"?limit={limit}"
+    if after is not None:
+        url += f"&after={after.isoformat()}"
+    if before is not None:
+        url += f"&before={before.isoformat()}"
+    result = requests.get(url, headers=headers, timeout=timeout)
     if result.status_code != 200:
-        click.echo(f"Failed to retrieve data from TTN API: {result.status_code}")
+        echo(f"Failed to retrieve data from TTN API: {result.status_code}")
         return []
     items = result.text.split("\n\n")
+    # filter empty lines and load each message as JSON
     return list(map(json.loads, filter(None, items)))
 
 
+def ttn_options(function):
+    """
+    Decorator to add common TTN options to a Click command. These are
+    all required for API calls to TTN.
+    """
+    function = option(
+        "--region", default="nam1", help="TTN region.", required=True
+    )(function)
+    function = option(
+        "--subdomain", default="neracoos", help="TTN subdomain.", required=True
+    )(function)
+    function = option(
+        "--application-id",
+        default=APPLICATION_ID,
+        help="TTN application ID.",
+        required=True,
+    )(function)
+    function = option(
+        "--device-id", default=DEVICE_ID, help="TTN device ID.", required=True
+    )(function)
+    function = option(
+        "--api-key",
+        envvar="TTN_API_KEY",
+        help="TTN API key with write permissions on devices",
+        required=True,
+    )(function)
+    function = option(
+        "--timeout",
+        default=5,
+        type=IntRange(min=1, max=60),
+        help="Timeout for HTTP requests in seconds.",
+        required=True,
+    )(function)
+    return function
+
+
 @device.command(name="uplink")
-@click.option("--application-id", default=APPLICATION_ID, help="TTN application ID.")
-@click.option("--device-id", default=DEVICE_ID, help="TTN device ID.")
-@click.option("--api-key", envvar="TTN_API_KEY", help="TTN API key with write permissions on devices", required=True)
+@ttn_options
 def lorawan_device_uplink_decoder(
     application_id: str,
     device_id: str,
     api_key: str,
-    region: str = "nam1",
-    subdomain: str = "neracoos"
+    region: str,
+    subdomain: str,
+    timeout: int,
 ):
     """
     Use HTTP API to send a new decoder, so that we can keep the code in git
@@ -139,77 +187,65 @@ def lorawan_device_uplink_decoder(
     Reference: https://www.thethingsindustries.com/docs/api/reference/http/routes/#asapplications{end_device.ids.application_ids.application_id}devices{end_device.ids.device_id}-put
     """
     if len(api_key) == 0:
-        click.ClickException("Things Network API key is not in environment")
+        raise EnvironmentError("Things Network API key is not in environment")
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Accept": "application/json",
     }
     url = ttn_device_url(subdomain, region, application_id, device_id)
-    filepath = Path(__file__).parent / f"{device_id}.js"
+    filepath = (Path(__file__).parent / device_id).with_suffix(".js")
     if not filepath.exists():
         # This won't work once we have multiple of the same device
-        click.ClickException("Decoder file name should be equal to device ID")
-
+        raise FileNotFoundError("Decoder file name should be equal to device ID")
     with open(filepath, "r", encoding="utf-8") as fid:
         src_code = fid.read()
-    body = {
-        "end_device": {
-            "ids": {
-                "application_ids": {"application_id": application_id},
-                "device_id": device_id
-            },
-            "formatters": {
-                "up_formatter": "FORMATTER_JAVASCRIPT",
-                "up_formatter_parameter": src_code
-            }
-        },
-        "field_mask": {
-            "paths": [
-                "formatters.up_formatter",
-                "formatters.up_formatter_parameter"
-            ]
-        }
-    }
+
     response = requests.put(
         url,
         headers=headers,
-        json=body
+        json={
+            "end_device": {
+                "ids": {
+                    "application_ids": {"application_id": application_id},
+                    "device_id": device_id,
+                },
+                "formatters": {
+                    "up_formatter": "FORMATTER_JAVASCRIPT",
+                    "up_formatter_parameter": src_code,
+                },
+            },
+            "field_mask": {
+                "paths": [
+                    "formatters.up_formatter",
+                    "formatters.up_formatter_parameter",
+                ]
+            },
+        },
+        timeout=timeout,
     )
     print(response.status_code, response.text)
 
-@describe.command(name=LoraWANCommand.SIGNAL)
-@click.option("--application-id", default=APPLICATION_ID, help="TTN application ID.")
-@click.option("--device-id", default=DEVICE_ID, help="TTN device ID.")
-def signal(application_id: str, device_id: str):
+
+@db.command(name=LoraWANCommand.TAIL)
+@ttn_options
+@option(
+    "--limit",
+    default=10,
+    type=IntRange(min=1, max=1000),
+    help="Number of latest uplink messages to retrieve.",
+)
+def lorawan_db_tail(**kwargs):
     """
     Display a table of signal metrics (RSSI, SNR) for the given device.
-    The data is retrieved from the TTN API and displayed in a pandas DataFrame.
     """
-    data = list(
-        map(parse_uplink_message, fetch_uplink_messages(application_id, device_id))
-    )
-    df = json_normalize(data)
-    df["time"] = to_datetime(df["time"]).dt.tz_convert("America/New_York")
-    df.set_index("time", inplace=True)
-    df = df[["latitude", "longitude", "altitude", "sats", "rssi", "snr"]]
+    time = "time"
+    messages = fetch_uplink_messages(**kwargs)
+    data = map(parse_uplink_message, messages)
+    df = json_normalize(list(data))
+    df[time] = to_datetime(df[time]).dt.tz_convert("America/New_York")
+    df.set_index(time, inplace=True)
+    df = df[list(Dimension)]
     print(df)
-
-
-@describe.command(name=LoraWANCommand.TAIL)
-@click.argument("application_id", default=APPLICATION_ID)
-@click.argument("device_id", default=DEVICE_ID)
-def lorawan_describe_tail(application_id, device_id):
-    """
-    Describe the latest uplink message from the field-tester device.
-    """
-    click.echo("Retrieving latest uplink message from TTN API...")
-    data = list(
-        map(
-            parse_uplink_message,
-            fetch_uplink_messages(application_id, device_id, limit=1),
-        )
-    )
-    click.echo(json.dumps(data, indent=4))
 
 
 @db.command(name=LoraWANCommand.SECRET)
@@ -218,8 +254,8 @@ def lorawan_db_secret():
     Create a secret to add to TTN and Cloudflare Workers.
     """
     secret = uuid4().hex
-    click.echo("Add this secret to your TTN Webhook and Cloudflare Worker:")
-    click.echo(f"{secret}")
+    echo("Add this secret to your TTN Webhook and Cloudflare Worker:")
+    echo(f"{secret}")
 
 
 def create_mock_message(device_id: str):
@@ -264,46 +300,60 @@ def create_mock_message(device_id: str):
 
 
 @db.command(name=LoraWANCommand.MOCK)
-@click.argument("device_id", default="mock-device")
-@click.option(
+@argument("device_id", default="mock-device")
+@option(
     "--secret",
-    default=None,
+    default="",
+    envvar="WEBHOOK_SECRET",
     help="Webhook secret to use. If not provided, will use WEBHOOK_SECRET from environment.",
 )
-def lorawan_db_mock(device_id: str, secret: Optional[str]):
+def lorawan_db_mock(device_id: str, secret: str):
     """
     Send a test message to the Cloudflare Worker that writes to InfluxDB.
     This is useful for testing the integration without sending real data from a device.
     """
-    click.echo("Sending test message to Cloudflare Worker...")
+    echo("Sending test message to Cloudflare Worker...")
     message = create_mock_message(device_id)
-    headers = {"X-TTN-Secret": secret or getenv("WEBHOOK_SECRET", "")}
+    headers = {"X-TTN-Secret": secret}
     response = requests.post(
         WORKER_URL, json=message["result"], headers=headers, timeout=10
     )
     if response.status_code == 204:
-        click.echo("Test message sent successfully.")
+        echo("Test message sent successfully.")
     else:
-        click.echo(f"Failed to send test message: {response.status_code}")
-        click.echo(f"Response: {response.text}")
+        echo(f"Failed to send test message: {response.status_code}")
+        echo(f"Response: {response.text}")
 
 
 @db.command(name=LoraWANCommand.SYNC)
-@click.option("--application-id", default=APPLICATION_ID, help="TTN application ID.")
-@click.option("--device-id", default=DEVICE_ID, help="TTN device ID.")
-def lorawan_db_sync(application_id: str, device_id: str):
+@ttn_options
+@option(
+    "--webhook-secret",
+    envvar="WEBHOOK_SECRET",
+    help="Webhook secret to use.",
+    required=True,
+)
+@option(
+    "--limit",
+    default=100,
+    type=IntRange(min=1, max=1000),
+    help="Maximum number of uplink messages to fetch from TTN.",
+)
+def lorawan_db_sync(
+    webhook_secret: str, timeout: int, **kwargs
+):
     """
     Sync the latest uplink messages from TTN to InfluxDB via the Cloudflare Worker.
     This is useful for backfilling data that may have been missed by the webhook.
     Unless values/keys have changed, this should be idempotent and safe to run multiple times.
     """
-    data = fetch_uplink_messages(application_id, device_id)
-    click.echo(f"Syncing {len(data)} (all) uplink messages from TTN to InfluxDB.")
-    headers = {"X-TTN-Secret": getenv("WEBHOOK_SECRET", "")}
+    data = fetch_uplink_messages(timeout=timeout, **kwargs)
+    echo(f"Syncing {len(data)} uplink messages from TTN to InfluxDB.")
+    headers = {"X-TTN-Secret": webhook_secret}
     for message in data:
         response = requests.post(
-            WORKER_URL, json=message["result"], headers=headers, timeout=10
+            WORKER_URL, json=message["result"], headers=headers, timeout=timeout
         )
         if response.status_code != 204:
-            click.echo(f"Failed to send message: {response.status_code}")
-            click.echo(f"Response: {response.text}")
+            echo(f"Failed to send message: {response.status_code}")
+            echo(f"Response: {response.text}")
