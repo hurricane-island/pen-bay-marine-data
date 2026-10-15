@@ -10,7 +10,7 @@ Features:
 
 """
 
-from typing import cast, Optional
+from typing import cast
 from warnings import simplefilter
 from pathlib import Path
 from enum import StrEnum, auto
@@ -27,7 +27,7 @@ from lib import (
     Frequency,
     ImageFormat
 )
-from buoys.database import database
+from buoys.database import db
 from buoys.firmware import firmware
 from buoys.locations import locations
 from buoys.qartod import (
@@ -49,6 +49,7 @@ from buoys.options import (
     figure_size,
     read_campbell_logger_files,
     filter_buoy_flat_files,
+    load_and_subset_multifile_table,
     DATA_DIR,
     FIGURES_DIR,
     EXPORT_DIR
@@ -113,7 +114,7 @@ def file_group():
 
 
 # Subcommands assignment, alphabetical order
-buoys.add_command(database)
+buoys.add_command(db)
 buoys.add_command(file_group)
 buoys.add_command(firmware)
 buoys.add_command(plot)
@@ -147,39 +148,11 @@ def buoys_file_describe(name: StationName, table: TableName):
     summary = df.describe().T.drop(columns=["25%", "75%", "std"])
     # Add Median Absolute Deviation
     mad = df.select_dtypes(include="number").apply(
-         lambda x: median_abs_deviation(x, nan_policy="omit")
+        lambda x: median_abs_deviation(x, nan_policy="omit")
     )
     summary["MAD"] = mad
     print("\nSamples:\n")
     print(summary)
-
-
-def load_and_subset_multifile_table(
-    name: StationName,
-    table: TableName,
-    start: Optional[datetime],
-    end: Optional[datetime],
-    omit: Optional[list[str|tuple[str, str]]] = None,
-) -> tuple[DataFrame, list]:
-    """
-    Load and subset a multi-file table for a given station and table name, returning
-    a DataFrame with data between the specified start and end dates.
-    """
-    simplefilter(action="ignore", category=PerformanceWarning)
-    files = filter_buoy_flat_files(name, table)
-    df = read_campbell_logger_files(list(files))
-    if omit is not None:
-        df = df.drop(columns=omit, errors="ignore")
-    _end = end if end is not None else datetime.now()
-    mask = (df.index <= _end)
-    if start is not None:
-        mask &= (df.index > start)
-    df = df[mask].sort_values("TimeRecovered").drop(columns=["TimeRecovered"], errors="ignore")
-    duplicates = df.index.duplicated(keep="first")
-    dropped = df[duplicates].index.to_list()
-    df = df[~duplicates].sort_index(kind="stable")
-    resampled = df.asfreq("h")  # Resample and fill gaps with NaN to force gaps when plotting
-    return resampled, dropped
 
 
 def format_column_name_with_units(col: str) -> str:
@@ -219,9 +192,8 @@ def buoys_file_export(
     flag: int
 ):
     """
-    Export buoy data to a different format.
+    Export buoy data to a CSV with single header row.
     """
-    
     sonde, _ = load_and_subset_multifile_table(name, TableName.SONDE, None, None)
     diagnostic, _ = load_and_subset_multifile_table(name, TableName.DIAGNOSTIC, None, None)
     df = sonde.drop(columns=["RECORD"]).join(diagnostic, how="left")[[
@@ -238,7 +210,7 @@ def buoys_file_export(
     df.index.rename("time", inplace=True)
     unit_names = list(map(format_column_name_with_units, df.columns))
     std_names = list(map(format_column_standard_name, df.columns))
-    df.columns = std_names
+    df.columns = std_names  # use standard names for quality checks
     config_key_value = load_and_merge_qa_configs(qartod)
     qa = run_qartod_tests(df, config_key_value)
     for group in qa.groups.keys():

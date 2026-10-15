@@ -2,12 +2,9 @@
 Firmware CLI command tests.
 """
 
-from click.testing import CliRunner
 from buoys.firmware import buoys_firmware_template
 from buoys.options import StationName
-from buoys.test_buoys import by_station
-
-runner = CliRunner()
+from buoys.test_buoys import by_station, runner
 
 
 @by_station

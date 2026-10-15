@@ -19,12 +19,22 @@ function timingSafeEqual(a, b) {
   return result === 0;
 }
 
-function parseRecord(record, fields) {
+// Still need to handle "NAN" values in the InfluxDB line protocol, and
+// tags
+function formatInfluxLine(measurement, station_name, record, fields) {
   const time = new Date(record.time).getTime(); // Convert to milliseconds
-  const parts = record.vals.filter(val => val !== "NAN").map((val, index) => {
+  const tags = {
+    ...environment,
+    "station_name": environment.station_name.toLowerCase(),
+    "DataloggerOSVersion": null,
+    "Ai1OSVersion": null
+  };
+  const parts = record.vals.map((val, index) => {
+    if (val === "NAN") return "";
     return `${fields[index]}=${val}`;
-  });
-  return `${parts.join(",")} ${time}`;
+  }).filter(part => part !== "");
+  const tagString = Object.entries(tags).map(([key, value]) => `${key}=${value}`).join(","); 
+  return `${measurement},${tagString} ${parts.join(",")} ${time}`;
 }
 
 function parseCRMessage(body) {
@@ -32,19 +42,25 @@ function parseCRMessage(body) {
     const endMarker = "----CSIBoundary----";
     const startIndex = body.indexOf(startMarker);
     const endIndex = body.indexOf(endMarker, startIndex);
-    
+
     if (startIndex === -1 || endIndex === -1) {
       const message = "Invalid format: CSI payload not found.";
       throw new Error(message);
     }
-    
+
     const jsonString = body.substring(startIndex + startMarker.length, endIndex).trim();
     const csiData = JSON.parse(jsonString);
     const environment = csiData.head.environment;
     const station_name = environment.station_name.toLowerCase();
-    const measurement = environment.table_name.toLowerCase();
+    const measurement = environment.table_name;
     const fields = csiData.head.fields.map(field => field.name);
-    const lines = csiData.data.map(record => `${measurement},device=${station_name} ` + parseRecord(record, fields)).join("\n");
+    const tags = {
+      "station_name": environment.station_name.toLowerCase(),
+      ...environment,
+      "DataloggerOSVersion": "",
+      "Ai1OSVersion": ""
+    };
+    const lines = csiData.data.map(record => formatInfluxLine(measurement, station_name, record, fields)).join("\n");
     return lines;
 }
 
@@ -53,10 +69,10 @@ export default {
     if (request.method !== "POST") {
       return new Response("POST only", { status: 405 });
     }
-    // const ttnAuthHeader = request.headers.get("X-TTN-Secret");
-    // if (!ttnAuthHeader || !timingSafeEqual(ttnAuthHeader, env.WEBHOOK_SECRET)) {
-    //   return new Response("Unauthorized", { status: 401 });
-    // }
+    const ttnAuthHeader = request.headers.get("X-TTN-Secret");
+    if (!ttnAuthHeader || !timingSafeEqual(ttnAuthHeader, env.WEBHOOK_SECRET)) {
+      return new Response("Unauthorized", { status: 401 });
+    }
     try {
       const body = await request.text();
       const line = parseCRMessage(body);
@@ -68,6 +84,9 @@ export default {
         },
         body: line
       });
+      if (!result.ok) {
+        return new Response("Failed to write to InfluxDB", { status: 500 });
+      }
       return new Response("Ok", { status: 200 });
     } catch (err) {
       console.error("Error processing request:", err);
@@ -75,5 +94,3 @@ export default {
     }
   }
 };
-
-// parseCRMessage(EXAMPLE_CSI_PAYLOAD);
