@@ -3,10 +3,13 @@ Common imports used in nested commands and the top-level group.
 """
 
 from enum import StrEnum, auto
+from warnings import simplefilter
+from typing import Optional
 from pathlib import Path
 from datetime import datetime
 from click import argument, Choice, option
 from pandas import read_csv, DataFrame, concat
+from pandas.errors import PerformanceWarning
 from lib.geo import FeatureOfInterest
 
 
@@ -156,3 +159,31 @@ def filter_buoy_flat_files(name: StationName, table: TableName):
         return station_match and table_match
 
     return filter(filter_prefix, DATA_DIR.glob("*.dat"))
+
+
+def load_and_subset_multifile_table(
+    name: StationName,
+    table: TableName,
+    start: Optional[datetime],
+    end: Optional[datetime],
+    omit: Optional[list[str|tuple[str, str]]] = None,
+) -> tuple[DataFrame, list]:
+    """
+    Load and subset a multi-file table for a given station and table name, returning
+    a DataFrame with data between the specified start and end dates.
+    """
+    simplefilter(action="ignore", category=PerformanceWarning)
+    files = filter_buoy_flat_files(name, table)
+    df = read_campbell_logger_files(list(files))
+    if omit is not None:
+        df = df.drop(columns=omit, errors="ignore")
+    _end = end if end is not None else datetime.now()
+    mask = (df.index <= _end)
+    if start is not None:
+        mask &= (df.index > start)
+    df = df[mask].sort_values("TimeRecovered").drop(columns=["TimeRecovered"], errors="ignore")
+    duplicates = df.index.duplicated(keep="first")
+    dropped = df[duplicates].index.to_list()
+    df = df[~duplicates].sort_index(kind="stable")
+    resampled = df.asfreq("h")  # Resample and fill gaps with NaN to force gaps when plotting
+    return resampled, dropped
