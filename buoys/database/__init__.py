@@ -20,6 +20,9 @@ from buoys.options import (
     station_name,
     data_table,
     read_single_campbell_logger_file,
+    parse_environment,
+    fill_metadata,
+    Tags
 )
 
 
@@ -41,15 +44,6 @@ def db_options(function):
     return function
 
 
-class Source(StrEnum):
-    """
-    To help with determining the source format of each row in the database.
-    """
-
-    TOA5 = auto()
-    CSIJSON = auto()
-
-
 class DatabaseCommands(StrEnum):
     """
     Group and commands for interacting with the buoy database.
@@ -61,24 +55,6 @@ class DatabaseCommands(StrEnum):
     DELETE = auto()
     CREATE = auto()
     DIFF = auto()
-
-
-class Tags(StrEnum):
-    """
-    Metadata fields derived from first line of data file.
-    """
-    # Tag constants
-    STATION_NAME = auto()
-    TABLE_NAME = auto()
-    MODEL = auto()
-    SERIAL_NO = auto()
-    OS_VERSION = auto()
-    PROG_NAME = auto()
-    SOURCE = auto()
-    # Tag columns
-    DATALOGGER_OS_VERSION = "DataloggerOSVersion"
-    AI1_OS_VERSION = "Ai1OSVersion"
-    SERIAL_NUMBER = "SerialNumber"
 
 
 @group(name=DatabaseCommands.DATABASE)
@@ -101,18 +77,6 @@ def buoys_db_create(**kwargs):
         raise ClickException(create_response.text)
 
 
-def parse_environment(filepath: Path):
-    """
-    Parse the environment variables for InfluxDB connection.
-    """
-    if not filepath.exists():
-        raise FileNotFoundError(f"File '{filepath}' does not exist.")
-    with open(filepath, "r", encoding="utf-8") as fid:
-        metadata_line = fid.readline().strip()
-        metadata = [item.strip('"') for item in metadata_line.split(",")]
-    return metadata
-
-
 @db.command(name=DatabaseCommands.UPLOAD)
 @argument("filename")
 @db_options
@@ -120,37 +84,12 @@ def buoys_db_upload(filename: str, **kwargs):
     """
     Upload a single CSV file to database using the Influx client.
     """
-    filepath = Path(filename)
-    [
-        source,  # file format, not in CSIJSON payload
-        _station_name,
-        model,
-        serial_no,
-        os_version,
-        prog_name,
-        _,  # signature, not in CSIJSON payload
-        table_name,
-    ] = parse_environment(filepath)
-    if source != Source.TOA5:
-        raise ValueError(f"Unsupported file format '{source}'")
-    if table_name not in filename:
-        raise ValueError(f"Table '{table_name}' does not match filename '{filename}'")
-    if _station_name not in filename:
-        raise ValueError(f"Station '{_station_name}' does not match filename '{filename}'")
-
+    file = Path(filename)
+    df = read_single_campbell_logger_file(file)
+    table_name = fill_metadata(df, file)
     index = "index"  # can't use "time" as name of index col
-    df = read_single_campbell_logger_file(filepath)
-    df.columns = [key[0] for key in df.columns]
     df.index.name = index
-
-    df[Tags.SOURCE] = source
-    df[Tags.STATION_NAME] = _station_name.lower()  # normalize station name
-    df[Tags.MODEL] = model
-    df[Tags.SERIAL_NO] = serial_no
-    df[Tags.OS_VERSION] = os_version
-    df[Tags.PROG_NAME] = prog_name
-    # don't need signature, table_name
-
+    df.columns = [key[0] for key in df.columns]
     InfluxDBClient3(**kwargs).write_dataframe(
         df.reset_index(),
         measurement=table_name,
@@ -173,14 +112,13 @@ def buoys_db_diff(filename: str, **kwargs):
     metadata = parse_environment(filepath)
     query = f"""
         SELECT * FROM "{metadata[7]}"
-        WHERE "{Tags.PROG_NAME}" == '{metadata[5]}'
-            AND "{Tags.STATION_NAME}" == '{metadata[1].lower()}'
-            AND "{Tags.SERIAL_NO}" == '{metadata[3]}'
+        WHERE "{Tags.PROG_NAME}" = '{metadata[5]}'
+            AND "{Tags.STATION_NAME}" = '{metadata[1]}'
+            AND "{Tags.SERIAL_NO}" = '{metadata[3]}'
         ORDER BY "{time}" ASC;
         """
     result = client.query(query, mode="pandas")
     read_back = cast(DataFrame, result)
-    print(query)
     df = read_single_campbell_logger_file(filepath)
     in_db = len(read_back)
     in_csv = len(df)
@@ -214,7 +152,7 @@ def buoys_db_describe(name: StationName, table: TableName, limit: int, **kwargs)
         mode="pandas",
     )
     read_back = cast(DataFrame, result)
-    print(read_back.describe())
+    echo(read_back.describe())
 
 
 def delete_bucket_by_name(database: str, host: str, token: str, org: str):

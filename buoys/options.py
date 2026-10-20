@@ -6,7 +6,8 @@ from enum import StrEnum, auto
 from warnings import simplefilter
 from typing import Optional
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from click import argument, Choice, option
 from pandas import read_csv, DataFrame, concat
 from pandas.errors import PerformanceWarning
@@ -50,6 +51,7 @@ class TableName(StrEnum):
 
     DIAGNOSTIC = "Ai1"
     SONDE = "SondeValues"
+    ANEMOMETER = "WindUltra"
 
 
 class VendoredNames(StrEnum):
@@ -70,6 +72,33 @@ class VendoredNames(StrEnum):
     LATITUDE = "Latitude"
     LONGITUDE = "Longitude"
     SATELLITES_IN_VIEW = "GPSSatellitesInView"
+
+
+class Source(StrEnum):
+    """
+    To help with determining the source format of each row in the database.
+    """
+
+    TOA5 = "TOA5"
+    CSIJSON = "CSIJSON"
+
+
+class Tags(StrEnum):
+    """
+    Metadata fields derived from first line of data file.
+    """
+    # Tag constants from CSI environment line
+    STATION_NAME = auto()
+    TABLE_NAME = auto()
+    MODEL = auto()
+    SERIAL_NO = auto()
+    OS_VERSION = auto()
+    PROG_NAME = auto()
+    SOURCE = auto()
+    # Tag columns
+    DATALOGGER_OS_VERSION = "DataloggerOSVersion"
+    AI1_OS_VERSION = "Ai1OSVersion"
+    SERIAL_NUMBER = "SerialNumber"
 
 
 class StandardNames(StrEnum):
@@ -125,13 +154,79 @@ def figure_size(default_size: tuple[float, float]):
     return decorator
 
 
-def read_single_campbell_logger_file(file: Path) -> DataFrame:
+def parse_environment(file: Path):
     """
-    Read a single Campbell logger file and return a DataFrame.
+    Parse the environment variables for InfluxDB connection.
+    """
+    if not file.exists():
+        raise FileNotFoundError(f"File '{file}' does not exist.")
+    with open(file, "r", encoding="utf-8") as fid:
+        metadata_line = fid.readline().strip()
+        metadata = [item.strip('"') for item in metadata_line.split(",")]
+    return metadata
+
+
+def fill_metadata(df: DataFrame, file: Path) -> TableName:
+    """
+    Add columns to the dataframe for the metadata extracted from the
+    header environment. After this step the resulting dataframe should
+    be identical to what is stored in the database.
+    """
+    # pylint: disable=redefined-outer-name
+    [
+        source,  # file format, not in CSIJSON payload
+        station_name,
+        model,
+        serial_no,
+        os_version,
+        prog_name,
+        _,  # signature, not in CSIJSON environment payload
+        table_name,
+    ] = parse_environment(file)
+    if source != Source.TOA5:
+        raise ValueError(f"Unsupported file format '{source}'")
+    if table_name not in file.stem:
+        raise ValueError(f"Table '{table_name}' does not match filename '{file.name}'")
+    if station_name not in file.stem:
+        raise ValueError(f"Station '{station_name}' does not match filename '{file.name}'")
+    df[(Tags.SOURCE, "", "")] = source
+    df[(Tags.STATION_NAME, "", "")] = station_name
+    df[(Tags.MODEL, "", "")] = model
+    df[(Tags.SERIAL_NO, "", "")] = serial_no
+    df[(Tags.OS_VERSION, "", "")] = os_version
+    df[(Tags.PROG_NAME, "", "")] = prog_name
+    return TableName(table_name)
+
+def read_single_campbell_logger_file(
+    file: Path
+) -> DataFrame:
+    """
+    Read a single Campbell logger file and return a DataFrame. The time
+    is assumed to be EST with Daylight Saving Time adjustments. Based 
+    on when the data was recorded, the whole series is shifted and 
+    update to be UTC time.
     """
     df = read_csv(file, header=[1, 2, 3], na_values=["NAN"], parse_dates=[0])
     ts_col = df.columns[0]
-    return df.set_index(ts_col)
+    df.set_index(ts_col, inplace=True)
+    start: datetime = df.index.min()
+    start_tz: ZoneInfo = ZoneInfo("America/New_York")
+    delta: timedelta = start.tz_localize(start_tz).dst()
+    df.index = (df.index - delta).tz_localize("EST").tz_convert("UTC")
+
+    # Add metadata column to be able to select overlapping data later without a join
+    try:
+        time_recovered_str = file.stem.split("_")[2]
+        time_recovered = datetime.strptime(time_recovered_str, "%Y-%m-%dT%H-%M")
+    except (IndexError, ValueError) as exc:
+        msg = f"Filename '{file.name}' does not contain a valid recovery time"
+        raise ValueError(msg) from exc
+    utc_recovered = (time_recovered - delta).tz_localize("EST").tz_convert("UTC")
+    if utc_recovered < df.index.max():
+        raise ValueError(f"Recovered time '{utc_recovered}' is before EOF in '{file.name}'")
+    df["TimeRecovered"] = utc_recovered
+
+    return df
 
 
 def read_campbell_logger_files(files: list[Path]) -> DataFrame:
@@ -141,9 +236,6 @@ def read_campbell_logger_files(files: list[Path]) -> DataFrame:
     all_data = []
     for file in sorted(files):
         df = read_single_campbell_logger_file(file)
-        # Add metadata column to be able to select overlapping data later without a join
-        time_recovered = file.stem.split("_")[2]
-        df["TimeRecovered"] = datetime.strptime(time_recovered, "%Y-%m-%dT%H-%M")
         all_data.append(df)
     return concat(all_data).dropna(how="all", axis=1)
 
