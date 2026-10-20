@@ -7,12 +7,12 @@ tests will fail due to a system exit event.
 import pytest
 from click.testing import CliRunner
 from buoys import buoys_names, buoys_file_describe, buoys_file_export, buoys_plot_tail, TestTypes
-from buoys.options import StationName, TableName
+from buoys.options import DATA_DIR, StationName, TableName, read_campbell_logger_files, filter_buoy_flat_files
 
 
-by_station = pytest.mark.parametrize("name", StationName)
+by_station = pytest.mark.parametrize("name", tuple(StationName))
 by_observed_property = pytest.mark.parametrize("observed_property", ["sea_water_salinity", "sea_water_temperature", "sea_water_chlorophyll_rfu", "sea_water_phycoerythrin_rfu"])
-by_qartod_test = pytest.mark.parametrize("qartod_test", [each for each in set(TestTypes) if each != TestTypes.GAP])
+by_qartod_test = pytest.mark.parametrize("qartod_test", [each for each in tuple(TestTypes) if each != TestTypes.GAP])
 runner = CliRunner()
 
 
@@ -26,7 +26,7 @@ def test_cli_buoys_file_list():
     assert "Wynken" in result.output
 
 @by_station
-@pytest.mark.parametrize("table", TableName)
+@pytest.mark.parametrize("table", tuple(TableName))
 def test_cli_buoys_file_describe(name: StationName, table: TableName):
     """
     Expect command line output
@@ -35,7 +35,7 @@ def test_cli_buoys_file_describe(name: StationName, table: TableName):
     assert result.exit_code == 0
 
 @by_station
-@pytest.mark.parametrize("table", TableName)
+@pytest.mark.parametrize("table", tuple(TableName))
 def test_cli_buoys_file_export(name: StationName, table: TableName):
     """
     Expect files to be written to disk

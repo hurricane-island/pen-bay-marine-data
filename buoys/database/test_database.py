@@ -2,10 +2,10 @@
 Tests for the buoy database commands.
 """
 
+from pathlib import Path
 from click.testing import CliRunner
 from pytest import mark
 from buoys.options import StationName, TableName, DATA_DIR
-from pathlib import Path
 from buoys.database import (
     buoys_db_create,
     buoys_db_delete,
@@ -15,6 +15,7 @@ from buoys.database import (
 )
 
 runner = CliRunner()
+data_files = tuple(DATA_DIR.glob("*.dat"))
 
 DATABASE_NAME = "buoys-test"
 
@@ -27,7 +28,7 @@ def test_cli_buoys_db_create():
     assert result.exit_code == 0, f"Create failed with output: {result.output}"
 
 
-@mark.parametrize("filename", DATA_DIR.glob("*.dat"))
+@mark.parametrize("filename", data_files)
 def test_cli_buoys_db_upload_file(filename: Path):
     """
     Test the CLI command for uploading buoy data to the database.
@@ -37,7 +38,7 @@ def test_cli_buoys_db_upload_file(filename: Path):
         result.exit_code == 0
     ), f"Upload failed for file {filename} with output: {result.output}"
 
-@mark.parametrize("filename", DATA_DIR.glob("*.dat"))
+@mark.parametrize("filename", data_files)
 def test_cli_buoys_db_diff_file(filename: Path):
     """
     Test the CLI command for diffing buoy data against the database.
@@ -47,8 +48,8 @@ def test_cli_buoys_db_diff_file(filename: Path):
         result.exit_code == 0
     ), f"Diff failed for file {filename} with output: {result.output}"
 
-@mark.parametrize("name", StationName)
-@mark.parametrize("table", TableName)
+@mark.parametrize("name", tuple(StationName))
+@mark.parametrize("table", tuple(TableName))
 def test_cli_buoys_db_describe(name: StationName, table: TableName):
     """
     Test the CLI command for describing the buoy database.
